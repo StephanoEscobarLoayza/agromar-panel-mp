@@ -113,15 +113,36 @@ igual que silo: sin conteo de unidades, el kg se estima a ojo). La columna
 "UBICACIÓN" de la hoja ("Silo 1", "Silo 2", "tolva"...) se guarda tal cual
 en `lotes.ubicacion`, solo informativo.
 
+## Sincronización con Trazabilidad (corridas)
+
+`sync_corridas.py` trae las corridas ya documentadas desde
+"Trazabilidad Nar 2026.xlsx" (una hoja por corrida) hacia la tabla
+`corridas`. Solo trae la cabecera (nombre = nombre de la hoja, tipo de
+proceso, fecha inicio/fin, MP kg, rendimiento, brix promedio) — no los
+lotes individuales de cada corrida. Corrida:
+
+```
+python sync_corridas.py "C:\ruta\a\Trazabilidad Nar 2026.xlsx"
+```
+
+Como la posición de las etiquetas ("MP kg", "Rendimiento", etc.) varía de
+hoja en hoja, el script las busca por nombre en la columna B en vez de
+por número de fila fijo. También lee la fecha real del contenido de cada
+hoja (no la infiere del nombre) — varias corridas tienen el nombre con un
+día distinto al que en verdad procesaron (cruzan medianoche), y esto ya lo
+resuelve solo.
+
+Todas las corridas que trae quedan `estado='cerrada'` — Trazabilidad
+documenta lo que ya pasó, nunca lo que está en curso ahora mismo (eso se
+crea directo desde la app, ver "Nueva corrida" en `web/index.html`).
+
 ## Próximos pasos sugeridos
 
 1. ~~Levantar Postgres y correr `schema.sql`~~ — hecho (Neon).
 2. ~~Sincronizar lotes desde Google Sheets~~ — hecho, ver arriba.
-3. Sincronizar `corridas`: leer las hojas de corrida de Trazabilidad Nar
-   2026.xlsx → poblar `corridas` (nombre, fecha_inicio, fecha_final,
-   mp_kg_objetivo) — para las corridas ya cerradas/documentadas. Las
-   corridas nuevas se crean directo desde la app cuando arrancan (sin
-   `mp_kg_objetivo` todavía, ver nota de flujo de trabajo en el código de
-   `web/index.html`).
-4. Considerar correr `sync_lotes.py` automáticamente cada cierto tiempo
-   (cron / tarea programada) en vez de a mano.
+3. ~~Sincronizar corridas desde Trazabilidad~~ — hecho, ver arriba.
+4. Considerar correr `sync_lotes.py` y `sync_corridas.py` automáticamente
+   cada cierto tiempo (cron / tarea programada) en vez de a mano.
+5. Opcional: importar también las asignaciones lote↔corrida históricas
+   desde las filas de detalle de cada hoja de Trazabilidad (por ahora solo
+   se trae la cabecera).
