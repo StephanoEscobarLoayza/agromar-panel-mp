@@ -212,8 +212,12 @@ async function cargar() {
       cont.innerHTML = corridas.map(corridaCard).join("");
     }
 
-    const activas = corridas.filter(c => c.fecha_final === null || c.estado_cuadre === "sin_objetivo" || c.estado_cuadre === "incompleto");
-    const enCurso = corridas.find(c => c.estado_cuadre === "sin_objetivo");
+    // "Activa" = literalmente sigue abierta ahora mismo (sin fecha_final).
+    // Antes tambien contaba corridas viejas "incompletas" por inconsistencias
+    // de Trazabilidad, lo que inflaba el numero sin que hubiera nada corriendo
+    // de verdad (Stephano lo noto: "si solo hay una corrida ahorita").
+    const activas = corridas.filter(c => c.fecha_final === null);
+    const enCurso = activas[0];
     const kgHoy = enCurso ? enCurso.kg_asignados_total : (corridas[0] ? corridas[0].kg_asignados_total : 0);
 
     // MP procesada: usa el objetivo de Trazabilidad cuando ya se documento
@@ -221,13 +225,19 @@ async function cargar() {
     // todavia no tienen objetivo (en curso o recien cerradas).
     const mpProcesada = corridas.reduce((suma, c) => suma + Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0), 0);
 
+    // "Lotes con saldo" se basa en el estado real del Sheet de recepcion
+    // (EN PROCESO / EN ESPERA = sigue en planta), no en el kg_saldo calculado
+    // por la app - ese arrastra saldo residual de lotes viejos que en la
+    // practica ya no estan (inconsistencias historicas de Trazabilidad que
+    // el backfill dejo marcadas para revisar, no lotes fisicos presentes).
     const lotesData = await apiGet("/api/lotes");
-    const conSaldo = lotesData.filter(l => l.kg_saldo > 0.01);
+    const normEstado = e => (e || "").trim().toUpperCase();
+    const enPlanta = lotesData.filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_fuente)));
 
     document.getElementById("kpis").innerHTML = `
-      <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${enCurso ? "incl. 1 en curso" : "de " + corridas.length + " totales"}</div></div>
+      <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${activas.length > 0 ? "en curso ahora" : "ninguna en curso"}</div></div>
       <div class="kpi"><div class="kpi-label">${enCurso ? "Kg registrados hoy" : "Kg asignados (última)"}</div><div class="kpi-value num citrus">${fmtKg(kgHoy)}</div><div class="kpi-note">${enCurso ? escapeHtml(enCurso.nombre) : ""}</div></div>
-      <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${conSaldo.length}</div><div class="kpi-note">de ${lotesData.length} en catálogo</div></div>
+      <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${enPlanta.length}</div><div class="kpi-note">en proceso o en espera</div></div>
       <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, todas las corridas</div></div>
     `;
   } catch (e) {
