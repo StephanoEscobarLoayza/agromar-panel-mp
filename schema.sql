@@ -185,7 +185,8 @@ SELECT
         WHEN ABS(c.mp_kg_objetivo - COALESCE(SUM(a.kg_asignados), 0)) < 1 THEN 'cuadra'
         WHEN COALESCE(SUM(a.kg_asignados), 0) > c.mp_kg_objetivo THEN 'excedido'
         ELSE 'incompleto'
-    END AS estado_cuadre
+    END AS estado_cuadre,
+    c.tipo_proceso
 FROM corridas c
 LEFT JOIN asignaciones a ON a.corrida_id = c.id
-GROUP BY c.id, c.nombre, c.fecha_inicio, c.fecha_final, c.mp_kg_objetivo;
+GROUP BY c.id, c.nombre, c.fecha_inicio, c.fecha_final, c.mp_kg_objetivo, c.tipo_proceso;

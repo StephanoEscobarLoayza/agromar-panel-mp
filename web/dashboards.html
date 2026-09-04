@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboards · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <a href="index.html">Corridas</a>
+        <a href="registrar.html">Registrar consumo</a>
+        <a href="lotes.html">Lotes</a>
+        <a href="dashboards.html" class="active">Dashboards</a>
+        <a href="sincronizar.html">Sincronizar</a>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Dashboards</h1>
+    <p class="hero-sub">Toda la campaña, de un vistazo.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+  <div class="kpis-3" id="kpis"><div class="empty">Cargando…</div></div>
+
+  <section>
+    <div class="section-head">
+      <h2>MP procesada por corrida</h2>
+      <span class="hint">de la más antigua a la más reciente — pasa el mouse sobre una barra</span>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="viz-wrap">
+          <div class="chart-scroll" id="chartCorridas"><div class="empty">Cargando…</div></div>
+          <div class="viz-tooltip" id="tipCorridas"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="split">
+    <div class="panel">
+      <div class="panel-head"><h3>MP por tipo de proceso</h3></div>
+      <div class="panel-body">
+        <div class="stat-row" id="porTipo"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Lotes por estado</h3></div>
+      <div class="panel-body">
+        <div class="stat-row" id="porEstado"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const TIPO_ORDEN = [
+  { key: "JSA", label: "JSA Aseptic", clase: "series-1" },
+  { key: "JCC", label: "JCC", clase: "series-2" },
+  { key: "JSC", label: "JSC", clase: "series-3" },
+  { key: "ICEGEN", label: "ICEGEN", clase: "series-4" },
+  { key: "OTRO", label: "Otro", clase: "series-otro" },
+];
+
+const ESTADO_ORDEN = [
+  { key: "EN ESPERA", label: "En espera", var: "--warn" },
+  { key: "EN PROCESO", label: "En proceso", var: "--ok" },
+  { key: "PROCESADO", label: "Procesado", var: "--text-muted" },
+];
+
+function normEstado(e) { return (e || "").trim().toUpperCase(); }
+
+function mpDeCorrida(c) {
+  return Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0);
+}
+
+// ---------- barra vertical con tooltip (SVG) ----------
+function renderBarChartCorridas(corridas) {
+  const cont = document.getElementById("chartCorridas");
+  const tip = document.getElementById("tipCorridas");
+  const datos = corridas
+    .slice()
+    .sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio))
+    .map(c => ({ nombre: c.nombre, valor: mpDeCorrida(c) }));
+
+  if (datos.length === 0) {
+    cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
+    return;
+  }
+
+  const barWidth = 14, gap = 6, height = 220, padTop = 10;
+  const chartHeight = height - padTop;
+  const max = Math.max(...datos.map(d => d.valor), 1);
+  const width = datos.length * (barWidth + gap) + gap;
+
+  const bars = datos.map((d, i) => {
+    const h = Math.max(2, (d.valor / max) * (chartHeight - padTop));
+    const x = gap + i * (barWidth + gap);
+    const y = chartHeight - h;
+    return `<rect class="viz-bar" x="${x}" y="${y}" width="${barWidth}" height="${h}" rx="4"
+      data-label="${escapeHtml(d.nombre)}" data-valor="${d.valor}"></rect>`;
+  }).join("");
+
+  cont.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+      ${bars}
+      <line class="viz-baseline" x1="0" y1="${chartHeight}" x2="${width}" y2="${chartHeight}"></line>
+    </svg>
+  `;
+
+  cont.querySelectorAll(".viz-bar").forEach(bar => {
+    const mover = (e) => {
+      const rect = cont.getBoundingClientRect();
+      tip.style.left = (e.clientX - rect.left + cont.scrollLeft) + "px";
+      tip.style.top = (e.clientY - rect.top) + "px";
+    };
+    bar.addEventListener("mouseenter", (e) => {
+      tip.innerHTML = `${escapeHtml(bar.dataset.label)}<br><b>${fmtKg(Number(bar.dataset.valor))} kg</b>`;
+      tip.classList.add("show");
+      mover(e);
+    });
+    bar.addEventListener("mousemove", mover);
+    bar.addEventListener("mouseleave", () => tip.classList.remove("show"));
+  });
+
+  // deja la vista donde esta lo mas reciente
+  cont.scrollLeft = cont.scrollWidth;
+}
+
+// ---------- barras horizontales (categoria + valor) ----------
+function statBarRow(label, valor, max, colorVar) {
+  const pct = max > 0 ? Math.max(2, (valor / max) * 100) : 0;
+  return `
+    <div class="stat-bar-row">
+      <div class="stat-bar-label">${escapeHtml(label)}</div>
+      <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;background:var(${colorVar})"></div></div>
+      <div class="stat-bar-value num">${valor}</div>
+    </div>
+  `;
+}
+
+function renderPorTipo(corridas) {
+  const totales = {};
+  for (const t of TIPO_ORDEN) totales[t.key] = 0;
+  for (const c of corridas) {
+    const tipo = TIPO_ORDEN.some(t => t.key === c.tipo_proceso) ? c.tipo_proceso : "OTRO";
+    totales[tipo] += mpDeCorrida(c);
+  }
+  const max = Math.max(...Object.values(totales), 1);
+  const cont = document.getElementById("porTipo");
+  const filas = TIPO_ORDEN
+    .filter(t => totales[t.key] > 0)
+    .map(t => `
+      <div class="stat-bar-row">
+        <div class="stat-bar-label">${t.label}</div>
+        <div class="stat-bar-track"><div class="stat-bar-fill ${t.clase}" style="width:${Math.max(2, (totales[t.key]/max)*100)}%"></div></div>
+        <div class="stat-bar-value num">${fmtKg(totales[t.key])}</div>
+      </div>
+    `);
+  cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
+
+  const leyenda = TIPO_ORDEN.filter(t => totales[t.key] > 0).map(t => `
+    <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(${t.clase === 'series-otro' ? '--text-muted' : '--' + t.clase})"></span>${t.label}</div>
+  `).join("");
+  cont.innerHTML += `<div class="viz-legend">${leyenda}</div>`;
+}
+
+function renderPorEstado(lotes) {
+  const conteo = { "EN ESPERA": 0, "EN PROCESO": 0, "PROCESADO": 0 };
+  for (const l of lotes) {
+    const e = normEstado(l.estado_fuente);
+    if (e in conteo) conteo[e]++;
+  }
+  const max = Math.max(...Object.values(conteo), 1);
+  const cont = document.getElementById("porEstado");
+  cont.innerHTML = ESTADO_ORDEN.map(e => statBarRow(e.label, conteo[e.key], max, e.var)).join("");
+}
+
+async function cargar() {
+  try {
+    const [corridas, lotes] = await Promise.all([apiGet("/api/corridas"), apiGet("/api/lotes")]);
+
+    const mpProcesada = corridas.reduce((suma, c) => suma + mpDeCorrida(c), 0);
+    const conValor = corridas.filter(c => mpDeCorrida(c) > 0);
+    const promedio = conValor.length ? mpProcesada / conValor.length : 0;
+
+    document.getElementById("kpis").innerHTML = `
+      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num citrus">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, toda la campaña</div></div>
+      <div class="kpi"><div class="kpi-label">Corridas</div><div class="kpi-value num">${corridas.length}</div><div class="kpi-note">registradas en total</div></div>
+      <div class="kpi"><div class="kpi-label">Promedio por corrida</div><div class="kpi-value num">${fmtKg(promedio)}</div><div class="kpi-note">kg de MP</div></div>
+    `;
+
+    renderBarChartCorridas(corridas);
+    renderPorTipo(corridas);
+    renderPorEstado(lotes);
+  } catch (e) {
+    document.getElementById("kpis").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+cargar();
+</script>
+</body>
+</html>
