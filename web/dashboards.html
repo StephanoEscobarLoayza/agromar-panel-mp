@@ -50,6 +50,18 @@
     </div>
   </section>
 
+  <section>
+    <div class="section-head">
+      <h2>Ritmo de producción</h2>
+      <span class="hint">MP procesada por semana</span>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="stat-row" id="ritmo"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+  </section>
+
   <section class="split">
     <div class="panel">
       <div class="panel-head"><h3>Promedio de MP por tipo de proceso</h3></div>
@@ -59,11 +71,29 @@
     </div>
 
     <div class="panel">
+      <div class="panel-head"><h3>Top proveedores</h3></div>
+      <div class="panel-body">
+        <div class="stat-row scroll-y" id="porProveedor" style="max-height:280px"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="split">
+    <div class="panel">
       <div class="panel-head"><h3>Lotes por estado</h3></div>
       <div class="panel-body">
         <div class="stat-row" id="porEstado"><div class="empty">Cargando…</div></div>
         <div class="mini-subhead">Lotes con saldo disponible</div>
         <div class="stat-row scroll-y" id="listaSaldo" style="max-height:260px"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Producto terminado</h3></div>
+      <div class="panel-body">
+        <div class="kpis-2" id="kpisProducto"></div>
+        <div class="mini-subhead">Por corrida</div>
+        <div class="stat-row scroll-y" id="porCorridaProducto" style="max-height:260px"><div class="empty">Cargando…</div></div>
       </div>
     </div>
   </section>
@@ -192,9 +222,121 @@ function renderListaSaldo(lotes) {
   )).join("");
 }
 
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+
+function lunesDeLaSemana(fecha) {
+  const d = new Date(fecha);
+  const dia = d.getDay(); // 0 = domingo
+  const ajuste = dia === 0 ? -6 : 1 - dia;
+  d.setDate(d.getDate() + ajuste);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function fmtFechaCorta(d) {
+  return `${String(d.getDate()).padStart(2, "0")} ${MESES_CORTOS[d.getMonth()]}`;
+}
+
+// ---------- ritmo de produccion: MP por semana, orden cronologico (es una tendencia) ----------
+function renderRitmo(corridas) {
+  const semanas = {};
+  for (const c of corridas) {
+    const valor = mpDeCorrida(c);
+    if (valor <= 0) continue;
+    const lunes = lunesDeLaSemana(c.fecha_inicio);
+    const key = lunes.toISOString().slice(0, 10);
+    semanas[key] = (semanas[key] || 0) + valor;
+  }
+  const entradas = Object.entries(semanas).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+  const cont = document.getElementById("ritmo");
+  if (entradas.length === 0) {
+    cont.innerHTML = '<div class="empty">Sin datos.</div>';
+    return;
+  }
+  const max = Math.max(...entradas.map(([, v]) => v), 1);
+  cont.innerHTML = entradas.map(([fecha, valor]) => {
+    const inicio = new Date(fecha);
+    const fin = new Date(inicio);
+    fin.setDate(fin.getDate() + 6);
+    return statBarRow(
+      `${fmtFechaCorta(inicio)} – ${fmtFechaCorta(fin)}`,
+      `${fmtKg(valor)} kg`,
+      Math.max(2, (valor / max) * 100),
+      "background:var(--forest-2)",
+      "110px"
+    );
+  }).join("");
+}
+
+// ---------- top proveedores por volumen de MP entregado ----------
+function renderPorProveedor(lotes) {
+  const totales = {};
+  for (const l of lotes) {
+    const prov = l.proveedor || "—";
+    totales[prov] = (totales[prov] || 0) + Number(l.peso_neto_kg || 0);
+  }
+  const entradas = Object.entries(totales).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const cont = document.getElementById("porProveedor");
+  if (entradas.length === 0) {
+    cont.innerHTML = '<div class="empty">Sin datos.</div>';
+    return;
+  }
+  const max = entradas[0][1] || 1;
+  cont.innerHTML = entradas.map(([prov, valor]) => statBarRow(
+    escapeHtml(prov),
+    `${fmtKg(valor)} kg`,
+    Math.max(2, (valor / max) * 100),
+    "background:var(--citrus)",
+    "170px"
+  )).join("");
+}
+
+// ---------- producto terminado: total + rendimiento, y detalle por corrida ----------
+function renderProductoTerminado(productos) {
+  const kpisCont = document.getElementById("kpisProducto");
+  const listaCont = document.getElementById("porCorridaProducto");
+
+  if (productos.length === 0) {
+    kpisCont.innerHTML = "";
+    listaCont.innerHTML = '<div class="empty">Todavía no hay productos de salida registrados — se completa cuando producción cargue tambores en una corrida (botón "Productos de salida").</div>';
+    return;
+  }
+
+  const ptTotal = productos.reduce((suma, p) => suma + Number(p.pt_kg || 0), 0);
+
+  const porCorrida = {};
+  for (const p of productos) {
+    if (!porCorrida[p.corrida_id]) {
+      porCorrida[p.corrida_id] = { nombre: p.corrida_nombre, fecha: p.fecha_inicio, mpKg: Number(p.mp_kg_objetivo || 0), pt: 0, items: [] };
+    }
+    porCorrida[p.corrida_id].pt += Number(p.pt_kg || 0);
+    porCorrida[p.corrida_id].items.push(`${p.producto} ${fmtKg(p.pt_kg)} kg`);
+  }
+  const filas = Object.values(porCorrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const rendimientos = filas.filter(f => f.mpKg > 0).map(f => f.pt / f.mpKg);
+  const rendimientoProm = rendimientos.length ? rendimientos.reduce((a, b) => a + b, 0) / rendimientos.length : null;
+
+  kpisCont.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Producto terminado</div><div class="kpi-value num citrus">${fmtKg(ptTotal)}</div><div class="kpi-note">kg, toda la campaña</div></div>
+    <div class="kpi"><div class="kpi-label">Rendimiento promedio</div><div class="kpi-value num">${rendimientoProm !== null ? (rendimientoProm * 100).toFixed(1) + "%" : "—"}</div><div class="kpi-note">PT kg / MP kg</div></div>
+  `;
+
+  const max = Math.max(...filas.map(f => f.pt), 1);
+  listaCont.innerHTML = filas.map(f => statBarRow(
+    `${escapeHtml(f.nombre)} <span class="stat-bar-sub">${escapeHtml(f.items.join(" · "))}</span>`,
+    `${fmtKg(f.pt)} kg`,
+    Math.max(2, (f.pt / max) * 100),
+    "background:var(--forest-2)",
+    "170px"
+  )).join("");
+}
+
 async function cargar() {
   try {
-    const [corridas, lotes] = await Promise.all([apiGet("/api/corridas"), apiGet("/api/lotes")]);
+    const [corridas, lotes, productos] = await Promise.all([
+      apiGet("/api/corridas"), apiGet("/api/lotes"), apiGet("/api/productos"),
+    ]);
 
     const mpProcesada = corridas.reduce((suma, c) => suma + mpDeCorrida(c), 0);
     const conValor = corridas.filter(c => mpDeCorrida(c) > 0);
@@ -207,9 +349,12 @@ async function cargar() {
     `;
 
     renderListaCorridas(corridas);
+    renderRitmo(corridas);
     renderPorTipo(corridas);
+    renderPorProveedor(lotes);
     renderPorEstado(lotes);
     renderListaSaldo(lotes);
+    renderProductoTerminado(productos);
   } catch (e) {
     document.getElementById("kpis").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
   }

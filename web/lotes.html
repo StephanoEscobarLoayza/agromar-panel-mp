@@ -69,6 +69,8 @@
   </div>
 </div>
 
+<ul class="csel-popup" id="cselPopup" hidden></ul>
+
 <script src="app.js"></script>
 <script>
 let todos = [];
@@ -89,31 +91,24 @@ function pillClaseEstado(estado) {
   return "neutral";
 }
 
-function estadoSelect(l) {
+function estadoBoton(l) {
   const actual = normEstado(l.estado_actual);
-  const opciones = ESTADOS.map(e =>
-    `<option value="${e}" ${e === actual ? "selected" : ""}>${ESTADO_LABEL[e]}</option>`
-  ).join("");
   const pillClase = pillClaseEstado(actual);
+  const label = ESTADO_LABEL[actual] || l.estado_actual || "—";
   const reset = l.estado_manual
     ? `<button class="btn-link reset-estado" data-lote="${l.numero}" title="Volver al estado del Sheet (${escapeHtml(l.estado_fuente || "—")})">↺</button>`
     : "";
-  return `<span class="edit-inline"><select class="pill-select ${pillClase} estado-select" data-lote="${l.numero}">${opciones}</select>${reset}</span>`;
+  return `<span class="edit-inline"><button type="button" class="csel-btn pill-select ${pillClase}" data-lote="${l.numero}" data-kind="estado">${escapeHtml(label)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
 }
 
-function ubicacionSelect(l) {
+function ubicacionBoton(l) {
   const actualNorm = (l.ubicacion_actual || "").trim().toLowerCase();
   const match = UBICACIONES.find(u => u.toLowerCase() === actualNorm);
-  const opciones = UBICACIONES.map(u =>
-    `<option value="${u}" ${u === match ? "selected" : ""}>${u}</option>`
-  ).join("");
-  const extra = !match && l.ubicacion_actual
-    ? `<option value="" selected>${escapeHtml(l.ubicacion_actual)}</option>`
-    : "";
+  const label = match || l.ubicacion_actual || "—";
   const reset = l.ubicacion_manual
     ? `<button class="btn-link reset-ubicacion" data-lote="${l.numero}" title="Volver a la ubicación del Sheet (${escapeHtml(l.ubicacion || "—")})">↺</button>`
     : "";
-  return `<span class="edit-inline"><select class="ubic-select" data-lote="${l.numero}">${extra}${opciones}</select>${reset}</span>`;
+  return `<span class="edit-inline"><button type="button" class="csel-btn" data-lote="${l.numero}" data-kind="ubicacion">${escapeHtml(label)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
 }
 
 function fila(l) {
@@ -125,8 +120,8 @@ function fila(l) {
       <td>${escapeHtml(l.proveedor)}</td>
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
-      <td>${ubicacionSelect(l)}</td>
-      <td>${estadoSelect(l)}</td>
+      <td>${ubicacionBoton(l)}</td>
+      <td>${estadoBoton(l)}</td>
       <td class="right num">${fmtKg(l.peso_neto_kg)}</td>
       <td class="right num"><span class="saldo-bar"><i style="width:${pct}%"></i></span>${fmtKg(l.kg_saldo)}</td>
       <td class="right num">${l.brix_recepcion ?? "—"}</td>
@@ -174,16 +169,54 @@ document.getElementById("filtroEstado").addEventListener("change", aplicarFiltro
 
 const filasBody = document.getElementById("filas");
 
-filasBody.addEventListener("change", async (ev) => {
-  const numero = ev.target.dataset.lote;
-  if (!numero) return;
+// ---------- dropdown propio (reemplaza el <select> nativo, imposible de
+// personalizar del todo entre navegadores) - una sola lista compartida,
+// position:fixed para no quedar cortada por el scroll de la tabla ----------
+const popup = document.getElementById("cselPopup");
+let cselContext = null; // { numero, kind }
+
+function abrirCsel(btn, numero, kind) {
+  const lote = todos.find(l => l.numero === Number(numero));
+  if (!lote) return;
+
+  let opciones, actual;
+  if (kind === "estado") {
+    opciones = ESTADOS.map(e => ({ value: e, label: ESTADO_LABEL[e] }));
+    actual = normEstado(lote.estado_actual);
+  } else {
+    opciones = UBICACIONES.map(u => ({ value: u, label: u }));
+    const actualNorm = (lote.ubicacion_actual || "").trim().toLowerCase();
+    actual = UBICACIONES.find(u => u.toLowerCase() === actualNorm) || "";
+  }
+
+  popup.innerHTML = opciones.map(o =>
+    `<li data-value="${escapeHtml(o.value)}" class="${o.value === actual ? "csel-selected" : ""}">${escapeHtml(o.label)}</li>`
+  ).join("");
+
+  const r = btn.getBoundingClientRect();
+  popup.style.left = Math.round(r.left) + "px";
+  popup.style.top = Math.round(r.bottom + 4) + "px";
+  popup.style.minWidth = Math.round(r.width) + "px";
+  popup.hidden = false;
+  cselContext = { numero, kind };
+}
+
+function cerrarCsel() {
+  popup.hidden = true;
+  cselContext = null;
+}
+
+popup.addEventListener("click", async (ev) => {
+  const li = ev.target.closest("li[data-value]");
+  if (!li || !cselContext) return;
+  const { numero, kind } = cselContext;
+  const valor = li.dataset.value;
+  cerrarCsel();
   try {
-    if (ev.target.classList.contains("estado-select")) {
-      await apiPost(`/api/lotes/${numero}/estado`, { estado: ev.target.value });
-    } else if (ev.target.classList.contains("ubic-select")) {
-      await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: ev.target.value });
+    if (kind === "estado") {
+      await apiPost(`/api/lotes/${numero}/estado`, { estado: valor });
     } else {
-      return;
+      await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: valor });
     }
     await cargar();
   } catch (e) {
@@ -191,7 +224,22 @@ filasBody.addEventListener("change", async (ev) => {
   }
 });
 
+document.addEventListener("click", (ev) => {
+  if (!cselContext) return;
+  if (ev.target.closest(".csel-popup") || ev.target.closest(".csel-btn")) return;
+  cerrarCsel();
+});
+document.addEventListener("scroll", () => { if (cselContext) cerrarCsel(); }, true);
+window.addEventListener("resize", () => { if (cselContext) cerrarCsel(); });
+
 filasBody.addEventListener("click", async (ev) => {
+  const cselBtn = ev.target.closest(".csel-btn");
+  if (cselBtn) {
+    const mismoAbierto = cselContext && cselContext.numero === cselBtn.dataset.lote && cselContext.kind === cselBtn.dataset.kind;
+    mismoAbierto ? cerrarCsel() : abrirCsel(cselBtn, cselBtn.dataset.lote, cselBtn.dataset.kind);
+    return;
+  }
+
   const btn = ev.target.closest("button[data-lote]");
   if (!btn) return;
   const numero = btn.dataset.lote;

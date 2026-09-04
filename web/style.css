@@ -134,17 +134,33 @@ td.right,th.right{text-align:right}
 .saldo-bar i{display:block;height:100%;background:var(--citrus)}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:6px;background:var(--forest-tint);color:var(--forest-2);font-weight:600}
 
-/* ---------- selects editables en tablas (lotes: estado/ubicación) ---------- */
+/* ---------- dropdown propio para celdas editables (lotes: estado/ubicación) ---------- */
 .edit-inline{display:inline-flex;align-items:center;gap:4px}
-.ubic-select,.pill-select{
-  width:auto;min-width:88px;padding:4px 8px;font-size:12.5px;border-radius:99px;border:1px solid var(--border);
+.csel-btn{
+  width:auto;min-width:88px;padding:4px 10px;font-size:12.5px;border-radius:99px;border:1px solid var(--border);
   background:var(--surface-2);color:var(--text-2);font-family:inherit;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;justify-content:space-between;
 }
-.pill-select{font-weight:600;border:none}
-.pill-select.neutral{background:var(--surface-2);color:var(--text-2)}
-.pill-select.ok{background:var(--ok-bg);color:var(--ok)}
-.pill-select.warn{background:var(--warn-bg);color:var(--warn)}
+.csel-btn:hover{border-color:var(--citrus)}
+.csel-btn:focus-visible{outline:2px solid var(--citrus);outline-offset:1px}
+.csel-arrow{font-size:9px;color:var(--text-muted);flex-shrink:0}
+.csel-btn.pill-select{font-weight:600;border:none}
+.csel-btn.pill-select.neutral{background:var(--surface-2);color:var(--text-2)}
+.csel-btn.pill-select.ok{background:var(--ok-bg);color:var(--ok)}
+.csel-btn.pill-select.warn{background:var(--warn-bg);color:var(--warn)}
+.csel-btn.pill-select .csel-arrow{color:inherit;opacity:.6}
 .edit-inline .btn-link{font-size:13px;line-height:1;padding:2px}
+
+.csel-popup{
+  position:fixed;list-style:none;margin:0;padding:6px;z-index:100;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
+  min-width:120px;max-height:240px;overflow-y:auto;
+}
+.csel-popup li{
+  padding:8px 12px;border-radius:8px;font-size:13px;color:var(--text);cursor:pointer;white-space:nowrap;
+}
+.csel-popup li:hover{background:var(--surface-2)}
+.csel-popup li.csel-selected{background:var(--citrus-tint);color:var(--citrus);font-weight:600}
 
 /* ---------- forms (registrar consumo) ---------- */
 .split{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start}
@@ -181,6 +197,10 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 
 /* ---------- dashboards / charts ---------- */
 .kpis-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kpis-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:6px}
+.kpis-2:empty{display:none}
+.kpis-2 .kpi{padding:14px 16px;box-shadow:none;border:1px solid var(--border)}
+.kpis-2 .kpi-value{font-size:20px}
 .chart-scroll{overflow-x:auto;padding-bottom:4px}
 .chart-scroll svg{display:block}
 .viz-bar{fill:var(--citrus);rx:4}

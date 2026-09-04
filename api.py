@@ -239,6 +239,27 @@ def listar_asignaciones(corrida_id: int):
         return rows(result)
 
 
+@app.get("/api/productos")
+def listar_todos_productos():
+    """Productos de salida de todas las corridas, con el nombre y el MP kg
+    de su corrida ya incluidos - para los dashboards de rendimiento y
+    producto terminado (evita pedir corrida por corrida)."""
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT cp.id, cp.corrida_id, c.nombre AS corrida_nombre, c.fecha_inicio,
+                       c.tipo_proceso, c.mp_kg_objetivo, cp.producto, cp.tambores,
+                       cp.peso_neto_tambor_kg, cp.pt_kg
+                FROM corrida_productos cp
+                JOIN corridas c ON c.id = cp.corrida_id
+                ORDER BY c.fecha_inicio DESC
+                """
+            )
+        )
+        return rows(result)
+
+
 @app.get("/api/corridas/{corrida_id}/productos")
 def listar_productos_corrida(corrida_id: int):
     with engine.connect() as conn:
