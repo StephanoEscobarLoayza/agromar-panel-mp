@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
+from sync_lotes import sincronizar_lotes
+
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
 
@@ -72,6 +74,17 @@ def obtener_lote(numero: int):
         if lote is None:
             raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro. Sincronízalo primero.")
         return lote
+
+
+@app.post("/api/sync/lotes")
+def sync_lotes_endpoint():
+    """Trae los lotes nuevos/actualizados desde el Google Sheet de
+    recepción - lo mismo que hace `python sync_lotes.py`, pero desde un
+    botón en la página en vez de la terminal."""
+    try:
+        return sincronizar_lotes(engine)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"No se pudo sincronizar: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -166,9 +179,11 @@ def listar_asignaciones(corrida_id: int):
             text(
                 """
                 SELECT a.id, a.lote_numero, l.proveedor, a.turno, a.kg_asignados,
-                       a.bines_consumidos, a.tipo_almacen_origen, a.observaciones, a.creado_en
+                       a.bines_consumidos, a.tipo_almacen_origen, a.observaciones, a.creado_en,
+                       v.peso_neto_kg, v.kg_saldo AS saldo_actual_lote
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
+                JOIN v_saldo_lotes v ON v.numero = a.lote_numero
                 WHERE a.corrida_id = :c
                 ORDER BY a.creado_en DESC
                 """

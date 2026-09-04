@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Sincronizar · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <a href="index.html">Corridas</a>
+        <a href="registrar.html">Registrar consumo</a>
+        <a href="lotes.html">Lotes</a>
+        <a href="sincronizar.html" class="active">Sincronizar</a>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Sincronizar</h1>
+    <p class="hero-sub">Trae los lotes nuevos desde el Google Sheet de recepción de camiones.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2;max-width:640px">
+  <div class="panel">
+    <div class="panel-head"><h3>Lotes de recepción</h3></div>
+    <div class="form-body">
+      <p class="hint-line">
+        Trae los lotes nuevos o actualizados desde la hoja de Google Sheets
+        de recepción de camiones ("NJ ORGANICA VAL"). Los lotes que ya
+        existen se actualizan (por ejemplo, uno que estaba "en espera" y
+        ya se pesó); nunca se borra nada.
+      </p>
+      <button class="btn" id="btnSync">Sincronizar ahora</button>
+      <div id="resultado"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const btn = document.getElementById("btnSync");
+const resultado = document.getElementById("resultado");
+
+btn.addEventListener("click", async () => {
+  btn.disabled = true;
+  btn.textContent = "Sincronizando…";
+  resultado.innerHTML = "";
+  try {
+    const r = await apiPost("/api/sync/lotes", {});
+    resultado.innerHTML = `
+      <div class="msg ok">
+        Listo — ${r.insertados} lotes nuevos, ${r.actualizados} actualizados
+        ${r.omitidos ? `, ${r.omitidos} todavía sin pesar (se traen solos cuando ya tengan el peso)` : ""}.
+      </div>`;
+  } catch (e) {
+    resultado.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sincronizar ahora";
+  }
+});
+</script>
+</body>
+</html>

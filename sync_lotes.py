@@ -10,7 +10,11 @@ Se puede correr las veces que haga falta: los lotes que ya existen se
 actualizan (por ejemplo cuando un lote que estaba "EN ESPERA" ya se pesó),
 los nuevos se agregan. Nunca borra nada.
 
-Correr:
+`sincronizar_lotes(engine)` es la función reusable — la usa tanto este
+script por línea de comandos como el botón "Sincronizar" de la página web
+(POST /api/sync/lotes en api.py), para no tener la lógica duplicada.
+
+Correr por línea de comandos:
     python sync_lotes.py
 """
 import csv
@@ -32,12 +36,6 @@ CSV_URL = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq"
     f"?tqx=out:csv&sheet={TAB_NAME.replace(' ', '%20')}"
 )
-
-DATABASE_URL = os.environ.get("DATABASE_URL_POOLED") or os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    raise SystemExit("Falta DATABASE_URL en .env")
-
-engine = create_engine(DATABASE_URL)
 
 # columnas de la hoja, en orden (A..N):
 # UBICACIÓN, LOTE NISIRA, Proveedor, PLACA, MATERIA PRIMA, FECHA INGRESO A
@@ -80,7 +78,10 @@ def tipo_almacen_y_bines(bines_tolva):
         return "SILO", None
 
 
-def main():
+def sincronizar_lotes(engine):
+    """Descarga la hoja y hace upsert en `lotes`. Devuelve un dict con los
+    contadores de resultado (para mostrar en la respuesta de la API o en
+    la salida de consola)."""
     with urllib.request.urlopen(CSV_URL, timeout=30) as resp:
         contenido = resp.read().decode("utf-8")
 
@@ -108,7 +109,7 @@ def main():
 
             # lotes "EN ESPERA" que aun no llegaron/pesaron no tienen estos
             # datos todavia - se importan solos la proxima vez que se corra
-            # este script, una vez que ya los hayan pesado.
+            # esto, una vez que ya los hayan pesado.
             if peso is None or not proveedor or fecha_ingreso is None:
                 omitidos += 1
                 continue
@@ -130,6 +131,7 @@ def main():
                 "ratio": num(ratio_s),
                 "materia_prima": materia_prima.strip() or "NARANJA ORGÁNICA",
                 "ubicacion": ubicacion.strip() or None,
+                "estado_fuente": estado.strip() or None,
             }
 
             resultado = conn.execute(
@@ -138,11 +140,11 @@ def main():
                     INSERT INTO lotes
                         (numero, proveedor, procedencia, placa, fecha_ingreso, tipo_almacen,
                          peso_neto_kg, bines_totales, brix_recepcion, ph_recepcion, acidez,
-                         ratio, materia_prima, ubicacion)
+                         ratio, materia_prima, ubicacion, estado_fuente)
                     VALUES
                         (:numero, :proveedor, :procedencia, :placa, :fecha_ingreso, :tipo_almacen,
                          :peso_neto_kg, :bines_totales, :brix_recepcion, :ph_recepcion, :acidez,
-                         :ratio, :materia_prima, :ubicacion)
+                         :ratio, :materia_prima, :ubicacion, :estado_fuente)
                     ON CONFLICT (numero) DO UPDATE SET
                         proveedor = EXCLUDED.proveedor,
                         procedencia = EXCLUDED.procedencia,
@@ -157,6 +159,7 @@ def main():
                         ratio = EXCLUDED.ratio,
                         materia_prima = EXCLUDED.materia_prima,
                         ubicacion = EXCLUDED.ubicacion,
+                        estado_fuente = EXCLUDED.estado_fuente,
                         actualizado_en = now()
                     RETURNING (xmax = 0) AS es_insercion
                     """
@@ -168,9 +171,18 @@ def main():
             else:
                 actualizados += 1
 
+    return {"insertados": insertados, "actualizados": actualizados, "omitidos": omitidos}
+
+
+def main():
+    DATABASE_URL = os.environ.get("DATABASE_URL_POOLED") or os.environ.get("DATABASE_URL")
+    if not DATABASE_URL:
+        raise SystemExit("Falta DATABASE_URL en .env")
+    engine = create_engine(DATABASE_URL)
+    r = sincronizar_lotes(engine)
     print(
-        f"Listo: {insertados} lotes nuevos, {actualizados} actualizados, "
-        f"{omitidos} omitidos (todavía sin peso/proveedor/fecha - lotes en espera)."
+        f"Listo: {r['insertados']} lotes nuevos, {r['actualizados']} actualizados, "
+        f"{r['omitidos']} omitidos (todavía sin peso/proveedor/fecha - lotes en espera)."
     )
 
 

@@ -23,6 +23,7 @@ CREATE TABLE lotes (
     acidez              NUMERIC(5,2),
     ratio               NUMERIC(6,2),
     ubicacion           TEXT,                 -- "Silo 1", "Silo 2", "Tolva"... (tal cual llega de recepción)
+    estado_fuente       TEXT,                 -- "PROCESADO"/"EN PROCESO"/"EN ESPERA" tal cual llega de recepción
     materia_prima       TEXT NOT NULL DEFAULT 'NARANJA ORGÁNICA',
     creado_en           TIMESTAMPTZ NOT NULL DEFAULT now(),
     actualizado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -128,6 +129,7 @@ SELECT
     l.procedencia,
     l.tipo_almacen,
     l.ubicacion,
+    l.estado_fuente,
     l.fecha_ingreso,
     l.brix_recepcion,
     l.acidez,
@@ -139,7 +141,7 @@ SELECT
     l.bines_totales - COALESCE(SUM(a.bines_consumidos), 0) AS bines_saldo
 FROM lotes l
 LEFT JOIN asignaciones a ON a.lote_numero = l.numero
-GROUP BY l.numero, l.proveedor, l.procedencia, l.tipo_almacen, l.ubicacion, l.fecha_ingreso,
+GROUP BY l.numero, l.proveedor, l.procedencia, l.tipo_almacen, l.ubicacion, l.estado_fuente, l.fecha_ingreso,
          l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales;
 
 CREATE VIEW v_cuadre_corridas AS

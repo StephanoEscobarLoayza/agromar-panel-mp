@@ -22,6 +22,7 @@
         <a href="index.html">Corridas</a>
         <a href="registrar.html" class="active">Registrar consumo</a>
         <a href="lotes.html">Lotes</a>
+        <a href="sincronizar.html">Sincronizar</a>
       </nav>
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
@@ -70,8 +71,8 @@
       <div class="panel-head"><h3>Últimas asignaciones</h3></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th></tr></thead>
-          <tbody id="recientes"><tr><td colspan="3" class="empty">Elige una corrida</td></tr></tbody>
+          <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th><th class="right">Saldo restante</th></tr></thead>
+          <tbody id="recientes"><tr><td colspan="4" class="empty">Elige una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -112,10 +113,15 @@ async function cargarRecientes() {
   if (!corridaId) return;
   const asigs = await apiGet(`/api/corridas/${corridaId}/asignaciones`);
   if (asigs.length === 0) {
-    recientesBody.innerHTML = '<tr><td colspan="3" class="empty">Sin asignaciones todavía</td></tr>';
+    recientesBody.innerHTML = '<tr><td colspan="4" class="empty">Sin asignaciones todavía</td></tr>';
   } else {
     recientesBody.innerHTML = asigs.slice(0, 10).map(a => `
-      <tr><td class="strong num">${a.lote_numero}</td><td class="right num">${fmtKg(a.kg_asignados)}</td><td>${a.turno || ""}</td></tr>
+      <tr>
+        <td class="strong num">${a.lote_numero}</td>
+        <td class="right num">${fmtKg(a.kg_asignados)}</td>
+        <td>${a.turno || ""}</td>
+        <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtKg(a.saldo_actual_lote)}</td>
+      </tr>
     `).join("");
   }
 }
