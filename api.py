@@ -77,7 +77,7 @@ def obtener_lote(numero: int):
 
 
 ESTADOS_VALIDOS = {"PROCESADO", "EN PROCESO", "EN ESPERA"}
-UBICACIONES_VALIDAS = {"Tolva", "Silo 1", "Silo 2", "Bines"}
+UBICACIONES_VALIDAS = {"Tolva", "Silo 1", "Silo 2", "Silo 1 / Silo 2", "Bines"}
 
 
 class ActualizarEstadoLote(BaseModel):

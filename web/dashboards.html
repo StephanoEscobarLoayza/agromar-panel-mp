@@ -41,21 +41,18 @@
   <section>
     <div class="section-head">
       <h2>MP procesada por corrida</h2>
-      <span class="hint">de la más antigua a la más reciente — pasa el mouse sobre una barra</span>
+      <span class="hint">más reciente primero</span>
     </div>
     <div class="panel">
       <div class="panel-body">
-        <div class="viz-wrap">
-          <div class="chart-scroll" id="chartCorridas"><div class="empty">Cargando…</div></div>
-          <div class="viz-tooltip" id="tipCorridas"></div>
-        </div>
+        <div class="stat-row scroll-y" id="chartCorridas"><div class="empty">Cargando…</div></div>
       </div>
     </div>
   </section>
 
   <section class="split">
     <div class="panel">
-      <div class="panel-head"><h3>MP por tipo de proceso</h3></div>
+      <div class="panel-head"><h3>Promedio de MP por tipo de proceso</h3></div>
       <div class="panel-body">
         <div class="stat-row" id="porTipo"><div class="empty">Cargando…</div></div>
       </div>
@@ -65,6 +62,8 @@
       <div class="panel-head"><h3>Lotes por estado</h3></div>
       <div class="panel-body">
         <div class="stat-row" id="porEstado"><div class="empty">Cargando…</div></div>
+        <div class="mini-subhead">Lotes con saldo disponible</div>
+        <div class="stat-row scroll-y" id="listaSaldo" style="max-height:260px"><div class="empty">Cargando…</div></div>
       </div>
     </div>
   </section>
@@ -98,95 +97,65 @@ function mpDeCorrida(c) {
   return Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0);
 }
 
-// ---------- barra vertical con tooltip (SVG) ----------
-function renderBarChartCorridas(corridas) {
+// ---------- barras horizontales (categoria + valor), etiqueta y numero siempre visibles ----------
+function statBarRow(label, valorTexto, pct, colorStyle, labelWidth) {
+  return `
+    <div class="stat-bar-row">
+      <div class="stat-bar-label" style="${labelWidth ? `width:${labelWidth}` : ""}">${label}</div>
+      <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
+      <div class="stat-bar-value num">${valorTexto}</div>
+    </div>
+  `;
+}
+
+// ---------- MP procesada por corrida: lista (mas reciente primero), no un grafico mudo ----------
+function renderListaCorridas(corridas) {
   const cont = document.getElementById("chartCorridas");
-  const tip = document.getElementById("tipCorridas");
   const datos = corridas
     .slice()
-    .sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio))
+    .sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio))
     .map(c => ({ nombre: c.nombre, valor: mpDeCorrida(c) }));
 
   if (datos.length === 0) {
     cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
     return;
   }
-
-  const barWidth = 14, gap = 6, height = 220, padTop = 10;
-  const chartHeight = height - padTop;
   const max = Math.max(...datos.map(d => d.valor), 1);
-  const width = datos.length * (barWidth + gap) + gap;
-
-  const bars = datos.map((d, i) => {
-    const h = Math.max(2, (d.valor / max) * (chartHeight - padTop));
-    const x = gap + i * (barWidth + gap);
-    const y = chartHeight - h;
-    return `<rect class="viz-bar" x="${x}" y="${y}" width="${barWidth}" height="${h}" rx="4"
-      data-label="${escapeHtml(d.nombre)}" data-valor="${d.valor}"></rect>`;
-  }).join("");
-
-  cont.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-      ${bars}
-      <line class="viz-baseline" x1="0" y1="${chartHeight}" x2="${width}" y2="${chartHeight}"></line>
-    </svg>
-  `;
-
-  cont.querySelectorAll(".viz-bar").forEach(bar => {
-    const mover = (e) => {
-      const rect = cont.getBoundingClientRect();
-      tip.style.left = (e.clientX - rect.left + cont.scrollLeft) + "px";
-      tip.style.top = (e.clientY - rect.top) + "px";
-    };
-    bar.addEventListener("mouseenter", (e) => {
-      tip.innerHTML = `${escapeHtml(bar.dataset.label)}<br><b>${fmtKg(Number(bar.dataset.valor))} kg</b>`;
-      tip.classList.add("show");
-      mover(e);
-    });
-    bar.addEventListener("mousemove", mover);
-    bar.addEventListener("mouseleave", () => tip.classList.remove("show"));
-  });
-
-  // deja la vista donde esta lo mas reciente
-  cont.scrollLeft = cont.scrollWidth;
+  cont.innerHTML = datos.map(d => statBarRow(
+    escapeHtml(d.nombre),
+    `${fmtKg(d.valor)} kg`,
+    Math.max(2, (d.valor / max) * 100),
+    "background:var(--citrus)",
+    "190px"
+  )).join("");
 }
 
-// ---------- barras horizontales (categoria + valor) ----------
-function statBarRow(label, valor, max, colorVar) {
-  const pct = max > 0 ? Math.max(2, (valor / max) * 100) : 0;
-  return `
-    <div class="stat-bar-row">
-      <div class="stat-bar-label">${escapeHtml(label)}</div>
-      <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;background:var(${colorVar})"></div></div>
-      <div class="stat-bar-value num">${valor}</div>
-    </div>
-  `;
-}
-
+// ---------- MP por tipo de proceso: PROMEDIO por corrida (no el total, que solo refleja cuantas corridas hubo de cada tipo) ----------
 function renderPorTipo(corridas) {
-  const totales = {};
-  for (const t of TIPO_ORDEN) totales[t.key] = 0;
+  const stats = {};
+  for (const t of TIPO_ORDEN) stats[t.key] = { suma: 0, cuenta: 0 };
   for (const c of corridas) {
+    const valor = mpDeCorrida(c);
+    if (valor <= 0) continue;
     const tipo = TIPO_ORDEN.some(t => t.key === c.tipo_proceso) ? c.tipo_proceso : "OTRO";
-    totales[tipo] += mpDeCorrida(c);
+    stats[tipo].suma += valor;
+    stats[tipo].cuenta += 1;
   }
-  const max = Math.max(...Object.values(totales), 1);
+  const promedios = {};
+  for (const t of TIPO_ORDEN) promedios[t.key] = stats[t.key].cuenta ? stats[t.key].suma / stats[t.key].cuenta : 0;
+  const max = Math.max(...Object.values(promedios), 1);
+
   const cont = document.getElementById("porTipo");
   const filas = TIPO_ORDEN
-    .filter(t => totales[t.key] > 0)
-    .map(t => `
-      <div class="stat-bar-row">
-        <div class="stat-bar-label">${t.label}</div>
-        <div class="stat-bar-track"><div class="stat-bar-fill ${t.clase}" style="width:${Math.max(2, (totales[t.key]/max)*100)}%"></div></div>
-        <div class="stat-bar-value num">${fmtKg(totales[t.key])}</div>
-      </div>
-    `);
+    .filter(t => stats[t.key].cuenta > 0)
+    .map(t => statBarRow(
+      `${t.label} <span class="stat-bar-sub">(${stats[t.key].cuenta})</span>`,
+      `${fmtKg(promedios[t.key])} kg`,
+      Math.max(2, (promedios[t.key] / max) * 100),
+      `background:var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`,
+      "150px"
+    ));
   cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
-
-  const leyenda = TIPO_ORDEN.filter(t => totales[t.key] > 0).map(t => `
-    <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(${t.clase === 'series-otro' ? '--text-muted' : '--' + t.clase})"></span>${t.label}</div>
-  `).join("");
-  cont.innerHTML += `<div class="viz-legend">${leyenda}</div>`;
 }
 
 function renderPorEstado(lotes) {
@@ -197,7 +166,30 @@ function renderPorEstado(lotes) {
   }
   const max = Math.max(...Object.values(conteo), 1);
   const cont = document.getElementById("porEstado");
-  cont.innerHTML = ESTADO_ORDEN.map(e => statBarRow(e.label, conteo[e.key], max, e.var)).join("");
+  cont.innerHTML = ESTADO_ORDEN.map(e => statBarRow(
+    e.label, conteo[e.key], Math.max(2, (conteo[e.key] / max) * 100), `background:var(${e.var})`
+  )).join("");
+}
+
+// ---------- lotes que todavia tienen saldo (los que de verdad siguen en planta) ----------
+function renderListaSaldo(lotes) {
+  const conSaldo = lotes
+    .filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_actual)))
+    .sort((a, b) => Number(b.kg_saldo) - Number(a.kg_saldo));
+
+  const cont = document.getElementById("listaSaldo");
+  if (conSaldo.length === 0) {
+    cont.innerHTML = '<div class="empty">No hay lotes con saldo en este momento.</div>';
+    return;
+  }
+  const max = Math.max(...conSaldo.map(l => Number(l.kg_saldo)), 1);
+  cont.innerHTML = conSaldo.map(l => statBarRow(
+    `#${l.numero} <span class="stat-bar-sub">${escapeHtml(l.ubicacion_actual || "—")}</span>`,
+    `${fmtKg(l.kg_saldo)} kg`,
+    Math.max(2, (Number(l.kg_saldo) / max) * 100),
+    "background:var(--forest-2)",
+    "120px"
+  )).join("");
 }
 
 async function cargar() {
@@ -214,9 +206,10 @@ async function cargar() {
       <div class="kpi"><div class="kpi-label">Promedio por corrida</div><div class="kpi-value num">${fmtKg(promedio)}</div><div class="kpi-note">kg de MP</div></div>
     `;
 
-    renderBarChartCorridas(corridas);
+    renderListaCorridas(corridas);
     renderPorTipo(corridas);
     renderPorEstado(lotes);
+    renderListaSaldo(lotes);
   } catch (e) {
     document.getElementById("kpis").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
   }
