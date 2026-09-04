@@ -76,6 +76,52 @@ def obtener_lote(numero: int):
         return lote
 
 
+ESTADOS_VALIDOS = {"PROCESADO", "EN PROCESO", "EN ESPERA"}
+UBICACIONES_VALIDAS = {"Tolva", "Silo 1", "Silo 2", "Bines"}
+
+
+class ActualizarEstadoLote(BaseModel):
+    estado: Optional[str] = None  # None = volver a usar el que trae el Sheet
+
+
+@app.post("/api/lotes/{numero}/estado")
+def actualizar_estado_lote(numero: int, body: ActualizarEstadoLote):
+    """Override manual de producción sobre el estado del lote, para cuando
+    Calidad todavía no actualizó el Sheet. Mandar estado=null vuelve a usar
+    el valor del Sheet."""
+    valor = body.estado.strip().upper() if body.estado else None
+    if valor and valor not in ESTADOS_VALIDOS:
+        raise HTTPException(status_code=400, detail=f"Estado inválido. Usa uno de: {', '.join(ESTADOS_VALIDOS)}.")
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("UPDATE lotes SET estado_manual = :v WHERE numero = :n RETURNING numero"),
+            {"v": valor, "n": numero},
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro.")
+    return {"ok": True}
+
+
+class ActualizarUbicacionLote(BaseModel):
+    ubicacion: Optional[str] = None  # None = volver a usar la que trae el Sheet
+
+
+@app.post("/api/lotes/{numero}/ubicacion")
+def actualizar_ubicacion_lote(numero: int, body: ActualizarUbicacionLote):
+    """Override manual de producción sobre la ubicación del lote."""
+    valor = body.ubicacion.strip() if body.ubicacion else None
+    if valor and valor not in UBICACIONES_VALIDAS:
+        raise HTTPException(status_code=400, detail=f"Ubicación inválida. Usa una de: {', '.join(UBICACIONES_VALIDAS)}.")
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("UPDATE lotes SET ubicacion_manual = :v WHERE numero = :n RETURNING numero"),
+            {"v": valor, "n": numero},
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro.")
+    return {"ok": True}
+
+
 @app.post("/api/sync/lotes")
 def sync_lotes_endpoint():
     """Trae los lotes nuevos/actualizados desde el Google Sheet de

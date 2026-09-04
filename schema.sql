@@ -24,6 +24,8 @@ CREATE TABLE lotes (
     ratio               NUMERIC(6,2),
     ubicacion           TEXT,                 -- "Silo 1", "Silo 2", "Tolva"... (tal cual llega de recepción)
     estado_fuente       TEXT,                 -- "PROCESADO"/"EN PROCESO"/"EN ESPERA" tal cual llega de recepción
+    estado_manual       TEXT,                 -- override de producción cuando Calidad aún no actualizó el Sheet; NULL = usar estado_fuente
+    ubicacion_manual    TEXT,                 -- override de producción sobre ubicacion; NULL = usar ubicacion
     materia_prima       TEXT NOT NULL DEFAULT 'NARANJA ORGÁNICA',
     creado_en           TIMESTAMPTZ NOT NULL DEFAULT now(),
     actualizado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -31,6 +33,8 @@ CREATE TABLE lotes (
 
 COMMENT ON TABLE lotes IS 'Maestro de lotes recibidos, sincronizado desde el Google Sheet de recepción de camiones.';
 COMMENT ON COLUMN lotes.brix_recepcion IS 'Brix medido al momento de recepción del camión (distinto del brix medido en línea al procesar).';
+COMMENT ON COLUMN lotes.estado_manual IS 'Override de producción sobre estado_fuente cuando Calidad aún no actualizó el Sheet. NULL = usar el del Sheet.';
+COMMENT ON COLUMN lotes.ubicacion_manual IS 'Override de producción sobre ubicacion cuando Calidad aún no actualizó el Sheet. NULL = usar el del Sheet.';
 
 -- ----------------------------------------------------------------------------
 -- CORRIDAS: la unidad real de cuadre (NO la fecha). Una corrida puede cruzar
@@ -138,11 +142,15 @@ SELECT
     COALESCE(SUM(a.kg_asignados), 0)                     AS kg_consumidos,
     l.peso_neto_kg - COALESCE(SUM(a.kg_asignados), 0)     AS kg_saldo,
     l.bines_totales,
-    l.bines_totales - COALESCE(SUM(a.bines_consumidos), 0) AS bines_saldo
+    l.bines_totales - COALESCE(SUM(a.bines_consumidos), 0) AS bines_saldo,
+    l.estado_manual,
+    l.ubicacion_manual,
+    COALESCE(l.estado_manual, l.estado_fuente) AS estado_actual,
+    COALESCE(l.ubicacion_manual, l.ubicacion) AS ubicacion_actual
 FROM lotes l
 LEFT JOIN asignaciones a ON a.lote_numero = l.numero
 GROUP BY l.numero, l.proveedor, l.procedencia, l.tipo_almacen, l.ubicacion, l.estado_fuente, l.fecha_ingreso,
-         l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales;
+         l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales, l.estado_manual, l.ubicacion_manual;
 
 -- ----------------------------------------------------------------------------
 -- CORRIDA_PRODUCTOS: cuando una corrida produce más de un producto terminado

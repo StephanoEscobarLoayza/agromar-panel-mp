@@ -233,7 +233,7 @@ async function cargar() {
     // el backfill dejo marcadas para revisar, no lotes fisicos presentes).
     const lotesData = await apiGet("/api/lotes");
     const normEstado = e => (e || "").trim().toUpperCase();
-    const enPlanta = lotesData.filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_fuente)));
+    const enPlanta = lotesData.filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_actual)));
 
     document.getElementById("kpis").innerHTML = `
       <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${activas.length > 0 ? "en curso ahora" : "ninguna en curso"}</div></div>

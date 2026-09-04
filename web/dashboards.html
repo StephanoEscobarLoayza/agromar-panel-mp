@@ -192,7 +192,7 @@ function renderPorTipo(corridas) {
 function renderPorEstado(lotes) {
   const conteo = { "EN ESPERA": 0, "EN PROCESO": 0, "PROCESADO": 0 };
   for (const l of lotes) {
-    const e = normEstado(l.estado_fuente);
+    const e = normEstado(l.estado_actual);
     if (e in conteo) conteo[e]++;
   }
   const max = Math.max(...Object.values(conteo), 1);

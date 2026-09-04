@@ -134,6 +134,18 @@ td.right,th.right{text-align:right}
 .saldo-bar i{display:block;height:100%;background:var(--citrus)}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:6px;background:var(--forest-tint);color:var(--forest-2);font-weight:600}
 
+/* ---------- selects editables en tablas (lotes: estado/ubicación) ---------- */
+.edit-inline{display:inline-flex;align-items:center;gap:4px}
+.ubic-select,.pill-select{
+  width:auto;padding:4px 8px;font-size:12.5px;border-radius:99px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text-2);font-family:inherit;cursor:pointer;
+}
+.pill-select{font-weight:600;border:none}
+.pill-select.neutral{background:var(--surface-2);color:var(--text-2)}
+.pill-select.ok{background:var(--ok-bg);color:var(--ok)}
+.pill-select.warn{background:var(--warn-bg);color:var(--warn)}
+.edit-inline .btn-link{font-size:13px;line-height:1;padding:2px}
+
 /* ---------- forms (registrar consumo) ---------- */
 .split{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start}
 .form-body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:14px}

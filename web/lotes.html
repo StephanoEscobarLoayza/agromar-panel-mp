@@ -73,30 +73,60 @@
 <script>
 let todos = [];
 
+const ESTADOS = ["EN ESPERA", "EN PROCESO", "PROCESADO"];
+const ESTADO_LABEL = { "EN ESPERA": "En espera", "EN PROCESO": "En proceso", "PROCESADO": "Procesado" };
+const UBICACIONES = ["Tolva", "Silo 1", "Silo 2", "Bines"];
+
 function normEstado(e) {
   return (e || "").trim().toUpperCase();
 }
 
-function pillEstado(estado) {
+function pillClaseEstado(estado) {
   const e = normEstado(estado);
-  if (e === "PROCESADO") return ["neutral", "Procesado"];
-  if (e === "EN PROCESO") return ["ok", "En proceso"];
-  if (e === "EN ESPERA") return ["warn", "En espera"];
-  return ["neutral", estado || "—"];
+  if (e === "PROCESADO") return "neutral";
+  if (e === "EN PROCESO") return "ok";
+  if (e === "EN ESPERA") return "warn";
+  return "neutral";
+}
+
+function estadoSelect(l) {
+  const actual = normEstado(l.estado_actual);
+  const opciones = ESTADOS.map(e =>
+    `<option value="${e}" ${e === actual ? "selected" : ""}>${ESTADO_LABEL[e]}</option>`
+  ).join("");
+  const pillClase = pillClaseEstado(actual);
+  const reset = l.estado_manual
+    ? `<button class="btn-link reset-estado" data-lote="${l.numero}" title="Volver al estado del Sheet (${escapeHtml(l.estado_fuente || "—")})">↺</button>`
+    : "";
+  return `<span class="edit-inline"><select class="pill-select ${pillClase} estado-select" data-lote="${l.numero}">${opciones}</select>${reset}</span>`;
+}
+
+function ubicacionSelect(l) {
+  const actualNorm = (l.ubicacion_actual || "").trim().toLowerCase();
+  const match = UBICACIONES.find(u => u.toLowerCase() === actualNorm);
+  const opciones = UBICACIONES.map(u =>
+    `<option value="${u}" ${u === match ? "selected" : ""}>${u}</option>`
+  ).join("");
+  const extra = !match && l.ubicacion_actual
+    ? `<option value="" selected>${escapeHtml(l.ubicacion_actual)}</option>`
+    : "";
+  const reset = l.ubicacion_manual
+    ? `<button class="btn-link reset-ubicacion" data-lote="${l.numero}" title="Volver a la ubicación del Sheet (${escapeHtml(l.ubicacion || "—")})">↺</button>`
+    : "";
+  return `<span class="edit-inline"><select class="ubic-select" data-lote="${l.numero}">${extra}${opciones}</select>${reset}</span>`;
 }
 
 function fila(l) {
   const pct = l.peso_neto_kg > 0 ? Math.min(100, (l.kg_saldo / l.peso_neto_kg) * 100) : 0;
   const tagLabel = l.tipo_almacen === "BINES" ? "Bines" : l.tipo_almacen === "SILO" ? "Silo" : "Mixto";
-  const [pillClass, pillLabel] = pillEstado(l.estado_fuente);
   return `
     <tr>
       <td class="strong num">${l.numero}</td>
       <td>${escapeHtml(l.proveedor)}</td>
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
-      <td>${escapeHtml(l.ubicacion || "—")}</td>
-      <td><span class="pill ${pillClass}">${pillLabel}</span></td>
+      <td>${ubicacionSelect(l)}</td>
+      <td>${estadoSelect(l)}</td>
       <td class="right num">${fmtKg(l.peso_neto_kg)}</td>
       <td class="right num"><span class="saldo-bar"><i style="width:${pct}%"></i></span>${fmtKg(l.kg_saldo)}</td>
       <td class="right num">${l.brix_recepcion ?? "—"}</td>
@@ -124,7 +154,7 @@ function aplicarFiltros() {
   );
 
   if (filtroEstado !== "todos") {
-    lista = lista.filter(l => normEstado(l.estado_fuente) === filtroEstado);
+    lista = lista.filter(l => normEstado(l.estado_actual) === filtroEstado);
   }
 
   render(lista);
@@ -141,6 +171,43 @@ async function cargar() {
 
 document.getElementById("buscar").addEventListener("input", aplicarFiltros);
 document.getElementById("filtroEstado").addEventListener("change", aplicarFiltros);
+
+const filasBody = document.getElementById("filas");
+
+filasBody.addEventListener("change", async (ev) => {
+  const numero = ev.target.dataset.lote;
+  if (!numero) return;
+  try {
+    if (ev.target.classList.contains("estado-select")) {
+      await apiPost(`/api/lotes/${numero}/estado`, { estado: ev.target.value });
+    } else if (ev.target.classList.contains("ubic-select")) {
+      await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: ev.target.value });
+    } else {
+      return;
+    }
+    await cargar();
+  } catch (e) {
+    alert(e.message);
+  }
+});
+
+filasBody.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-lote]");
+  if (!btn) return;
+  const numero = btn.dataset.lote;
+  try {
+    if (btn.classList.contains("reset-estado")) {
+      await apiPost(`/api/lotes/${numero}/estado`, { estado: null });
+    } else if (btn.classList.contains("reset-ubicacion")) {
+      await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: null });
+    } else {
+      return;
+    }
+    await cargar();
+  } catch (e) {
+    alert(e.message);
+  }
+});
 
 cargar();
 </script>
