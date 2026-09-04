@@ -216,15 +216,10 @@ async function cargar() {
     const enCurso = corridas.find(c => c.estado_cuadre === "sin_objetivo");
     const kgHoy = enCurso ? enCurso.kg_asignados_total : (corridas[0] ? corridas[0].kg_asignados_total : 0);
 
-    // Solo cuenta corridas recientes: las viejas casi siempre traen diferencias
-    // de datos historicos de Trazabilidad que ya no se pueden "cuadrar" desde
-    // aqui, y mostrarlas junto con las de verdad accionables solo confunde al
-    // equipo de produccion.
-    const DIAS_RECIENTES = 15;
-    const limiteReciente = new Date();
-    limiteReciente.setDate(limiteReciente.getDate() - DIAS_RECIENTES);
-    const esReciente = c => new Date(c.fecha_final || c.fecha_inicio) >= limiteReciente;
-    const porCuadrar = corridas.filter(c => (c.estado_cuadre === "incompleto" || c.estado_cuadre === "excedido") && esReciente(c));
+    // MP procesada: usa el objetivo de Trazabilidad cuando ya se documento
+    // (dato confiable), y el total registrado hasta ahora para corridas que
+    // todavia no tienen objetivo (en curso o recien cerradas).
+    const mpProcesada = corridas.reduce((suma, c) => suma + Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0), 0);
 
     const lotesData = await apiGet("/api/lotes");
     const conSaldo = lotesData.filter(l => l.kg_saldo > 0.01);
@@ -233,7 +228,7 @@ async function cargar() {
       <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${enCurso ? "incl. 1 en curso" : "de " + corridas.length + " totales"}</div></div>
       <div class="kpi"><div class="kpi-label">${enCurso ? "Kg registrados hoy" : "Kg asignados (última)"}</div><div class="kpi-value num citrus">${fmtKg(kgHoy)}</div><div class="kpi-note">${enCurso ? escapeHtml(enCurso.nombre) : ""}</div></div>
       <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${conSaldo.length}</div><div class="kpi-note">de ${lotesData.length} en catálogo</div></div>
-      <div class="kpi"><div class="kpi-label">Corridas por cuadrar</div><div class="kpi-value num">${porCuadrar.length}</div><div class="kpi-note">incompletas o excedidas, últimos ${DIAS_RECIENTES} días</div></div>
+      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, todas las corridas</div></div>
     `;
   } catch (e) {
     document.getElementById("corridas").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
