@@ -22,6 +22,15 @@ async function apiPost(path, data) {
   return body;
 }
 
+async function apiDelete(path) {
+  const res = await fetch(path, { method: "DELETE" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.detail || `Error ${res.status}`);
+  }
+  return body;
+}
+
 function fmtKg(n) {
   if (n === null || n === undefined) return "—";
   return Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

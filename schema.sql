@@ -144,6 +144,33 @@ LEFT JOIN asignaciones a ON a.lote_numero = l.numero
 GROUP BY l.numero, l.proveedor, l.procedencia, l.tipo_almacen, l.ubicacion, l.estado_fuente, l.fecha_ingreso,
          l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales;
 
+-- ----------------------------------------------------------------------------
+-- CORRIDA_PRODUCTOS: cuando una corrida produce más de un producto terminado
+-- en paralelo (ej. Concentrado + Aséptico desde el mismo lote de MP), NO se
+-- reparte el MP crudo entre productos (los tambores de cada producto pesan
+-- distinto y el rendimiento también difiere - repartir a mano el kg de MP
+-- es lo que arriesgaba descuadrar). En cambio la corrida sigue siendo UNA
+-- sola (un solo mp_kg_objetivo), y cada producto de salida se registra por
+-- separado con lo que producción ya pesa al final: tambores y peso neto del
+-- tambor. Mismos 4 campos que Trazabilidad ya trae por corrida (Tambores /
+-- Peso Neto del tambor / PT kg / Rendimiento) - solo que ahora puede haber
+-- más de un bloque de esos por corrida.
+-- ----------------------------------------------------------------------------
+CREATE TABLE corrida_productos (
+    id                   SERIAL PRIMARY KEY,
+    corrida_id           INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
+    producto             TEXT NOT NULL,             -- "Concentrado", "Aséptico", "Jugo Simple"...
+    tambores             INTEGER,
+    peso_neto_tambor_kg  NUMERIC(8,2),
+    pt_kg                NUMERIC(12,2),              -- producto terminado en kg (tambores × peso, o cargado directo)
+    observaciones        TEXT,
+    creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    UNIQUE (corrida_id, producto)
+);
+
+COMMENT ON TABLE corrida_productos IS 'Productos de salida de una corrida (soporta producción en paralelo de más de un producto desde el mismo MP).';
+
 CREATE VIEW v_cuadre_corridas AS
 SELECT
     c.id,

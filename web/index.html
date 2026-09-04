@@ -146,6 +146,7 @@ function corridaCard(c) {
     acciones.push(`<button class="btn-link" data-accion="finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Finalizar corrida</button>`);
   }
   acciones.push(`<button class="btn-link" data-accion="objetivo" data-id="${c.id}">${c.mp_kg_objetivo ? "Editar" : "Agregar"} objetivo</button>`);
+  acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
 
   return `
     <div class="corrida${liveClass}">
@@ -162,8 +163,42 @@ function corridaCard(c) {
         <input type="number" min="0" step="0.01" placeholder="MP kg de Trazabilidad" id="obj-input-${c.id}">
         <button class="btn-link strong" data-accion="guardar-objetivo" data-id="${c.id}">Guardar</button>
       </div>
+      <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
+        <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
+        <div class="two-col" style="margin-top:10px">
+          <input type="text" id="prod-nombre-${c.id}" placeholder="Producto (ej. Concentrado)">
+          <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
+        </div>
+        <div class="two-col" style="margin-top:8px">
+          <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
+          <div class="hint-line" id="prod-pt-${c.id}" style="align-self:center">PT kg: —</div>
+        </div>
+        <div id="prod-msg-${c.id}"></div>
+        <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar producto</button>
+      </div>
     </div>
   `;
+}
+
+function productoFila(p, corridaId) {
+  return `
+    <div class="prod-fila">
+      <div><b>${escapeHtml(p.producto)}</b><span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg</span></div>
+      <div class="prod-pt num">${fmtKg(p.pt_kg)} kg<button class="btn-link" data-accion="eliminar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Eliminar">✕</button></div>
+    </div>
+  `;
+}
+
+async function cargarProductosPanel(corridaId) {
+  const cont = document.getElementById(`prod-lista-${corridaId}`);
+  try {
+    const productos = await apiGet(`/api/corridas/${corridaId}/productos`);
+    cont.innerHTML = productos.length
+      ? productos.map(p => productoFila(p, corridaId)).join("")
+      : '<div class="empty">Sin productos registrados todavía.</div>';
+  } catch (e) {
+    cont.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  }
 }
 
 async function cargar() {
@@ -277,7 +312,56 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     } catch (e) {
       alert(e.message);
     }
+  } else if (accion === "productos") {
+    const panel = document.getElementById(`prod-panel-${id}`);
+    const abrir = panel.style.display === "none";
+    panel.style.display = abrir ? "block" : "none";
+    if (abrir) cargarProductosPanel(id);
+  } else if (accion === "guardar-producto") {
+    const nombre = document.getElementById(`prod-nombre-${id}`).value.trim();
+    const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || null;
+    const peso = Number(document.getElementById(`prod-peso-${id}`).value) || null;
+    const msg = document.getElementById(`prod-msg-${id}`);
+    if (!nombre) {
+      msg.innerHTML = '<div class="msg bad">Ponle un nombre al producto.</div>';
+      return;
+    }
+    try {
+      await apiPost(`/api/corridas/${id}/productos`, {
+        producto: nombre,
+        tambores,
+        peso_neto_tambor_kg: peso,
+      });
+      document.getElementById(`prod-nombre-${id}`).value = "";
+      document.getElementById(`prod-tambores-${id}`).value = "";
+      document.getElementById(`prod-peso-${id}`).value = "";
+      document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
+      msg.innerHTML = "";
+      cargarProductosPanel(id);
+    } catch (e) {
+      msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    }
+  } else if (accion === "eliminar-producto") {
+    const corridaId = btn.dataset.corrida;
+    if (!confirm("¿Eliminar este producto de la corrida?")) return;
+    try {
+      await apiDelete(`/api/corridas/${corridaId}/productos/${id}`);
+      cargarProductosPanel(corridaId);
+    } catch (e) {
+      alert(e.message);
+    }
   }
+});
+
+// PT kg en vivo mientras se llena tambores/peso en cualquier panel de productos
+document.getElementById("corridas").addEventListener("input", (ev) => {
+  const el = ev.target;
+  if (!el.id.startsWith("prod-tambores-") && !el.id.startsWith("prod-peso-")) return;
+  const id = el.id.split("-").pop();
+  const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || 0;
+  const peso = Number(document.getElementById(`prod-peso-${id}`).value) || 0;
+  const ptEl = document.getElementById(`prod-pt-${id}`);
+  ptEl.textContent = tambores && peso ? `PT kg: ${fmtKg(tambores * peso)}` : "PT kg: —";
 });
 
 cargar();

@@ -193,6 +193,79 @@ def listar_asignaciones(corrida_id: int):
         return rows(result)
 
 
+@app.get("/api/corridas/{corrida_id}/productos")
+def listar_productos_corrida(corrida_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                "SELECT id, producto, tambores, peso_neto_tambor_kg, pt_kg, observaciones "
+                "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
+            ),
+            {"c": corrida_id},
+        )
+        return rows(result)
+
+
+class NuevoProductoCorrida(BaseModel):
+    producto: str
+    tambores: Optional[int] = None
+    peso_neto_tambor_kg: Optional[float] = None
+    pt_kg: Optional[float] = None
+    observaciones: Optional[str] = ""
+
+
+@app.post("/api/corridas/{corrida_id}/productos")
+def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
+    producto = p.producto.strip()
+    if not producto:
+        raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
+    pt_kg = p.pt_kg
+    if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
+        pt_kg = p.tambores * p.peso_neto_tambor_kg
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    INSERT INTO corrida_productos
+                        (corrida_id, producto, tambores, peso_neto_tambor_kg, pt_kg, observaciones)
+                    VALUES
+                        (:corrida_id, :producto, :tambores, :peso_tambor, :pt_kg, :obs)
+                    ON CONFLICT (corrida_id, producto) DO UPDATE SET
+                        tambores = EXCLUDED.tambores,
+                        peso_neto_tambor_kg = EXCLUDED.peso_neto_tambor_kg,
+                        pt_kg = EXCLUDED.pt_kg,
+                        observaciones = EXCLUDED.observaciones
+                    RETURNING id
+                    """
+                ),
+                {
+                    "corrida_id": corrida_id,
+                    "producto": producto,
+                    "tambores": p.tambores,
+                    "peso_tambor": p.peso_neto_tambor_kg,
+                    "pt_kg": pt_kg,
+                    "obs": p.observaciones,
+                },
+            )
+            new_id = result.scalar()
+        return {"id": new_id, "ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+
+
+@app.delete("/api/corridas/{corrida_id}/productos/{producto_id}")
+def eliminar_producto_corrida(corrida_id: int, producto_id: int):
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("DELETE FROM corrida_productos WHERE id = :id AND corrida_id = :c RETURNING id"),
+            {"id": producto_id, "c": corrida_id},
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Producto no encontrado.")
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------------------
 # asignaciones (registrar consumo)
 # ---------------------------------------------------------------------------
