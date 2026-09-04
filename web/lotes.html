@@ -39,10 +39,11 @@
     <div class="panel-body">
       <div class="two-col">
         <input type="text" id="buscar" placeholder="Buscar por número, proveedor o procedencia…">
-        <select id="filtroSaldo">
+        <select id="filtroEstado">
           <option value="todos">Todos los lotes</option>
-          <option value="en_piso">En piso (con saldo)</option>
-          <option value="consumido">Consumido / procesado</option>
+          <option value="PROCESADO">Procesado</option>
+          <option value="EN PROCESO">En proceso</option>
+          <option value="EN ESPERA">En espera</option>
         </select>
       </div>
     </div>
@@ -71,10 +72,22 @@
 <script>
 let todos = [];
 
+function normEstado(e) {
+  return (e || "").trim().toUpperCase();
+}
+
+function pillEstado(estado) {
+  const e = normEstado(estado);
+  if (e === "PROCESADO") return ["neutral", "Procesado"];
+  if (e === "EN PROCESO") return ["ok", "En proceso"];
+  if (e === "EN ESPERA") return ["warn", "En espera"];
+  return ["neutral", estado || "—"];
+}
+
 function fila(l) {
   const pct = l.peso_neto_kg > 0 ? Math.min(100, (l.kg_saldo / l.peso_neto_kg) * 100) : 0;
   const tagLabel = l.tipo_almacen === "BINES" ? "Bines" : l.tipo_almacen === "SILO" ? "Silo" : "Mixto";
-  const consumido = l.kg_saldo <= 0.01;
+  const [pillClass, pillLabel] = pillEstado(l.estado_fuente);
   return `
     <tr>
       <td class="strong num">${l.numero}</td>
@@ -82,7 +95,7 @@ function fila(l) {
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
       <td>${escapeHtml(l.ubicacion || "—")}</td>
-      <td><span class="pill ${consumido ? "neutral" : "ok"}">${consumido ? "Consumido" : "En piso"}</span></td>
+      <td><span class="pill ${pillClass}">${pillLabel}</span></td>
       <td class="right num">${fmtKg(l.peso_neto_kg)}</td>
       <td class="right num"><span class="saldo-bar"><i style="width:${pct}%"></i></span>${fmtKg(l.kg_saldo)}</td>
       <td class="right num">${l.brix_recepcion ?? "—"}</td>
@@ -101,7 +114,7 @@ function render(lista) {
 
 function aplicarFiltros() {
   const q = document.getElementById("buscar").value.toLowerCase();
-  const filtroSaldo = document.getElementById("filtroSaldo").value;
+  const filtroEstado = document.getElementById("filtroEstado").value;
 
   let lista = todos.filter(l =>
     String(l.numero).includes(q) ||
@@ -109,10 +122,8 @@ function aplicarFiltros() {
     (l.procedencia || "").toLowerCase().includes(q)
   );
 
-  if (filtroSaldo === "en_piso") {
-    lista = lista.filter(l => l.kg_saldo > 0.01);
-  } else if (filtroSaldo === "consumido") {
-    lista = lista.filter(l => l.kg_saldo <= 0.01);
+  if (filtroEstado !== "todos") {
+    lista = lista.filter(l => normEstado(l.estado_fuente) === filtroEstado);
   }
 
   render(lista);
@@ -128,7 +139,7 @@ async function cargar() {
 }
 
 document.getElementById("buscar").addEventListener("input", aplicarFiltros);
-document.getElementById("filtroSaldo").addEventListener("change", aplicarFiltros);
+document.getElementById("filtroEstado").addEventListener("change", aplicarFiltros);
 
 cargar();
 </script>
