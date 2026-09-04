@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cuadre de producción · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <a href="index.html" class="active">Corridas</a>
+        <a href="registrar.html">Registrar consumo</a>
+        <a href="lotes.html">Lotes</a>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Cuadre de producción,<br><em>corrida por corrida.</em></h1>
+    <p class="hero-sub">Cada lote asignado se valida contra Trazabilidad en el momento — nada de cuadrar a mano al cierre de campaña.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
+
+  <section>
+    <div class="section-head">
+      <h2>Corridas</h2>
+      <button class="btn" id="btnMostrarForm" style="width:auto;padding:8px 16px">+ Nueva corrida</button>
+    </div>
+
+    <div class="panel" id="formNuevaCorrida" style="display:none;margin-bottom:16px">
+      <div class="form-body">
+        <div class="two-col">
+          <div class="field">
+            <label for="ncTipo">Tipo de proceso</label>
+            <select id="ncTipo">
+              <option value="JSA">JSA Aseptic</option>
+              <option value="JCC">JCC</option>
+              <option value="JSC">JSC</option>
+              <option value="ICEGEN">ICEGEN</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ncFecha">Fecha y hora de inicio</label>
+            <input type="datetime-local" id="ncFecha">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ncNombre">Nombre de la corrida</label>
+          <input type="text" id="ncNombre" placeholder="se sugiere solo, puedes cambiarlo">
+        </div>
+        <div class="hint-line">El objetivo de Trazabilidad (MP kg) no se pide aquí — se agrega después, cuando se documente la corrida.</div>
+        <div id="ncMsg"></div>
+        <div class="two-col">
+          <button class="btn" id="btnCrearCorrida">Crear corrida</button>
+          <button class="btn" id="btnCancelarCorrida" style="background:var(--surface-2);color:var(--text)">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="corridas"><div class="empty">Cargando…</div></div>
+  </section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Setiembre","Octubre","Noviembre","Diciembre"];
+
+function nowLocalDatetime() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function sugerirNombre() {
+  const fechaStr = document.getElementById("ncFecha").value;
+  const tipo = document.getElementById("ncTipo").value;
+  if (!fechaStr) return;
+  const d = new Date(fechaStr);
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = MESES[d.getMonth()];
+  const nombreInput = document.getElementById("ncNombre");
+  const sugerido = `${dia}-${mes} ${tipo}`;
+  // solo pisa el nombre si el usuario no lo edito a mano todavia
+  if (!nombreInput.dataset.tocado) nombreInput.value = sugerido;
+}
+
+function pillFor(estado) {
+  const map = {
+    cuadra: ["ok", "Cuadra"],
+    incompleto: ["warn", "Incompleto"],
+    excedido: ["bad", "Excedido"],
+    sin_objetivo: ["neutral", "En curso"],
+  };
+  return map[estado] || ["neutral", estado];
+}
+
+function corridaCard(c) {
+  const [pillClass, pillLabel] = pillFor(c.estado_cuadre);
+  const rango = c.fecha_final
+    ? `${fmtDate(c.fecha_inicio)} — ${fmtDate(c.fecha_final)}`
+    : `En curso desde ${fmtDate(c.fecha_inicio)}`;
+
+  let body;
+  if (c.estado_cuadre === "sin_objetivo") {
+    body = `
+      <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg registrados hasta ahora</div>
+      <div class="corrida-note">Todavía sin objetivo de Trazabilidad — se completa cuando se documente la corrida.</div>
+    `;
+  } else {
+    const pct = c.mp_kg_objetivo > 0 ? Math.min(100, (c.kg_asignados_total / c.mp_kg_objetivo) * 100) : 0;
+    body = `
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill ${pillClass}" style="width:${pct}%"></div></div>
+        <div class="progress-figs"><b class="num">${fmtKg(c.kg_asignados_total)}</b> / <span class="num">${fmtKg(c.mp_kg_objetivo)}</span> kg</div>
+      </div>
+    `;
+  }
+
+  const liveClass = c.estado_cuadre === "sin_objetivo" ? " live" : "";
+  const abierta = c.fecha_final === null;
+
+  const acciones = [];
+  if (abierta) {
+    acciones.push(`<button class="btn-link" data-accion="finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Finalizar corrida</button>`);
+  }
+  acciones.push(`<button class="btn-link" data-accion="objetivo" data-id="${c.id}">${c.mp_kg_objetivo ? "Editar" : "Agregar"} objetivo</button>`);
+
+  return `
+    <div class="corrida${liveClass}">
+      <div class="corrida-top">
+        <div>
+          <div class="corrida-name">${escapeHtml(c.nombre)}</div>
+          <div class="corrida-range">${rango}</div>
+        </div>
+        <span class="pill ${pillClass}">${pillLabel}</span>
+      </div>
+      ${body}
+      <div class="corrida-acciones">${acciones.join("")}</div>
+      <div class="objetivo-form" id="obj-form-${c.id}" style="display:none">
+        <input type="number" min="0" step="0.01" placeholder="MP kg de Trazabilidad" id="obj-input-${c.id}">
+        <button class="btn-link strong" data-accion="guardar-objetivo" data-id="${c.id}">Guardar</button>
+      </div>
+    </div>
+  `;
+}
+
+async function cargar() {
+  try {
+    const corridas = await apiGet("/api/corridas");
+    const cont = document.getElementById("corridas");
+
+    if (corridas.length === 0) {
+      cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
+    } else {
+      cont.innerHTML = corridas.map(corridaCard).join("");
+    }
+
+    const activas = corridas.filter(c => c.fecha_final === null || c.estado_cuadre === "sin_objetivo" || c.estado_cuadre === "incompleto");
+    const enCurso = corridas.find(c => c.estado_cuadre === "sin_objetivo");
+    const kgHoy = enCurso ? enCurso.kg_asignados_total : (corridas[0] ? corridas[0].kg_asignados_total : 0);
+    const porCuadrar = corridas.filter(c => c.estado_cuadre === "incompleto" || c.estado_cuadre === "excedido");
+
+    const lotesData = await apiGet("/api/lotes");
+    const conSaldo = lotesData.filter(l => l.kg_saldo > 0.01);
+
+    document.getElementById("kpis").innerHTML = `
+      <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${enCurso ? "incl. 1 en curso" : "de " + corridas.length + " totales"}</div></div>
+      <div class="kpi"><div class="kpi-label">${enCurso ? "Kg registrados hoy" : "Kg asignados (última)"}</div><div class="kpi-value num citrus">${fmtKg(kgHoy)}</div><div class="kpi-note">${enCurso ? escapeHtml(enCurso.nombre) : ""}</div></div>
+      <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${conSaldo.length}</div><div class="kpi-note">de ${lotesData.length} en catálogo</div></div>
+      <div class="kpi"><div class="kpi-label">Corridas por cuadrar</div><div class="kpi-value num">${porCuadrar.length}</div><div class="kpi-note">incompletas o excedidas</div></div>
+    `;
+  } catch (e) {
+    document.getElementById("corridas").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ---------- formulario "nueva corrida" ----------
+const btnMostrarForm = document.getElementById("btnMostrarForm");
+const formNuevaCorrida = document.getElementById("formNuevaCorrida");
+const ncFecha = document.getElementById("ncFecha");
+const ncTipo = document.getElementById("ncTipo");
+const ncNombre = document.getElementById("ncNombre");
+const ncMsg = document.getElementById("ncMsg");
+
+btnMostrarForm.addEventListener("click", () => {
+  const mostrar = formNuevaCorrida.style.display === "none";
+  formNuevaCorrida.style.display = mostrar ? "block" : "none";
+  if (mostrar) {
+    ncFecha.value = nowLocalDatetime();
+    ncNombre.dataset.tocado = "";
+    sugerirNombre();
+  }
+});
+
+document.getElementById("btnCancelarCorrida").addEventListener("click", () => {
+  formNuevaCorrida.style.display = "none";
+});
+
+ncFecha.addEventListener("change", sugerirNombre);
+ncTipo.addEventListener("change", sugerirNombre);
+ncNombre.addEventListener("input", () => { ncNombre.dataset.tocado = "1"; });
+
+document.getElementById("btnCrearCorrida").addEventListener("click", async () => {
+  const nombre = ncNombre.value.trim();
+  if (!nombre) {
+    ncMsg.innerHTML = '<div class="msg bad">Ponle un nombre a la corrida.</div>';
+    return;
+  }
+  if (!ncFecha.value) {
+    ncMsg.innerHTML = '<div class="msg bad">Elige la fecha y hora de inicio.</div>';
+    return;
+  }
+  try {
+    await apiPost("/api/corridas", {
+      nombre,
+      tipo_proceso: ncTipo.value,
+      fecha_inicio: ncFecha.value,
+    });
+    formNuevaCorrida.style.display = "none";
+    ncMsg.innerHTML = "";
+    cargar();
+  } catch (e) {
+    ncMsg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  }
+});
+
+// ---------- acciones por tarjeta (finalizar / objetivo) ----------
+document.getElementById("corridas").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-accion]");
+  if (!btn) return;
+  const accion = btn.dataset.accion;
+  const id = btn.dataset.id;
+
+  if (accion === "finalizar") {
+    if (!confirm(`¿Finalizar "${btn.dataset.nombre}"? Se cierra con la fecha y hora de ahora mismo.`)) return;
+    try {
+      await apiPost(`/api/corridas/${id}/finalizar`, {});
+      cargar();
+    } catch (e) {
+      alert(e.message);
+    }
+  } else if (accion === "objetivo") {
+    const formDiv = document.getElementById(`obj-form-${id}`);
+    formDiv.style.display = formDiv.style.display === "none" ? "flex" : "none";
+  } else if (accion === "guardar-objetivo") {
+    const input = document.getElementById(`obj-input-${id}`);
+    const valor = Number(input.value);
+    if (!valor || valor <= 0) {
+      input.style.outline = "2px solid var(--bad)";
+      return;
+    }
+    try {
+      await apiPost(`/api/corridas/${id}/objetivo`, { mp_kg_objetivo: valor });
+      cargar();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+});
+
+cargar();
+</script>
+</body>
+</html>

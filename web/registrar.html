@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Registrar consumo · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <a href="index.html">Corridas</a>
+        <a href="registrar.html" class="active">Registrar consumo</a>
+        <a href="lotes.html">Lotes</a>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Registrar consumo</h1>
+    <p class="hero-sub">Elige la corrida, escribe el lote — el resto se completa solo.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+  <section class="split" style="margin-top:0">
+    <div class="panel">
+      <div class="panel-head"><h3>Nueva asignación</h3></div>
+      <div class="form-body">
+
+        <div class="two-col">
+          <div class="field">
+            <label for="corrida">Corrida</label>
+            <select id="corrida"></select>
+          </div>
+          <div class="field">
+            <label for="turno">Turno</label>
+            <select id="turno">
+              <option value="DÍA">Día</option>
+              <option value="NOCHE">Noche</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="lote">Número de lote</label>
+          <input type="number" id="lote" min="0" step="1" placeholder="ej. 2291">
+        </div>
+
+        <div id="loteInfo"></div>
+        <div id="camposPeso"></div>
+
+        <div id="mensaje"></div>
+        <button class="btn" id="btnGuardar" disabled>Guardar asignación</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Últimas asignaciones</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th></tr></thead>
+          <tbody id="recientes"><tr><td colspan="3" class="empty">Elige una corrida</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let lote = null; // ultimo lote encontrado (con saldo, bines_totales, etc.)
+
+const corridaSel = document.getElementById("corrida");
+const turnoSel = document.getElementById("turno");
+const loteInput = document.getElementById("lote");
+const loteInfo = document.getElementById("loteInfo");
+const camposPeso = document.getElementById("camposPeso");
+const mensaje = document.getElementById("mensaje");
+const btnGuardar = document.getElementById("btnGuardar");
+const recientesBody = document.getElementById("recientes");
+
+async function cargarCorridas() {
+  const corridas = await apiGet("/api/corridas?abiertas=true");
+  if (corridas.length === 0) {
+    corridaSel.innerHTML = '<option value="">No hay corridas abiertas</option>';
+    return;
+  }
+  corridaSel.innerHTML = corridas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("");
+  cargarRecientes();
+}
+
+async function cargarRecientes() {
+  const corridaId = corridaSel.value;
+  if (!corridaId) return;
+  const asigs = await apiGet(`/api/corridas/${corridaId}/asignaciones`);
+  if (asigs.length === 0) {
+    recientesBody.innerHTML = '<tr><td colspan="3" class="empty">Sin asignaciones todavía</td></tr>';
+  } else {
+    recientesBody.innerHTML = asigs.slice(0, 10).map(a => `
+      <tr><td class="strong num">${a.lote_numero}</td><td class="right num">${fmtKg(a.kg_asignados)}</td><td>${a.turno || ""}</td></tr>
+    `).join("");
+  }
+}
+
+function renderCamposPeso() {
+  mensaje.innerHTML = "";
+  if (!lote) { camposPeso.innerHTML = ""; btnGuardar.disabled = true; return; }
+
+  const saldo = Math.max(Number(lote.kg_saldo), 0);
+  const origenes = lote.tipo_almacen === "MIXTO" ? ["BINES", "SILO"] : [lote.tipo_almacen];
+  const origenSelectorHtml = origenes.length > 1
+    ? `<select id="origen">${origenes.map(o => `<option value="${o}">${o === "BINES" ? "Bines" : "Silo"}</option>`).join("")}</select>`
+    : `<input type="hidden" id="origen" value="${origenes[0]}"><div class="hint-line">Origen: ${origenes[0] === "BINES" ? "Bines" : "Silo"}</div>`;
+
+  camposPeso.innerHTML = `
+    <div class="field"><label>Origen</label>${origenSelectorHtml}</div>
+    <div id="camposOrigen"></div>
+  `;
+  document.getElementById("origen")?.addEventListener("change", renderCamposOrigen);
+  renderCamposOrigen();
+}
+
+function renderCamposOrigen() {
+  const origen = document.getElementById("origen").value;
+  const saldo = Math.max(Number(lote.kg_saldo), 0);
+  const cont = document.getElementById("camposOrigen");
+
+  if (origen === "BINES") {
+    if (!lote.bines_totales) {
+      cont.innerHTML = '<div class="msg bad">Este lote no tiene bines_totales registrados — no se puede calcular el kg por bin. Corrígelo en Lotes.</div>';
+      btnGuardar.disabled = true;
+      return;
+    }
+    const kgPorBin = Number(lote.peso_neto_kg) / Number(lote.bines_totales);
+    const binesSaldo = lote.bines_saldo !== null ? Number(lote.bines_saldo) : null;
+    cont.innerHTML = `
+      <div class="hint-line" style="margin-bottom:8px">${kgPorBin.toFixed(2)} kg por bin · saldo actual: ${binesSaldo !== null ? fmtInt(binesSaldo) : "—"} bines</div>
+      <div class="field"><label>Bines consumidos</label><input type="number" id="bines" min="0" max="${binesSaldo ?? 9999}" step="1" value="0"></div>
+      <div class="suggested" style="margin:8px 0"><b>Peso sugerido:</b> <span id="pesoSugerido" class="num">0.00</span> kg</div>
+      <div class="field"><label>Kg a registrar (ajusta si difiere del sugerido)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
+      <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
+    `;
+    const binesInput = document.getElementById("bines");
+    const kgInput = document.getElementById("kg");
+    binesInput.addEventListener("input", () => {
+      const b = Number(binesInput.value) || 0;
+      const sugerido = Math.min(b * kgPorBin, saldo);
+      document.getElementById("pesoSugerido").textContent = fmtKg(sugerido);
+      kgInput.value = sugerido.toFixed(2);
+    });
+  } else {
+    cont.innerHTML = `
+      <div class="field"><label>Kg a asignar (estimado)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
+      <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
+    `;
+  }
+  btnGuardar.disabled = false;
+}
+
+async function buscarLote() {
+  const n = parseInt(loteInput.value, 10);
+  if (!n) { lote = null; loteInfo.innerHTML = ""; renderCamposPeso(); return; }
+  try {
+    lote = await apiGet(`/api/lotes/${n}`);
+    loteInfo.innerHTML = `
+      <div class="lookup">
+        <div class="lookup-row"><span>Proveedor</span><span>${escapeHtml(lote.proveedor)}</span></div>
+        <div class="lookup-row"><span>Procedencia</span><span>${escapeHtml(lote.procedencia || "—")}</span></div>
+        <div class="lookup-row saldo"><span>Saldo disponible</span><span class="num">${fmtKg(lote.kg_saldo)} kg</span></div>
+      </div>
+    `;
+    renderCamposPeso();
+  } catch (e) {
+    lote = null;
+    loteInfo.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    camposPeso.innerHTML = "";
+    btnGuardar.disabled = true;
+  }
+}
+
+let loteTimer;
+loteInput.addEventListener("input", () => {
+  clearTimeout(loteTimer);
+  loteTimer = setTimeout(buscarLote, 350);
+});
+corridaSel.addEventListener("change", cargarRecientes);
+
+btnGuardar.addEventListener("click", async () => {
+  const origen = document.getElementById("origen").value;
+  const kg = Number(document.getElementById("kg").value);
+  const binesEl = document.getElementById("bines");
+  const bines = binesEl ? parseInt(binesEl.value, 10) : null;
+  const obs = document.getElementById("obs")?.value || "";
+
+  if (!kg || kg <= 0) {
+    mensaje.innerHTML = '<div class="msg bad">Ingresa un peso mayor a 0.</div>';
+    return;
+  }
+  if (origen === "BINES" && (!bines || bines <= 0)) {
+    mensaje.innerHTML = '<div class="msg bad">Ingresa cuántos bines se consumieron.</div>';
+    return;
+  }
+
+  btnGuardar.disabled = true;
+  try {
+    await apiPost("/api/asignaciones", {
+      lote_numero: lote.numero,
+      corrida_id: Number(corridaSel.value),
+      turno: turnoSel.value,
+      tipo_almacen_origen: origen,
+      kg_asignados: kg,
+      bines_consumidos: bines || null,
+      observaciones: obs,
+    });
+    mensaje.innerHTML = `<div class="msg ok">Asignados ${fmtKg(kg)} kg del lote ${lote.numero}.</div>`;
+    loteInput.value = "";
+    lote = null;
+    loteInfo.innerHTML = "";
+    camposPeso.innerHTML = "";
+    cargarRecientes();
+  } catch (e) {
+    mensaje.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    btnGuardar.disabled = false;
+  }
+});
+
+cargarCorridas();
+</script>
+</body>
+</html>

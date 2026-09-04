@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Lotes · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <a href="index.html">Corridas</a>
+        <a href="registrar.html">Registrar consumo</a>
+        <a href="lotes.html" class="active">Lotes</a>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Lotes</h1>
+    <p class="hero-sub">Saldo en vivo, sin fórmulas que se rompan.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+  <div class="panel">
+    <div class="panel-body">
+      <input type="text" id="buscar" placeholder="Buscar por número, proveedor o procedencia…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Lote</th><th>Proveedor</th><th>Procedencia</th><th>Almacén</th><th>Ubicación</th>
+            <th class="right">Peso neto</th><th class="right">Saldo</th>
+            <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
+          </tr>
+        </thead>
+        <tbody id="filas"><tr><td colspan="10" class="empty">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let todos = [];
+
+function fila(l) {
+  const pct = l.peso_neto_kg > 0 ? Math.min(100, (l.kg_saldo / l.peso_neto_kg) * 100) : 0;
+  const tagLabel = l.tipo_almacen === "BINES" ? "Bines" : l.tipo_almacen === "SILO" ? "Silo" : "Mixto";
+  return `
+    <tr>
+      <td class="strong num">${l.numero}</td>
+      <td>${escapeHtml(l.proveedor)}</td>
+      <td>${escapeHtml(l.procedencia || "—")}</td>
+      <td><span class="tag">${tagLabel}</span></td>
+      <td>${escapeHtml(l.ubicacion || "—")}</td>
+      <td class="right num">${fmtKg(l.peso_neto_kg)}</td>
+      <td class="right num"><span class="saldo-bar"><i style="width:${pct}%"></i></span>${fmtKg(l.kg_saldo)}</td>
+      <td class="right num">${l.brix_recepcion ?? "—"}</td>
+      <td class="right num">${l.acidez ?? "—"}</td>
+      <td class="right num">${l.ratio ?? "—"}</td>
+    </tr>
+  `;
+}
+
+function render(lista) {
+  const cont = document.getElementById("filas");
+  cont.innerHTML = lista.length
+    ? lista.map(fila).join("")
+    : '<tr><td colspan="10" class="empty">Sin resultados</td></tr>';
+}
+
+async function cargar() {
+  try {
+    todos = await apiGet("/api/lotes");
+    render(todos);
+  } catch (e) {
+    document.getElementById("filas").innerHTML = `<tr><td colspan="10"><div class="msg bad">${escapeHtml(e.message)}</div></td></tr>`;
+  }
+}
+
+document.getElementById("buscar").addEventListener("input", (ev) => {
+  const q = ev.target.value.toLowerCase();
+  render(todos.filter(l =>
+    String(l.numero).includes(q) ||
+    (l.proveedor || "").toLowerCase().includes(q) ||
+    (l.procedencia || "").toLowerCase().includes(q)
+  ));
+});
+
+cargar();
+</script>
+</body>
+</html>
