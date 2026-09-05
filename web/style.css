@@ -39,8 +39,9 @@ nav.tabs a.active{background:rgba(18,53,36,.08);color:var(--hero-text)}
 .hero-title{font-size:38px;font-weight:800;line-height:1.08;letter-spacing:-.01em;margin-top:8px;max-width:620px;color:var(--hero-text)}
 .hero-title em{font-style:italic;font-weight:500;color:var(--hero-citrus)}
 .hero-sub{font-size:15px;color:var(--hero-text-2);margin-top:12px;max-width:480px;line-height:1.6}
-.hero-badges{display:flex;align-items:center;gap:16px;margin-top:28px;flex-wrap:wrap}
-.hero-badges img{height:38px;width:auto;display:block}
+.hero-badges{display:flex;align-items:center;gap:18px;margin-top:28px;flex-wrap:wrap}
+.hero-badges img{height:42px;width:auto;display:block}
+.hero-badges img.round{height:46px;border-radius:50%;box-shadow:0 0 0 1px var(--hero-border)}
 .hero-badges-placeholder{display:flex;gap:10px;margin-top:28px;flex-wrap:wrap}
 .hero-badge-slot{width:54px;height:54px;flex-shrink:0;border:1px dashed var(--hero-border);border-radius:10px;
   display:flex;align-items:center;justify-content:center;text-align:center;
