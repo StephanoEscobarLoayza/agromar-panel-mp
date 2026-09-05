@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Cuadre de producción · Agromar</title>
+<title>Dashboards · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -19,61 +19,83 @@
         <div class="mark-sub">Industrial</div>
       </div>
       <nav class="tabs">
-        <a href="index.html" class="active">Corridas</a>
+        <a href="index.html" class="active">Dashboards</a>
+        <a href="corridas.html">Corridas</a>
         <a href="registrar.html">Registrar consumo</a>
         <a href="lotes.html">Lotes</a>
-        <a href="dashboards.html">Dashboards</a>
         <a href="sincronizar.html">Sincronizar</a>
       </nav>
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
-    <h1 class="hero-title">Cuadre de producción,<br><em>corrida por corrida.</em></h1>
-    <p class="hero-sub">Cada lote se valida al momento de asignarlo — nada de cuadrar a mano al cierre de campaña.</p>
+    <h1 class="hero-title">Dashboards</h1>
+    <p class="hero-sub">Toda la campaña, de un vistazo.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
   </div>
 </div>
 
-<div class="wrap">
-  <div class="kpis" id="kpis"></div>
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+  <div class="kpis-3" id="kpis"><div class="empty">Cargando…</div></div>
 
   <section>
     <div class="section-head">
-      <h2>Corridas</h2>
-      <button class="btn" id="btnMostrarForm" style="width:auto;padding:8px 16px">+ Nueva corrida</button>
+      <h2>MP procesada por corrida</h2>
+      <span class="hint">más reciente primero</span>
     </div>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="stat-row scroll-y" id="chartCorridas"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+  </section>
 
-    <div class="panel" id="formNuevaCorrida" style="display:none;margin-bottom:16px">
-      <div class="form-body">
-        <div class="two-col">
-          <div class="field">
-            <label for="ncTipo">Tipo de proceso</label>
-            <select id="ncTipo">
-              <option value="JSA">JSA Aseptic</option>
-              <option value="JCC">JCC</option>
-              <option value="JSC">JSC</option>
-              <option value="ICEGEN">ICEGEN</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="ncFecha">Fecha y hora de inicio</label>
-            <input type="datetime-local" id="ncFecha">
-          </div>
-        </div>
-        <div class="field">
-          <label for="ncNombre">Nombre de la corrida</label>
-          <input type="text" id="ncNombre" placeholder="se sugiere solo, puedes cambiarlo">
-        </div>
-        <div id="ncMsg"></div>
-        <div class="two-col">
-          <button class="btn" id="btnCrearCorrida">Crear corrida</button>
-          <button class="btn" id="btnCancelarCorrida" style="background:var(--surface-2);color:var(--text)">Cancelar</button>
-        </div>
+  <section>
+    <div class="section-head">
+      <h2>Duración promedio de corrida</h2>
+      <span class="hint">horas, por tipo de proceso</span>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="stat-row" id="duracion"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="split split-stretch">
+    <div class="panel">
+      <div class="panel-head"><h3>Promedio de MP por tipo de proceso</h3></div>
+      <div class="panel-body">
+        <div class="stat-row" id="porTipo"><div class="empty">Cargando…</div></div>
       </div>
     </div>
 
-    <div id="corridas"><div class="empty">Cargando…</div></div>
+    <div class="panel">
+      <div class="panel-head"><h3>Top proveedores</h3></div>
+      <div class="panel-body">
+        <div class="stat-row scroll-y" id="porProveedor" style="max-height:280px"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="split split-stretch">
+    <div class="panel">
+      <div class="panel-head"><h3>Lotes por estado</h3></div>
+      <div class="panel-body">
+        <div class="stat-row" id="porEstado"><div class="empty">Cargando…</div></div>
+        <div class="mini-subhead">Lotes con saldo disponible</div>
+        <div class="stat-row scroll-y" id="listaSaldo" style="max-height:260px"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Producto terminado</h3></div>
+      <div class="panel-body">
+        <div class="kpis-2" id="kpisProducto"></div>
+        <div class="mini-subhead">Por corrida</div>
+        <div class="stat-row scroll-y" id="porCorridaProducto" style="max-height:260px"><div class="empty">Cargando…</div></div>
+      </div>
+    </div>
   </section>
 
   <div class="foot">
@@ -85,258 +107,241 @@
 
 <script src="app.js"></script>
 <script>
-const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Setiembre","Octubre","Noviembre","Diciembre"];
+const TIPO_ORDEN = [
+  { key: "JSA", label: "JSA Aseptic", clase: "series-1" },
+  { key: "JCC", label: "JCC", clase: "series-2" },
+  { key: "JSC", label: "JSC", clase: "series-3" },
+  { key: "ICEGEN", label: "ICEGEN", clase: "series-4" },
+  { key: "OTRO", label: "Otro", clase: "series-otro" },
+];
 
-function nowLocalDatetime() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const ESTADO_ORDEN = [
+  { key: "EN ESPERA", label: "En espera", var: "--warn" },
+  { key: "EN PROCESO", label: "En proceso", var: "--ok" },
+  { key: "PROCESADO", label: "Procesado", var: "--text-muted" },
+];
+
+function normEstado(e) { return (e || "").trim().toUpperCase(); }
+
+function mpDeCorrida(c) {
+  return Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0);
 }
 
-function sugerirNombre() {
-  const fechaStr = document.getElementById("ncFecha").value;
-  const tipo = document.getElementById("ncTipo").value;
-  if (!fechaStr) return;
-  const d = new Date(fechaStr);
-  const dia = String(d.getDate()).padStart(2, "0");
-  const mes = MESES[d.getMonth()];
-  const nombreInput = document.getElementById("ncNombre");
-  const sugerido = `${dia}-${mes} ${tipo}`;
-  // solo pisa el nombre si el usuario no lo edito a mano todavia
-  if (!nombreInput.dataset.tocado) nombreInput.value = sugerido;
-}
-
-function corridaCard(c) {
-  const rango = c.fecha_final
-    ? `${fmtDate(c.fecha_inicio)} — ${fmtDate(c.fecha_final)}`
-    : `En curso desde ${fmtDate(c.fecha_inicio)}`;
-  const abierta = c.fecha_final === null;
-
-  const acciones = [];
-  if (abierta) {
-    acciones.push(`<button class="btn-link" data-accion="finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Finalizar corrida</button>`);
-  }
-  acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
-  if (Number(c.kg_asignados_total) === 0) {
-    acciones.push(`<button class="btn-link btn-link-bad" data-accion="eliminar-corrida" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Eliminar</button>`);
-  }
-
+// ---------- barras horizontales (categoria + valor), etiqueta y numero siempre visibles ----------
+function statBarRow(label, valorTexto, pct, colorStyle, labelWidth) {
   return `
-    <div class="corrida${abierta ? " live" : ""}">
-      <div class="corrida-top">
-        <div>
-          <div class="corrida-name">${escapeHtml(c.nombre)}</div>
-          <div class="corrida-range">${rango}</div>
-        </div>
-      </div>
-      <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
-      <div class="corrida-acciones">${acciones.join("")}</div>
-      <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
-        <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
-        <div class="two-col" style="margin-top:10px">
-          <input type="text" id="prod-nombre-${c.id}" placeholder="Producto (ej. Concentrado)">
-          <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
-        </div>
-        <div class="two-col" style="margin-top:8px">
-          <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
-          <div class="hint-line" id="prod-pt-${c.id}" style="align-self:center">PT kg: —</div>
-        </div>
-        <div id="prod-msg-${c.id}"></div>
-        <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar producto</button>
-      </div>
+    <div class="stat-bar-row">
+      <div class="stat-bar-label" style="${labelWidth ? `width:${labelWidth}` : ""}">${label}</div>
+      <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
+      <div class="stat-bar-value num">${valorTexto}</div>
     </div>
   `;
 }
 
-function productoFila(p, corridaId) {
-  return `
-    <div class="prod-fila">
-      <div><b>${escapeHtml(p.producto)}</b><span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg</span></div>
-      <div class="prod-pt num">${fmtKg(p.pt_kg)} kg<button class="btn-link" data-accion="eliminar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Eliminar">✕</button></div>
-    </div>
-  `;
+// ---------- MP procesada por corrida: lista (mas reciente primero), no un grafico mudo ----------
+function renderListaCorridas(corridas) {
+  const cont = document.getElementById("chartCorridas");
+  const datos = corridas
+    .slice()
+    .sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio))
+    .map(c => ({ nombre: c.nombre, valor: mpDeCorrida(c) }));
+
+  if (datos.length === 0) {
+    cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
+    return;
+  }
+  const max = Math.max(...datos.map(d => d.valor), 1);
+  cont.innerHTML = datos.map(d => statBarRow(
+    escapeHtml(d.nombre),
+    `${fmtKg(d.valor)} kg`,
+    Math.max(2, (d.valor / max) * 100),
+    "background:var(--citrus)",
+    "190px"
+  )).join("");
 }
 
-async function cargarProductosPanel(corridaId) {
-  const cont = document.getElementById(`prod-lista-${corridaId}`);
-  try {
-    const productos = await apiGet(`/api/corridas/${corridaId}/productos`);
-    cont.innerHTML = productos.length
-      ? productos.map(p => productoFila(p, corridaId)).join("")
-      : '<div class="empty">Sin productos registrados todavía.</div>';
-  } catch (e) {
-    cont.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+// ---------- MP por tipo de proceso: PROMEDIO por corrida (no el total, que solo refleja cuantas corridas hubo de cada tipo) ----------
+function renderPorTipo(corridas) {
+  const stats = {};
+  for (const t of TIPO_ORDEN) stats[t.key] = { suma: 0, cuenta: 0 };
+  for (const c of corridas) {
+    const valor = mpDeCorrida(c);
+    if (valor <= 0) continue;
+    const tipo = TIPO_ORDEN.some(t => t.key === c.tipo_proceso) ? c.tipo_proceso : "OTRO";
+    stats[tipo].suma += valor;
+    stats[tipo].cuenta += 1;
   }
+  const promedios = {};
+  for (const t of TIPO_ORDEN) promedios[t.key] = stats[t.key].cuenta ? stats[t.key].suma / stats[t.key].cuenta : 0;
+  const max = Math.max(...Object.values(promedios), 1);
+
+  const cont = document.getElementById("porTipo");
+  const filas = TIPO_ORDEN
+    .filter(t => stats[t.key].cuenta > 0)
+    .map(t => statBarRow(
+      `${t.label} <span class="stat-bar-sub">(${stats[t.key].cuenta})</span>`,
+      `${fmtKg(promedios[t.key])} kg`,
+      Math.max(2, (promedios[t.key] / max) * 100),
+      `background:var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`,
+      "150px"
+    ));
+  cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
+}
+
+function renderPorEstado(lotes) {
+  const conteo = { "EN ESPERA": 0, "EN PROCESO": 0, "PROCESADO": 0 };
+  for (const l of lotes) {
+    const e = normEstado(l.estado_actual);
+    if (e in conteo) conteo[e]++;
+  }
+  const max = Math.max(...Object.values(conteo), 1);
+  const cont = document.getElementById("porEstado");
+  cont.innerHTML = ESTADO_ORDEN.map(e => statBarRow(
+    e.label, conteo[e.key], Math.max(2, (conteo[e.key] / max) * 100), `background:var(${e.var})`
+  )).join("");
+}
+
+// ---------- lotes que todavia tienen saldo (los que de verdad siguen en planta) ----------
+function renderListaSaldo(lotes) {
+  const conSaldo = lotes
+    .filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_actual)))
+    .sort((a, b) => Number(b.kg_saldo) - Number(a.kg_saldo));
+
+  const cont = document.getElementById("listaSaldo");
+  if (conSaldo.length === 0) {
+    cont.innerHTML = '<div class="empty">No hay lotes con saldo en este momento.</div>';
+    return;
+  }
+  const max = Math.max(...conSaldo.map(l => Number(l.kg_saldo)), 1);
+  cont.innerHTML = conSaldo.map(l => statBarRow(
+    `#${l.numero} <span class="stat-bar-sub">${escapeHtml(l.ubicacion_actual || "—")}</span>`,
+    `${fmtKg(l.kg_saldo)} kg`,
+    Math.max(2, (Number(l.kg_saldo) / max) * 100),
+    "background:var(--forest-2)",
+    "120px"
+  )).join("");
+}
+
+// ---------- duracion promedio de corrida por tipo de proceso (solo corridas cerradas, que ya tienen fecha_final real) ----------
+function renderDuracionPromedio(corridas) {
+  const stats = {};
+  for (const t of TIPO_ORDEN) stats[t.key] = { sumaHoras: 0, cuenta: 0 };
+  for (const c of corridas) {
+    if (!c.fecha_final) continue;
+    const horas = (new Date(c.fecha_final) - new Date(c.fecha_inicio)) / 3600000;
+    if (horas <= 0) continue;
+    const tipo = TIPO_ORDEN.some(t => t.key === c.tipo_proceso) ? c.tipo_proceso : "OTRO";
+    stats[tipo].sumaHoras += horas;
+    stats[tipo].cuenta += 1;
+  }
+  const promedios = {};
+  for (const t of TIPO_ORDEN) promedios[t.key] = stats[t.key].cuenta ? stats[t.key].sumaHoras / stats[t.key].cuenta : 0;
+  const max = Math.max(...Object.values(promedios), 1);
+
+  const cont = document.getElementById("duracion");
+  const filas = TIPO_ORDEN
+    .filter(t => stats[t.key].cuenta > 0)
+    .map(t => statBarRow(
+      `${t.label} <span class="stat-bar-sub">(${stats[t.key].cuenta})</span>`,
+      `${promedios[t.key].toFixed(1)} h`,
+      Math.max(2, (promedios[t.key] / max) * 100),
+      `background:var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`,
+      "150px"
+    ));
+  cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
+}
+
+// ---------- top proveedores por volumen de MP entregado ----------
+function renderPorProveedor(lotes) {
+  const totales = {};
+  for (const l of lotes) {
+    const prov = l.proveedor || "—";
+    totales[prov] = (totales[prov] || 0) + Number(l.peso_neto_kg || 0);
+  }
+  const entradas = Object.entries(totales).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const cont = document.getElementById("porProveedor");
+  if (entradas.length === 0) {
+    cont.innerHTML = '<div class="empty">Sin datos.</div>';
+    return;
+  }
+  const max = entradas[0][1] || 1;
+  cont.innerHTML = entradas.map(([prov, valor]) => statBarRow(
+    escapeHtml(prov),
+    `${fmtKg(valor)} kg`,
+    Math.max(2, (valor / max) * 100),
+    "background:var(--citrus)",
+    "170px"
+  )).join("");
+}
+
+// ---------- producto terminado: total + rendimiento, y detalle por corrida ----------
+function renderProductoTerminado(productos) {
+  const kpisCont = document.getElementById("kpisProducto");
+  const listaCont = document.getElementById("porCorridaProducto");
+
+  if (productos.length === 0) {
+    kpisCont.innerHTML = "";
+    listaCont.innerHTML = '<div class="empty">Todavía no hay productos de salida registrados — se completa cuando producción cargue tambores en una corrida (botón "Productos de salida").</div>';
+    return;
+  }
+
+  const ptTotal = productos.reduce((suma, p) => suma + Number(p.pt_kg || 0), 0);
+
+  const porCorrida = {};
+  for (const p of productos) {
+    if (!porCorrida[p.corrida_id]) {
+      porCorrida[p.corrida_id] = { nombre: p.corrida_nombre, fecha: p.fecha_inicio, mpKg: Number(p.mp_kg_objetivo || 0), pt: 0, items: [] };
+    }
+    porCorrida[p.corrida_id].pt += Number(p.pt_kg || 0);
+    porCorrida[p.corrida_id].items.push(`${p.producto} ${fmtKg(p.pt_kg)} kg`);
+  }
+  const filas = Object.values(porCorrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  const rendimientos = filas.filter(f => f.mpKg > 0).map(f => f.pt / f.mpKg);
+  const rendimientoProm = rendimientos.length ? rendimientos.reduce((a, b) => a + b, 0) / rendimientos.length : null;
+
+  kpisCont.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Producto terminado</div><div class="kpi-value num citrus">${fmtKg(ptTotal)}</div><div class="kpi-note">kg, toda la campaña</div></div>
+    <div class="kpi"><div class="kpi-label">Rendimiento promedio</div><div class="kpi-value num">${rendimientoProm !== null ? (rendimientoProm * 100).toFixed(1) + "%" : "—"}</div><div class="kpi-note">PT kg / MP kg</div></div>
+  `;
+
+  const max = Math.max(...filas.map(f => f.pt), 1);
+  listaCont.innerHTML = filas.map(f => statBarRow(
+    `${escapeHtml(f.nombre)} <span class="stat-bar-sub">${escapeHtml(f.items.join(" · "))}</span>`,
+    `${fmtKg(f.pt)} kg`,
+    Math.max(2, (f.pt / max) * 100),
+    "background:var(--forest-2)",
+    "170px"
+  )).join("");
 }
 
 async function cargar() {
   try {
-    const corridas = await apiGet("/api/corridas");
-    const cont = document.getElementById("corridas");
+    const [corridas, lotes, productos] = await Promise.all([
+      apiGet("/api/corridas"), apiGet("/api/lotes"), apiGet("/api/productos"),
+    ]);
 
-    if (corridas.length === 0) {
-      cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
-    } else {
-      cont.innerHTML = corridas.map(corridaCard).join("");
-    }
-
-    // "Activa" = literalmente sigue abierta ahora mismo (sin fecha_final).
-    // Antes tambien contaba corridas viejas "incompletas" por inconsistencias
-    // de Trazabilidad, lo que inflaba el numero sin que hubiera nada corriendo
-    // de verdad (Stephano lo noto: "si solo hay una corrida ahorita").
-    const activas = corridas.filter(c => c.fecha_final === null);
-    const enCurso = activas[0];
-    const kgHoy = enCurso ? enCurso.kg_asignados_total : (corridas[0] ? corridas[0].kg_asignados_total : 0);
-
-    // MP procesada: usa el objetivo de Trazabilidad cuando ya se documento
-    // (dato confiable), y el total registrado hasta ahora para corridas que
-    // todavia no tienen objetivo (en curso o recien cerradas).
-    const mpProcesada = corridas.reduce((suma, c) => suma + Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0), 0);
-
-    // "Lotes con saldo" se basa en el estado real del Sheet de recepcion
-    // (EN PROCESO / EN ESPERA = sigue en planta), no en el kg_saldo calculado
-    // por la app - ese arrastra saldo residual de lotes viejos que en la
-    // practica ya no estan (inconsistencias historicas de Trazabilidad que
-    // el backfill dejo marcadas para revisar, no lotes fisicos presentes).
-    const lotesData = await apiGet("/api/lotes");
-    const normEstado = e => (e || "").trim().toUpperCase();
-    const enPlanta = lotesData.filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_actual)));
+    const mpProcesada = corridas.reduce((suma, c) => suma + mpDeCorrida(c), 0);
+    const conValor = corridas.filter(c => mpDeCorrida(c) > 0);
+    const promedio = conValor.length ? mpProcesada / conValor.length : 0;
 
     document.getElementById("kpis").innerHTML = `
-      <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${activas.length > 0 ? "en curso ahora" : "ninguna en curso"}</div></div>
-      <div class="kpi"><div class="kpi-label">${enCurso ? "Kg registrados hoy" : "Kg asignados (última)"}</div><div class="kpi-value num citrus">${fmtKg(kgHoy)}</div><div class="kpi-note">${enCurso ? escapeHtml(enCurso.nombre) : ""}</div></div>
-      <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${enPlanta.length}</div><div class="kpi-note">en proceso o en espera</div></div>
-      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, todas las corridas</div></div>
+      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num citrus">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, toda la campaña</div></div>
+      <div class="kpi"><div class="kpi-label">Corridas</div><div class="kpi-value num">${corridas.length}</div><div class="kpi-note">registradas en total</div></div>
+      <div class="kpi"><div class="kpi-label">Promedio por corrida</div><div class="kpi-value num">${fmtKg(promedio)}</div><div class="kpi-note">kg de MP</div></div>
     `;
+
+    renderListaCorridas(corridas);
+    renderDuracionPromedio(corridas);
+    renderPorTipo(corridas);
+    renderPorProveedor(lotes);
+    renderPorEstado(lotes);
+    renderListaSaldo(lotes);
+    renderProductoTerminado(productos);
   } catch (e) {
-    document.getElementById("corridas").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    document.getElementById("kpis").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
   }
 }
-
-// ---------- formulario "nueva corrida" ----------
-const btnMostrarForm = document.getElementById("btnMostrarForm");
-const formNuevaCorrida = document.getElementById("formNuevaCorrida");
-const ncFecha = document.getElementById("ncFecha");
-const ncTipo = document.getElementById("ncTipo");
-const ncNombre = document.getElementById("ncNombre");
-const ncMsg = document.getElementById("ncMsg");
-
-btnMostrarForm.addEventListener("click", () => {
-  const mostrar = formNuevaCorrida.style.display === "none";
-  formNuevaCorrida.style.display = mostrar ? "block" : "none";
-  if (mostrar) {
-    ncFecha.value = nowLocalDatetime();
-    ncNombre.dataset.tocado = "";
-    sugerirNombre();
-  }
-});
-
-document.getElementById("btnCancelarCorrida").addEventListener("click", () => {
-  formNuevaCorrida.style.display = "none";
-});
-
-ncFecha.addEventListener("change", sugerirNombre);
-ncTipo.addEventListener("change", sugerirNombre);
-ncNombre.addEventListener("input", () => { ncNombre.dataset.tocado = "1"; });
-
-document.getElementById("btnCrearCorrida").addEventListener("click", async () => {
-  const nombre = ncNombre.value.trim();
-  if (!nombre) {
-    ncMsg.innerHTML = '<div class="msg bad">Ponle un nombre a la corrida.</div>';
-    return;
-  }
-  if (!ncFecha.value) {
-    ncMsg.innerHTML = '<div class="msg bad">Elige la fecha y hora de inicio.</div>';
-    return;
-  }
-  try {
-    await apiPost("/api/corridas", {
-      nombre,
-      tipo_proceso: ncTipo.value,
-      fecha_inicio: ncFecha.value,
-    });
-    formNuevaCorrida.style.display = "none";
-    ncMsg.innerHTML = "";
-    cargar();
-  } catch (e) {
-    ncMsg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
-  }
-});
-
-// ---------- acciones por tarjeta (finalizar / objetivo) ----------
-document.getElementById("corridas").addEventListener("click", async (ev) => {
-  const btn = ev.target.closest("button[data-accion]");
-  if (!btn) return;
-  const accion = btn.dataset.accion;
-  const id = btn.dataset.id;
-
-  if (accion === "finalizar") {
-    if (!confirm(`¿Finalizar "${btn.dataset.nombre}"? Se cierra con la fecha y hora de ahora mismo.`)) return;
-    try {
-      await apiPost(`/api/corridas/${id}/finalizar`, {});
-      cargar();
-    } catch (e) {
-      alert(e.message);
-    }
-  } else if (accion === "eliminar-corrida") {
-    if (!confirm(`¿Eliminar la corrida "${btn.dataset.nombre}"? Esto no se puede deshacer.`)) return;
-    try {
-      await apiDelete(`/api/corridas/${id}`);
-      cargar();
-    } catch (e) {
-      alert(e.message);
-    }
-  } else if (accion === "productos") {
-    const panel = document.getElementById(`prod-panel-${id}`);
-    const abrir = panel.style.display === "none";
-    panel.style.display = abrir ? "block" : "none";
-    if (abrir) cargarProductosPanel(id);
-  } else if (accion === "guardar-producto") {
-    const nombre = document.getElementById(`prod-nombre-${id}`).value.trim();
-    const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || null;
-    const peso = Number(document.getElementById(`prod-peso-${id}`).value) || null;
-    const msg = document.getElementById(`prod-msg-${id}`);
-    if (!nombre) {
-      msg.innerHTML = '<div class="msg bad">Ponle un nombre al producto.</div>';
-      return;
-    }
-    try {
-      await apiPost(`/api/corridas/${id}/productos`, {
-        producto: nombre,
-        tambores,
-        peso_neto_tambor_kg: peso,
-      });
-      document.getElementById(`prod-nombre-${id}`).value = "";
-      document.getElementById(`prod-tambores-${id}`).value = "";
-      document.getElementById(`prod-peso-${id}`).value = "";
-      document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
-      msg.innerHTML = "";
-      cargarProductosPanel(id);
-    } catch (e) {
-      msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
-    }
-  } else if (accion === "eliminar-producto") {
-    const corridaId = btn.dataset.corrida;
-    if (!confirm("¿Eliminar este producto de la corrida?")) return;
-    try {
-      await apiDelete(`/api/corridas/${corridaId}/productos/${id}`);
-      cargarProductosPanel(corridaId);
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-});
-
-// PT kg en vivo mientras se llena tambores/peso en cualquier panel de productos
-document.getElementById("corridas").addEventListener("input", (ev) => {
-  const el = ev.target;
-  if (!el.id.startsWith("prod-tambores-") && !el.id.startsWith("prod-peso-")) return;
-  const id = el.id.split("-").pop();
-  const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || 0;
-  const peso = Number(document.getElementById(`prod-peso-${id}`).value) || 0;
-  const ptEl = document.getElementById(`prod-pt-${id}`);
-  ptEl.textContent = tambores && peso ? `PT kg: ${fmtKg(tambores * peso)}` : "PT kg: —";
-});
 
 cargar();
 </script>
