@@ -200,19 +200,20 @@ def finalizar_corrida(corrida_id: int):
     return {"ok": True}
 
 
-class NuevoObjetivo(BaseModel):
-    mp_kg_objetivo: float
-
-
-@app.post("/api/corridas/{corrida_id}/objetivo")
-def actualizar_objetivo(corrida_id: int, o: NuevoObjetivo):
-    if o.mp_kg_objetivo <= 0:
-        raise HTTPException(status_code=400, detail="El objetivo debe ser mayor a 0.")
+@app.delete("/api/corridas/{corrida_id}")
+def eliminar_corrida(corrida_id: int):
+    """Solo se puede borrar una corrida sin asignaciones - para corregir una
+    creada por error, no para descartar consumo ya registrado."""
     with engine.begin() as conn:
-        result = conn.execute(
-            text("UPDATE corridas SET mp_kg_objetivo = :v WHERE id = :id RETURNING id"),
-            {"v": o.mp_kg_objetivo, "id": corrida_id},
-        )
+        n_asignaciones = conn.execute(
+            text("SELECT count(*) FROM asignaciones WHERE corrida_id = :id"), {"id": corrida_id}
+        ).scalar()
+        if n_asignaciones > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Esta corrida ya tiene {n_asignaciones} asignación(es) de consumo - no se puede eliminar para no perder ese registro.",
+            )
+        result = conn.execute(text("DELETE FROM corridas WHERE id = :id RETURNING id"), {"id": corrida_id})
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Corrida no encontrada.")
     return {"ok": True}
@@ -380,6 +381,44 @@ def crear_asignacion(a: NuevaAsignacion):
         # el trigger de saldo insuficiente (trg_validar_saldo_lote) llega aqui
         # como excepcion de la base - se traduce a un 400 con el mensaje tal cual.
         raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+
+
+class EditarAsignacion(BaseModel):
+    kg_asignados: float
+
+
+@app.post("/api/asignaciones/{asignacion_id}")
+def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
+    """Corrige el kg de una asignacion ya registrada (ej. se tecleo mal el
+    numero). Solo toca kg_asignados - bines_consumidos/observaciones no se
+    piden en la UI de edicion, y sobreescribirlos con valores por defecto
+    los borraria de un registro que ya tenia datos reales."""
+    if a.kg_asignados <= 0:
+        raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text("UPDATE asignaciones SET kg_asignados = :kg WHERE id = :id RETURNING id"),
+                {"id": asignacion_id, "kg": a.kg_asignados},
+            )
+            if result.scalar() is None:
+                raise HTTPException(status_code=404, detail="Asignación no encontrada.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+    return {"ok": True}
+
+
+@app.delete("/api/asignaciones/{asignacion_id}")
+def eliminar_asignacion(asignacion_id: int):
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("DELETE FROM asignaciones WHERE id = :id RETURNING id"), {"id": asignacion_id}
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Asignación no encontrada.")
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

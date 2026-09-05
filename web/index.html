@@ -28,7 +28,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Cuadre de producción,<br><em>corrida por corrida.</em></h1>
-    <p class="hero-sub">Cada lote asignado se valida contra Trazabilidad en el momento — nada de cuadrar a mano al cierre de campaña.</p>
+    <p class="hero-sub">Cada lote se valida al momento de asignarlo — nada de cuadrar a mano al cierre de campaña.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -65,7 +65,6 @@
           <label for="ncNombre">Nombre de la corrida</label>
           <input type="text" id="ncNombre" placeholder="se sugiere solo, puedes cambiarlo">
         </div>
-        <div class="hint-line">El objetivo de Trazabilidad (MP kg) no se pide aquí — se agrega después, cuando se documente la corrida.</div>
         <div id="ncMsg"></div>
         <div class="two-col">
           <button class="btn" id="btnCrearCorrida">Crear corrida</button>
@@ -107,63 +106,31 @@ function sugerirNombre() {
   if (!nombreInput.dataset.tocado) nombreInput.value = sugerido;
 }
 
-function pillFor(estado) {
-  const map = {
-    cuadra: ["ok", "Cuadra"],
-    incompleto: ["warn", "Incompleto"],
-    excedido: ["bad", "Excedido"],
-    sin_objetivo: ["neutral", "En curso"],
-  };
-  return map[estado] || ["neutral", estado];
-}
-
 function corridaCard(c) {
-  const [pillClass, pillLabel] = pillFor(c.estado_cuadre);
   const rango = c.fecha_final
     ? `${fmtDate(c.fecha_inicio)} — ${fmtDate(c.fecha_final)}`
     : `En curso desde ${fmtDate(c.fecha_inicio)}`;
-
-  let body;
-  if (c.estado_cuadre === "sin_objetivo") {
-    body = `
-      <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg registrados hasta ahora</div>
-      <div class="corrida-note">Todavía sin objetivo de Trazabilidad — se completa cuando se documente la corrida.</div>
-    `;
-  } else {
-    const pct = c.mp_kg_objetivo > 0 ? Math.min(100, (c.kg_asignados_total / c.mp_kg_objetivo) * 100) : 0;
-    body = `
-      <div class="progress-row">
-        <div class="progress-track"><div class="progress-fill ${pillClass}" style="width:${pct}%"></div></div>
-        <div class="progress-figs"><b class="num">${fmtKg(c.kg_asignados_total)}</b> / <span class="num">${fmtKg(c.mp_kg_objetivo)}</span> kg</div>
-      </div>
-    `;
-  }
-
-  const liveClass = c.estado_cuadre === "sin_objetivo" ? " live" : "";
   const abierta = c.fecha_final === null;
 
   const acciones = [];
   if (abierta) {
     acciones.push(`<button class="btn-link" data-accion="finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Finalizar corrida</button>`);
   }
-  acciones.push(`<button class="btn-link" data-accion="objetivo" data-id="${c.id}">${c.mp_kg_objetivo ? "Editar" : "Agregar"} objetivo</button>`);
   acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
+  if (Number(c.kg_asignados_total) === 0) {
+    acciones.push(`<button class="btn-link btn-link-bad" data-accion="eliminar-corrida" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Eliminar</button>`);
+  }
 
   return `
-    <div class="corrida${liveClass}">
+    <div class="corrida${abierta ? " live" : ""}">
       <div class="corrida-top">
         <div>
           <div class="corrida-name">${escapeHtml(c.nombre)}</div>
           <div class="corrida-range">${rango}</div>
         </div>
-        <span class="pill ${pillClass}">${pillLabel}</span>
       </div>
-      ${body}
+      <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
       <div class="corrida-acciones">${acciones.join("")}</div>
-      <div class="objetivo-form" id="obj-form-${c.id}" style="display:none">
-        <input type="number" min="0" step="0.01" placeholder="MP kg de Trazabilidad" id="obj-input-${c.id}">
-        <button class="btn-link strong" data-accion="guardar-objetivo" data-id="${c.id}">Guardar</button>
-      </div>
       <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
         <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
         <div class="two-col" style="margin-top:10px">
@@ -311,18 +278,10 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     } catch (e) {
       alert(e.message);
     }
-  } else if (accion === "objetivo") {
-    const formDiv = document.getElementById(`obj-form-${id}`);
-    formDiv.style.display = formDiv.style.display === "none" ? "flex" : "none";
-  } else if (accion === "guardar-objetivo") {
-    const input = document.getElementById(`obj-input-${id}`);
-    const valor = Number(input.value);
-    if (!valor || valor <= 0) {
-      input.style.outline = "2px solid var(--bad)";
-      return;
-    }
+  } else if (accion === "eliminar-corrida") {
+    if (!confirm(`¿Eliminar la corrida "${btn.dataset.nombre}"? Esto no se puede deshacer.`)) return;
     try {
-      await apiPost(`/api/corridas/${id}/objetivo`, { mp_kg_objetivo: valor });
+      await apiDelete(`/api/corridas/${id}`);
       cargar();
     } catch (e) {
       alert(e.message);

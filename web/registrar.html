@@ -72,8 +72,8 @@
       <div class="panel-head"><h3>Últimas asignaciones</h3></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th><th class="right">Saldo restante</th></tr></thead>
-          <tbody id="recientes"><tr><td colspan="4" class="empty">Elige una corrida</td></tr></tbody>
+          <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th><th class="right">Saldo restante</th><th></th></tr></thead>
+          <tbody id="recientes"><tr><td colspan="5" class="empty">Elige una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -114,18 +114,60 @@ async function cargarRecientes() {
   if (!corridaId) return;
   const asigs = await apiGet(`/api/corridas/${corridaId}/asignaciones`);
   if (asigs.length === 0) {
-    recientesBody.innerHTML = '<tr><td colspan="4" class="empty">Sin asignaciones todavía</td></tr>';
+    recientesBody.innerHTML = '<tr><td colspan="5" class="empty">Sin asignaciones todavía</td></tr>';
   } else {
     recientesBody.innerHTML = asigs.slice(0, 10).map(a => `
-      <tr>
+      <tr data-asig-id="${a.id}">
         <td class="strong num">${a.lote_numero}</td>
-        <td class="right num">${fmtKg(a.kg_asignados)}</td>
+        <td class="right num" data-celda="kg">${fmtKg(a.kg_asignados)}</td>
         <td>${a.turno || ""}</td>
         <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtKg(a.saldo_actual_lote)}</td>
+        <td class="right" data-celda="acciones" style="white-space:nowrap">
+          <button class="btn-link" data-accion="editar-asig" data-id="${a.id}" data-kg="${a.kg_asignados}" title="Editar kg">✎</button>
+          <button class="btn-link btn-link-bad" data-accion="eliminar-asig" data-id="${a.id}" title="Eliminar">✕</button>
+        </td>
       </tr>
     `).join("");
   }
 }
+
+recientesBody.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-accion]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const fila = btn.closest("tr");
+
+  if (btn.dataset.accion === "editar-asig") {
+    fila.querySelector('[data-celda="kg"]').innerHTML =
+      `<input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">`;
+    fila.querySelector('[data-celda="acciones"]').innerHTML = `
+      <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
+      <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
+    `;
+  } else if (btn.dataset.accion === "cancelar-asig") {
+    cargarRecientes();
+  } else if (btn.dataset.accion === "guardar-asig") {
+    const kg = Number(fila.querySelector(".edit-kg-input").value);
+    if (!kg || kg <= 0) {
+      alert("Ingresa un peso mayor a 0.");
+      return;
+    }
+    try {
+      await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg });
+      cargarRecientes();
+    } catch (e) {
+      alert(e.message);
+    }
+  } else if (btn.dataset.accion === "eliminar-asig") {
+    if (!confirm("¿Eliminar esta asignación? El saldo del lote se libera de vuelta.")) return;
+    try {
+      await apiDelete(`/api/asignaciones/${id}`);
+      cargarRecientes();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+});
 
 function renderCamposPeso() {
   mensaje.innerHTML = "";
