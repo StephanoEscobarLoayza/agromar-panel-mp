@@ -139,8 +139,9 @@ function corridaCard(c) {
         </div>
         <div class="two-col" style="margin-top:8px">
           <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
-          <div class="hint-line" id="prod-pt-${c.id}" style="align-self:center">PT kg: —</div>
+          <input type="number" id="prod-litros-${c.id}" min="0" step="0.01" placeholder="Volumen (litros)">
         </div>
+        <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:8px">PT kg: —</div>
         <div id="prod-msg-${c.id}"></div>
         <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar producto</button>
       </div>
@@ -149,9 +150,10 @@ function corridaCard(c) {
 }
 
 function productoFila(p, corridaId) {
+  const litros = p.volumen_litros != null && p.volumen_litros !== "" ? ` · ${fmtKg(p.volumen_litros)} L` : "";
   return `
     <div class="prod-fila">
-      <div><b>${escapeHtml(p.producto)}</b><span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg</span></div>
+      <div><b>${escapeHtml(p.producto)}</b><span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}</span></div>
       <div class="prod-pt num">${fmtKg(p.pt_kg)} kg<button class="btn-link" data-accion="eliminar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Eliminar">✕</button></div>
     </div>
   `;
@@ -295,6 +297,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const nombre = document.getElementById(`prod-nombre-${id}`).value.trim();
     const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || null;
     const peso = Number(document.getElementById(`prod-peso-${id}`).value) || null;
+    const litros = Number(document.getElementById(`prod-litros-${id}`).value) || null;
     const msg = document.getElementById(`prod-msg-${id}`);
     if (!nombre) {
       msg.innerHTML = '<div class="msg bad">Ponle un nombre al producto.</div>';
@@ -305,10 +308,12 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
         producto: nombre,
         tambores,
         peso_neto_tambor_kg: peso,
+        volumen_litros: litros,
       });
       document.getElementById(`prod-nombre-${id}`).value = "";
       document.getElementById(`prod-tambores-${id}`).value = "";
       document.getElementById(`prod-peso-${id}`).value = "";
+      document.getElementById(`prod-litros-${id}`).value = "";
       document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
       msg.innerHTML = "";
       cargarProductosPanel(id);

@@ -261,7 +261,7 @@ def listar_todos_productos():
                 """
                 SELECT cp.id, cp.corrida_id, c.nombre AS corrida_nombre, c.fecha_inicio,
                        c.tipo_proceso, c.mp_kg_objetivo, cp.producto, cp.tambores,
-                       cp.peso_neto_tambor_kg, cp.pt_kg
+                       cp.peso_neto_tambor_kg, cp.pt_kg, cp.volumen_litros
                 FROM corrida_productos cp
                 JOIN corridas c ON c.id = cp.corrida_id
                 ORDER BY c.fecha_inicio DESC
@@ -276,7 +276,7 @@ def listar_productos_corrida(corrida_id: int):
     with engine.connect() as conn:
         result = conn.execute(
             text(
-                "SELECT id, producto, tambores, peso_neto_tambor_kg, pt_kg, observaciones "
+                "SELECT id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, observaciones "
                 "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
             ),
             {"c": corrida_id},
@@ -289,6 +289,7 @@ class NuevoProductoCorrida(BaseModel):
     tambores: Optional[int] = None
     peso_neto_tambor_kg: Optional[float] = None
     pt_kg: Optional[float] = None
+    volumen_litros: Optional[float] = None  # se carga directo (medido/conocido), no se calcula con un factor
     observaciones: Optional[str] = ""
 
 
@@ -306,13 +307,14 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
                 text(
                     """
                     INSERT INTO corrida_productos
-                        (corrida_id, producto, tambores, peso_neto_tambor_kg, pt_kg, observaciones)
+                        (corrida_id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, observaciones)
                     VALUES
-                        (:corrida_id, :producto, :tambores, :peso_tambor, :pt_kg, :obs)
+                        (:corrida_id, :producto, :tambores, :peso_tambor, :pt_kg, :volumen, :obs)
                     ON CONFLICT (corrida_id, producto) DO UPDATE SET
                         tambores = EXCLUDED.tambores,
                         peso_neto_tambor_kg = EXCLUDED.peso_neto_tambor_kg,
                         pt_kg = EXCLUDED.pt_kg,
+                        volumen_litros = EXCLUDED.volumen_litros,
                         observaciones = EXCLUDED.observaciones
                     RETURNING id
                     """
@@ -323,6 +325,7 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
                     "tambores": p.tambores,
                     "peso_tambor": p.peso_neto_tambor_kg,
                     "pt_kg": pt_kg,
+                    "volumen": p.volumen_litros,
                     "obs": p.observaciones,
                 },
             )

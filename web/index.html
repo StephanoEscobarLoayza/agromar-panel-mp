@@ -266,23 +266,38 @@ function renderProductoTerminado(productos) {
   }
 
   const ptTotal = productos.reduce((suma, p) => suma + Number(p.pt_kg || 0), 0);
+  const litrosTotal = productos.reduce((suma, p) => suma + Number(p.volumen_litros || 0), 0);
+  const conLitros = productos.some(p => p.volumen_litros != null && p.volumen_litros !== "");
 
   const porCorrida = {};
   for (const p of productos) {
     if (!porCorrida[p.corrida_id]) {
-      porCorrida[p.corrida_id] = { nombre: p.corrida_nombre, fecha: p.fecha_inicio, mpKg: Number(p.mp_kg_objetivo || 0), pt: 0, items: [] };
+      porCorrida[p.corrida_id] = { nombre: p.corrida_nombre, fecha: p.fecha_inicio, mpKg: Number(p.mp_kg_objetivo || 0), pt: 0, litros: 0, items: [] };
     }
     porCorrida[p.corrida_id].pt += Number(p.pt_kg || 0);
-    porCorrida[p.corrida_id].items.push(`${p.producto} ${fmtKg(p.pt_kg)} kg`);
+    porCorrida[p.corrida_id].litros += Number(p.volumen_litros || 0);
+    const litrosTxt = p.volumen_litros != null && p.volumen_litros !== "" ? ` (${fmtKg(p.volumen_litros)} L)` : "";
+    porCorrida[p.corrida_id].items.push(`${p.producto} ${fmtKg(p.pt_kg)} kg${litrosTxt}`);
   }
   const filas = Object.values(porCorrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   const rendimientos = filas.filter(f => f.mpKg > 0).map(f => f.pt / f.mpKg);
   const rendimientoProm = rendimientos.length ? rendimientos.reduce((a, b) => a + b, 0) / rendimientos.length : null;
 
+  // rendimiento en litros: solo con las corridas que ya tienen volumen cargado -
+  // no se estima con un factor aproximado, es litros reales / mp kg real de esas corridas
+  const conLitrosMp = filas.filter(f => f.litros > 0 && f.mpKg > 0);
+  const litrosPorKg = conLitrosMp.length
+    ? conLitrosMp.reduce((s, f) => s + f.litros, 0) / conLitrosMp.reduce((s, f) => s + f.mpKg, 0)
+    : null;
+
   kpisCont.innerHTML = `
     <div class="kpi"><div class="kpi-label">Producto terminado</div><div class="kpi-value num citrus">${fmtKg(ptTotal)}</div><div class="kpi-note">kg, toda la campaña</div></div>
     <div class="kpi"><div class="kpi-label">Rendimiento promedio</div><div class="kpi-value num">${rendimientoProm !== null ? (rendimientoProm * 100).toFixed(1) + "%" : "—"}</div><div class="kpi-note">PT kg / MP kg</div></div>
+    ${conLitros ? `
+    <div class="kpi"><div class="kpi-label">Litros obtenidos</div><div class="kpi-value num citrus">${fmtKg(litrosTotal)}</div><div class="kpi-note">L, toda la campaña</div></div>
+    <div class="kpi"><div class="kpi-label">Rendimiento en litros</div><div class="kpi-value num">${litrosPorKg !== null ? litrosPorKg.toFixed(2) : "—"}</div><div class="kpi-note">L por kg de MP</div></div>
+    ` : ""}
   `;
 
   const max = Math.max(...filas.map(f => f.pt), 1);

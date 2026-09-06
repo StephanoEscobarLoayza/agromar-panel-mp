@@ -171,6 +171,7 @@ CREATE TABLE corrida_productos (
     tambores             INTEGER,
     peso_neto_tambor_kg  NUMERIC(8,2),
     pt_kg                NUMERIC(12,2),              -- producto terminado en kg (tambores × peso, o cargado directo)
+    volumen_litros       NUMERIC(12,2),              -- litros de producto terminado, cargados directo (no se calcula con un factor aproximado)
     observaciones        TEXT,
     creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
 
