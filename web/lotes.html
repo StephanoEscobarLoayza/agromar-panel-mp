@@ -82,7 +82,25 @@ let todos = [];
 
 const ESTADOS = ["EN ESPERA", "EN PROCESO", "PROCESADO"];
 const ESTADO_LABEL = { "EN ESPERA": "En espera", "EN PROCESO": "En proceso", "PROCESADO": "Procesado" };
-const UBICACIONES = ["Tolva", "Silo 1", "Silo 2", "Silo 1 / Silo 2", "Bines"];
+
+// ---------- ubicación: un lote puede estar en varios sitios a la vez
+// (dos lotes combinados en un mismo silo, o un lote repartido entre silos) -
+// por eso se maneja como un set de casillas, no una sola opción ----------
+const LOCATION_BASE = ["Tolva", "Silo 1", "Silo 2", "Bines"];
+
+function parseUbicaciones(raw) {
+  const s = (raw || "").toLowerCase();
+  return {
+    "Tolva": /tolva/.test(s),
+    "Silo 1": /silo\s*1\b/.test(s),
+    "Silo 2": /silo\s*2\b/.test(s),
+    "Bines": /bines/.test(s),
+  };
+}
+
+function canonicalUbicacion(set) {
+  return LOCATION_BASE.filter(loc => set[loc]);
+}
 
 function normEstado(e) {
   return (e || "").trim().toUpperCase();
@@ -107,9 +125,8 @@ function estadoBoton(l) {
 }
 
 function ubicacionBoton(l) {
-  const actualNorm = (l.ubicacion_actual || "").trim().toLowerCase();
-  const match = UBICACIONES.find(u => u.toLowerCase() === actualNorm);
-  const label = match || l.ubicacion_actual || "—";
+  const elegidos = canonicalUbicacion(parseUbicaciones(l.ubicacion_actual));
+  const label = elegidos.length ? elegidos.join(" / ") : (l.ubicacion_actual || "—");
   const reset = l.ubicacion_manual
     ? `<button class="btn-link reset-ubicacion" data-lote="${l.numero}" title="Volver a la ubicación del Sheet (${escapeHtml(l.ubicacion || "—")})">↺</button>`
     : "";
@@ -198,19 +215,18 @@ function abrirCsel(btn, numero, kind) {
   const lote = todos.find(l => l.numero === Number(numero));
   if (!lote) return;
 
-  let opciones, actual;
   if (kind === "estado") {
-    opciones = ESTADOS.map(e => ({ value: e, label: ESTADO_LABEL[e] }));
-    actual = normEstado(lote.estado_actual);
+    const actual = normEstado(lote.estado_actual);
+    popup.innerHTML = ESTADOS.map(e =>
+      `<li data-value="${escapeHtml(e)}" class="${e === actual ? "csel-selected" : ""}">${escapeHtml(ESTADO_LABEL[e])}</li>`
+    ).join("");
   } else {
-    opciones = UBICACIONES.map(u => ({ value: u, label: u }));
-    const actualNorm = (lote.ubicacion_actual || "").trim().toLowerCase();
-    actual = UBICACIONES.find(u => u.toLowerCase() === actualNorm) || "";
+    // ubicación: casillas (puede estar marcada mas de una a la vez) + botón Aplicar
+    const set = parseUbicaciones(lote.ubicacion_actual);
+    popup.innerHTML = LOCATION_BASE.map(loc =>
+      `<li class="csel-check"><label><input type="checkbox" value="${escapeHtml(loc)}" ${set[loc] ? "checked" : ""}>${escapeHtml(loc)}</label></li>`
+    ).join("") + `<li class="csel-apply-row"><button type="button" class="btn csel-apply">Aplicar</button></li>`;
   }
-
-  popup.innerHTML = opciones.map(o =>
-    `<li data-value="${escapeHtml(o.value)}" class="${o.value === actual ? "csel-selected" : ""}">${escapeHtml(o.label)}</li>`
-  ).join("");
 
   const r = btn.getBoundingClientRect();
   popup.style.left = Math.round(r.left) + "px";
@@ -226,17 +242,33 @@ function cerrarCsel() {
 }
 
 popup.addEventListener("click", async (ev) => {
-  const li = ev.target.closest("li[data-value]");
-  if (!li || !cselContext) return;
+  if (!cselContext) return;
   const { numero, kind } = cselContext;
+
+  if (kind === "ubicacion") {
+    // clic en una casilla: se marca/desmarca sola, el popup se queda abierto
+    if (!ev.target.closest(".csel-apply")) return;
+    const elegidos = Array.from(popup.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+    if (elegidos.length === 0) {
+      alert("Elige al menos una ubicación.");
+      return;
+    }
+    cerrarCsel();
+    try {
+      await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: elegidos.join(" / ") });
+      await cargar();
+    } catch (e) {
+      alert(e.message);
+    }
+    return;
+  }
+
+  const li = ev.target.closest("li[data-value]");
+  if (!li) return;
   const valor = li.dataset.value;
   cerrarCsel();
   try {
-    if (kind === "estado") {
-      await apiPost(`/api/lotes/${numero}/estado`, { estado: valor });
-    } else {
-      await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: valor });
-    }
+    await apiPost(`/api/lotes/${numero}/estado`, { estado: valor });
     await cargar();
   } catch (e) {
     alert(e.message);

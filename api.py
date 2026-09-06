@@ -77,7 +77,17 @@ def obtener_lote(numero: int):
 
 
 ESTADOS_VALIDOS = {"PROCESADO", "EN PROCESO", "EN ESPERA"}
-UBICACIONES_VALIDAS = {"Tolva", "Silo 1", "Silo 2", "Silo 1 / Silo 2", "Bines"}
+
+# un lote puede estar repartido entre varios sitios a la vez (dos lotes
+# combinados en un mismo silo, o un lote entre silo 1 y silo 2) - por eso
+# la ubicación se guarda como una combinación de estos, unida con " / ",
+# en vez de limitarla a una sola opción de una lista fija.
+UBICACIONES_BASE = ["Tolva", "Silo 1", "Silo 2", "Bines"]
+
+
+def ubicacion_es_valida(valor: str) -> bool:
+    partes = [p.strip() for p in valor.split("/")]
+    return bool(partes) and len(set(partes)) == len(partes) and all(p in UBICACIONES_BASE for p in partes)
 
 
 class ActualizarEstadoLote(BaseModel):
@@ -110,8 +120,8 @@ class ActualizarUbicacionLote(BaseModel):
 def actualizar_ubicacion_lote(numero: int, body: ActualizarUbicacionLote):
     """Override manual de producción sobre la ubicación del lote."""
     valor = body.ubicacion.strip() if body.ubicacion else None
-    if valor and valor not in UBICACIONES_VALIDAS:
-        raise HTTPException(status_code=400, detail=f"Ubicación inválida. Usa una de: {', '.join(UBICACIONES_VALIDAS)}.")
+    if valor and not ubicacion_es_valida(valor):
+        raise HTTPException(status_code=400, detail=f"Ubicación inválida. Usa una combinación de: {', '.join(UBICACIONES_BASE)}.")
     with engine.begin() as conn:
         result = conn.execute(
             text("UPDATE lotes SET ubicacion_manual = :v WHERE numero = :n RETURNING numero"),
