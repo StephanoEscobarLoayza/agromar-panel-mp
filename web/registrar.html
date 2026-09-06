@@ -117,13 +117,14 @@ async function cargarRecientes() {
     recientesBody.innerHTML = '<tr><td colspan="5" class="empty">Sin asignaciones todavía</td></tr>';
   } else {
     recientesBody.innerHTML = asigs.slice(0, 10).map(a => `
-      <tr data-asig-id="${a.id}">
+      <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
+          data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}">
         <td class="strong num">${a.lote_numero}</td>
         <td class="right num" data-celda="kg">${fmtKg(a.kg_asignados)}</td>
         <td>${a.turno || ""}</td>
         <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtKg(a.saldo_actual_lote)}</td>
         <td class="right" data-celda="acciones" style="white-space:nowrap">
-          <button class="btn-link" data-accion="editar-asig" data-id="${a.id}" data-kg="${a.kg_asignados}" title="Editar kg">✎</button>
+          <button class="btn-link" data-accion="editar-asig" data-id="${a.id}" data-kg="${a.kg_asignados}" title="Editar">✎</button>
           <button class="btn-link btn-link-bad" data-accion="eliminar-asig" data-id="${a.id}" title="Eliminar">✕</button>
         </td>
       </tr>
@@ -138,8 +139,23 @@ recientesBody.addEventListener("click", async (ev) => {
   const fila = btn.closest("tr");
 
   if (btn.dataset.accion === "editar-asig") {
-    fila.querySelector('[data-celda="kg"]').innerHTML =
-      `<input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">`;
+    const esBines = fila.dataset.tipoOrigen === "BINES" && Number(fila.dataset.binesTotales) > 0;
+    if (esBines) {
+      const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
+      fila.querySelector('[data-celda="kg"]').innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+          <input type="number" min="1" step="1" value="${fila.dataset.bines}" class="edit-bines-input" style="width:64px;text-align:right" placeholder="bines">
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:11px">${kgPorBin.toFixed(2)} kg/bin</span>
+        </div>`;
+      const binesInput = fila.querySelector(".edit-bines-input");
+      binesInput.addEventListener("input", () => {
+        const b = Number(binesInput.value) || 0;
+        document.getElementById(`edit-kg-hint-${id}`).textContent = `${kgPorBin.toFixed(2)} kg/bin · ${fmtKg(b * kgPorBin)} kg`;
+      });
+    } else {
+      fila.querySelector('[data-celda="kg"]').innerHTML =
+        `<input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">`;
+    }
     fila.querySelector('[data-celda="acciones"]').innerHTML = `
       <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
       <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -147,13 +163,25 @@ recientesBody.addEventListener("click", async (ev) => {
   } else if (btn.dataset.accion === "cancelar-asig") {
     cargarRecientes();
   } else if (btn.dataset.accion === "guardar-asig") {
-    const kg = Number(fila.querySelector(".edit-kg-input").value);
-    if (!kg || kg <= 0) {
-      alert("Ingresa un peso mayor a 0.");
-      return;
+    const binesInput = fila.querySelector(".edit-bines-input");
+    let kg, bines = null;
+    if (binesInput) {
+      bines = Number(binesInput.value);
+      if (!bines || bines <= 0) {
+        alert("Ingresa cuántos bines se consumieron.");
+        return;
+      }
+      const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
+      kg = bines * kgPorBin;
+    } else {
+      kg = Number(fila.querySelector(".edit-kg-input").value);
+      if (!kg || kg <= 0) {
+        alert("Ingresa un peso mayor a 0.");
+        return;
+      }
     }
     try {
-      await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg });
+      await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg, bines_consumidos: bines });
       cargarRecientes();
     } catch (e) {
       alert(e.message);

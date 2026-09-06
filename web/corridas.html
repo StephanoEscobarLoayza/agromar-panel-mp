@@ -115,6 +115,8 @@ function corridaCard(c) {
   const acciones = [];
   if (abierta) {
     acciones.push(`<button class="btn-link" data-accion="finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Finalizar corrida</button>`);
+  } else {
+    acciones.push(`<button class="btn-link" data-accion="reabrir" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}" title="Por si se te olvidó registrar el consumo de algún lote antes de cerrarla">Reabrir corrida</button>`);
   }
   acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
   if (Number(c.kg_asignados_total) === 0) {
@@ -276,6 +278,14 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     if (!confirm(`¿Finalizar "${btn.dataset.nombre}"? Se cierra con la fecha y hora de ahora mismo.`)) return;
     try {
       await apiPost(`/api/corridas/${id}/finalizar`, {});
+      cargar();
+    } catch (e) {
+      alert(e.message);
+    }
+  } else if (accion === "reabrir") {
+    if (!confirm(`¿Reabrir "${btn.dataset.nombre}"? Vuelve a aparecer como corrida activa en "Registrar consumo" hasta que la finalices de nuevo.`)) return;
+    try {
+      await apiPost(`/api/corridas/${id}/reabrir`, {});
       cargar();
     } catch (e) {
       alert(e.message);

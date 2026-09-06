@@ -210,6 +210,28 @@ def finalizar_corrida(corrida_id: int):
     return {"ok": True}
 
 
+@app.post("/api/corridas/{corrida_id}/reabrir")
+def reabrir_corrida(corrida_id: int):
+    """Vuelve a abrir una corrida ya finalizada - para cuando se olvidó
+    registrar el consumo de un lote antes de cerrarla (una vez cerrada,
+    deja de aparecer en el selector de 'Registrar consumo'). Se puede
+    volver a finalizar normal después."""
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                UPDATE corridas SET fecha_final = NULL, estado = 'abierta'
+                WHERE id = :id AND estado = 'cerrada'
+                RETURNING id
+                """
+            ),
+            {"id": corrida_id},
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada o ya estaba abierta.")
+    return {"ok": True}
+
+
 @app.delete("/api/corridas/{corrida_id}")
 def eliminar_corrida(corrida_id: int):
     """Solo se puede borrar una corrida sin asignaciones - para corregir una
@@ -237,7 +259,7 @@ def listar_asignaciones(corrida_id: int):
                 """
                 SELECT a.id, a.lote_numero, l.proveedor, a.turno, a.kg_asignados,
                        a.bines_consumidos, a.tipo_almacen_origen, a.observaciones, a.creado_en,
-                       v.peso_neto_kg, v.kg_saldo AS saldo_actual_lote
+                       v.peso_neto_kg, v.kg_saldo AS saldo_actual_lote, v.bines_totales
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
                 JOIN v_saldo_lotes v ON v.numero = a.lote_numero
@@ -398,21 +420,26 @@ def crear_asignacion(a: NuevaAsignacion):
 
 class EditarAsignacion(BaseModel):
     kg_asignados: float
+    bines_consumidos: Optional[int] = None  # solo aplica si el lote es de bines - el front recalcula el kg a partir de esto
 
 
 @app.post("/api/asignaciones/{asignacion_id}")
 def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
-    """Corrige el kg de una asignacion ya registrada (ej. se tecleo mal el
-    numero). Solo toca kg_asignados - bines_consumidos/observaciones no se
-    piden en la UI de edicion, y sobreescribirlos con valores por defecto
-    los borraria de un registro que ya tenia datos reales."""
+    """Corrige una asignacion ya registrada. Si el origen es BINES, el front
+    manda la cantidad de bines corregida junto con el kg ya recalculado
+    (bines x kg-por-bin) - no le pide a producción que calcule el kg a mano.
+    Si es SILO, bines_consumidos llega en null y se guarda así (nunca tuvo
+    bines)."""
     if a.kg_asignados <= 0:
         raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
     try:
         with engine.begin() as conn:
             result = conn.execute(
-                text("UPDATE asignaciones SET kg_asignados = :kg WHERE id = :id RETURNING id"),
-                {"id": asignacion_id, "kg": a.kg_asignados},
+                text(
+                    "UPDATE asignaciones SET kg_asignados = :kg, bines_consumidos = :bines "
+                    "WHERE id = :id RETURNING id"
+                ),
+                {"id": asignacion_id, "kg": a.kg_asignados, "bines": a.bines_consumidos},
             )
             if result.scalar() is None:
                 raise HTTPException(status_code=404, detail="Asignación no encontrada.")
