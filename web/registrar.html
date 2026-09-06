@@ -118,7 +118,7 @@ async function cargarRecientes() {
   } else {
     recientesBody.innerHTML = asigs.slice(0, 10).map(a => `
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
-          data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}">
+          data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
         <td class="strong num">${a.lote_numero}</td>
         <td class="right num" data-celda="kg">${fmtKg(a.kg_asignados)}</td>
         <td>${a.turno || ""}</td>
@@ -142,20 +142,27 @@ recientesBody.addEventListener("click", async (ev) => {
     const esBines = fila.dataset.tipoOrigen === "BINES" && Number(fila.dataset.binesTotales) > 0;
     if (esBines) {
       const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
-      fila.querySelector('[data-celda="kg"]').innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-          <input type="number" min="1" step="1" value="${fila.dataset.bines}" class="edit-bines-input" style="width:64px;text-align:right" placeholder="bines">
-          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:11px">${kgPorBin.toFixed(2)} kg/bin</span>
-        </div>`;
-      const binesInput = fila.querySelector(".edit-bines-input");
-      binesInput.addEventListener("input", () => {
-        const b = Number(binesInput.value) || 0;
-        document.getElementById(`edit-kg-hint-${id}`).textContent = `${kgPorBin.toFixed(2)} kg/bin · ${fmtKg(b * kgPorBin)} kg`;
-      });
-    } else {
+      const binesActual = Number(fila.dataset.bines) || 0;
+      const maxBines = (Number(fila.dataset.binesSaldo) || 0) + binesActual;
       fila.querySelector('[data-celda="kg"]').innerHTML =
-        `<input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">`;
+        `<input type="number" min="1" max="${maxBines}" step="1" value="${fila.dataset.bines}" class="edit-bines-input" style="width:56px;text-align:right">`;
+      fila.querySelector('[data-celda="acciones"]').innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">${fmtKg(binesActual * kgPorBin)} kg · máx ${maxBines} bines</span>
+          <div style="white-space:nowrap">
+            <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
+            <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
+          </div>
+        </div>
+      `;
+      fila.querySelector(".edit-bines-input").addEventListener("input", (ev) => {
+        const b = Number(ev.target.value) || 0;
+        document.getElementById(`edit-kg-hint-${id}`).textContent = `${fmtKg(b * kgPorBin)} kg · máx ${maxBines} bines`;
+      });
+      return;
     }
+    fila.querySelector('[data-celda="kg"]').innerHTML =
+      `<input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">`;
     fila.querySelector('[data-celda="acciones"]').innerHTML = `
       <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
       <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -169,6 +176,11 @@ recientesBody.addEventListener("click", async (ev) => {
       bines = Number(binesInput.value);
       if (!bines || bines <= 0) {
         alert("Ingresa cuántos bines se consumieron.");
+        return;
+      }
+      const maxBines = Number(binesInput.max);
+      if (maxBines && bines > maxBines) {
+        alert(`Ese lote solo tiene ${maxBines} bin(es) disponibles.`);
         return;
       }
       const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
@@ -293,6 +305,10 @@ btnGuardar.addEventListener("click", async () => {
   }
   if (origen === "BINES" && (!bines || bines <= 0)) {
     mensaje.innerHTML = '<div class="msg bad">Ingresa cuántos bines se consumieron.</div>';
+    return;
+  }
+  if (origen === "BINES" && lote.bines_saldo !== null && bines > Number(lote.bines_saldo)) {
+    mensaje.innerHTML = `<div class="msg bad">Ese lote solo tiene ${fmtInt(lote.bines_saldo)} bin(es) disponibles.</div>`;
     return;
   }
 

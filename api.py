@@ -259,7 +259,7 @@ def listar_asignaciones(corrida_id: int):
                 """
                 SELECT a.id, a.lote_numero, l.proveedor, a.turno, a.kg_asignados,
                        a.bines_consumidos, a.tipo_almacen_origen, a.observaciones, a.creado_en,
-                       v.peso_neto_kg, v.kg_saldo AS saldo_actual_lote, v.bines_totales
+                       v.peso_neto_kg, v.kg_saldo AS saldo_actual_lote, v.bines_totales, v.bines_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
                 JOIN v_saldo_lotes v ON v.numero = a.lote_numero
@@ -372,6 +372,29 @@ def eliminar_producto_corrida(corrida_id: int, producto_id: int):
 # ---------------------------------------------------------------------------
 # asignaciones (registrar consumo)
 # ---------------------------------------------------------------------------
+def bines_disponibles(conn, lote_numero: int, excluir_asignacion_id: Optional[int] = None):
+    """(bines_totales, bines_disponibles) de un lote. bines_disponibles ya sumó
+    de vuelta los bines de la propia asignación que se está editando (si
+    aplica) - mismo criterio que el trigger de saldo en kg, que excluye la
+    fila propia. El trigger de la base solo protege el saldo en KG; los
+    bines se validan aquí porque son un conteo aparte (kg y bines pueden
+    desalinearse si alguien ajusta el kg sugerido a mano)."""
+    row = conn.execute(
+        text("SELECT bines_totales, bines_saldo FROM v_saldo_lotes WHERE numero = :n"),
+        {"n": lote_numero},
+    ).mappings().first()
+    if row is None or row["bines_totales"] is None:
+        return (None, None)
+    disponibles = row["bines_saldo"] or 0
+    if excluir_asignacion_id is not None:
+        propios = conn.execute(
+            text("SELECT COALESCE(bines_consumidos, 0) FROM asignaciones WHERE id = :id"),
+            {"id": excluir_asignacion_id},
+        ).scalar()
+        disponibles += propios or 0
+    return (row["bines_totales"], disponibles)
+
+
 class NuevaAsignacion(BaseModel):
     lote_numero: int
     corrida_id: int
@@ -388,6 +411,13 @@ def crear_asignacion(a: NuevaAsignacion):
         raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
     try:
         with engine.begin() as conn:
+            if a.tipo_almacen_origen == "BINES" and a.bines_consumidos:
+                totales, disponibles = bines_disponibles(conn, a.lote_numero)
+                if disponibles is not None and a.bines_consumidos > disponibles:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Ese lote solo tiene {disponibles} bin(es) disponibles (de {totales} en total).",
+                    )
             result = conn.execute(
                 text(
                     """
@@ -434,6 +464,18 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
         raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
     try:
         with engine.begin() as conn:
+            lote_numero = conn.execute(
+                text("SELECT lote_numero FROM asignaciones WHERE id = :id"), {"id": asignacion_id}
+            ).scalar()
+            if lote_numero is None:
+                raise HTTPException(status_code=404, detail="Asignación no encontrada.")
+            if a.bines_consumidos:
+                totales, disponibles = bines_disponibles(conn, lote_numero, excluir_asignacion_id=asignacion_id)
+                if disponibles is not None and a.bines_consumidos > disponibles:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Ese lote solo tiene {disponibles} bin(es) disponibles (de {totales} en total).",
+                    )
             result = conn.execute(
                 text(
                     "UPDATE asignaciones SET kg_asignados = :kg, bines_consumidos = :bines "
