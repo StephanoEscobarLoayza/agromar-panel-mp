@@ -19,11 +19,11 @@
         <div class="mark-sub">Industrial</div>
       </div>
       <nav class="tabs">
-        <a href="index.html" class="active">Dashboards</a>
-        <a href="corridas.html">Corridas</a>
-        <a href="registrar.html">Registrar consumo</a>
-        <a href="lotes.html">Lotes</a>
-        <a href="sincronizar.html">Sincronizar</a>
+        <a href="index.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+        <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+        <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+        <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+        <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
       </nav>
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
@@ -46,18 +46,6 @@
     <div class="panel">
       <div class="panel-body">
         <div class="stat-row scroll-y" id="chartCorridas"><div class="empty">Cargando…</div></div>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2>Duración promedio de corrida</h2>
-      <span class="hint">horas, por tipo de proceso</span>
-    </div>
-    <div class="panel">
-      <div class="panel-body">
-        <div class="stat-row" id="duracion"><div class="empty">Cargando…</div></div>
       </div>
     </div>
   </section>
@@ -222,35 +210,6 @@ function renderListaSaldo(lotes) {
   )).join("");
 }
 
-// ---------- duracion promedio de corrida por tipo de proceso (solo corridas cerradas, que ya tienen fecha_final real) ----------
-function renderDuracionPromedio(corridas) {
-  const stats = {};
-  for (const t of TIPO_ORDEN) stats[t.key] = { sumaHoras: 0, cuenta: 0 };
-  for (const c of corridas) {
-    if (!c.fecha_final) continue;
-    const horas = (new Date(c.fecha_final) - new Date(c.fecha_inicio)) / 3600000;
-    if (horas <= 0) continue;
-    const tipo = TIPO_ORDEN.some(t => t.key === c.tipo_proceso) ? c.tipo_proceso : "OTRO";
-    stats[tipo].sumaHoras += horas;
-    stats[tipo].cuenta += 1;
-  }
-  const promedios = {};
-  for (const t of TIPO_ORDEN) promedios[t.key] = stats[t.key].cuenta ? stats[t.key].sumaHoras / stats[t.key].cuenta : 0;
-  const max = Math.max(...Object.values(promedios), 1);
-
-  const cont = document.getElementById("duracion");
-  const filas = TIPO_ORDEN
-    .filter(t => stats[t.key].cuenta > 0)
-    .map(t => statBarRow(
-      `${t.label} <span class="stat-bar-sub">(${stats[t.key].cuenta})</span>`,
-      `${promedios[t.key].toFixed(1)} h`,
-      Math.max(2, (promedios[t.key] / max) * 100),
-      `background:var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`,
-      "150px"
-    ));
-  cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
-}
-
 // ---------- top proveedores por volumen de MP entregado ----------
 function renderPorProveedor(lotes) {
   const totales = {};
@@ -332,7 +291,6 @@ async function cargar() {
     `;
 
     renderListaCorridas(corridas);
-    renderDuracionPromedio(corridas);
     renderPorTipo(corridas);
     renderPorProveedor(lotes);
     renderPorEstado(lotes);

@@ -19,11 +19,11 @@
         <div class="mark-sub">Industrial</div>
       </div>
       <nav class="tabs">
-        <a href="index.html">Dashboards</a>
-        <a href="corridas.html" class="active">Corridas</a>
-        <a href="registrar.html">Registrar consumo</a>
-        <a href="lotes.html">Lotes</a>
-        <a href="sincronizar.html">Sincronizar</a>
+        <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+        <a href="corridas.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+        <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+        <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+        <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
       </nav>
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
@@ -125,7 +125,7 @@ function corridaCard(c) {
     <div class="corrida${abierta ? " live" : ""}">
       <div class="corrida-top">
         <div>
-          <div class="corrida-name">${escapeHtml(c.nombre)}</div>
+          <div class="corrida-name">${abierta ? '<span class="live-dot" title="En curso"></span>' : ""}${escapeHtml(c.nombre)}</div>
           <div class="corrida-range">${rango}</div>
         </div>
       </div>
