@@ -74,6 +74,12 @@ nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
 .kpi{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease}
 .kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--citrus),var(--forest-2))}
 .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.kpi.with-icon{display:flex;gap:12px;align-items:flex-start}
+.kpi.with-icon::before{content:none}
+.kpi-medal{width:38px;height:38px;border-radius:11px;background:var(--forest-tint);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kpi-medal svg{width:19px;height:19px;stroke:var(--forest-2)}
+.kpi-medal.citrus{background:var(--citrus-tint)}
+.kpi-medal.citrus svg{stroke:var(--citrus)}
 .kpi-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
 .kpi-value{font-size:26px;font-weight:600;margin-top:6px}
 .kpi-value.citrus{color:var(--citrus)}
@@ -204,6 +210,14 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .msg.bad{background:var(--bad-bg);color:var(--bad)}
 .search-row{margin-bottom:16px}
 
+/* ---------- barra de búsqueda + chips de filtro rápido (lotes) ---------- */
+.lotes-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.lotes-toolbar input{flex:1 1 260px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip-filter{font-size:12.5px;font-weight:600;padding:8px 15px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);white-space:nowrap;cursor:pointer;font-family:inherit;transition:background .15s ease,color .15s ease,border-color .15s ease}
+.chip-filter:hover{border-color:var(--citrus)}
+.chip-filter.active{background:var(--forest);color:#F4EFE0;border-color:var(--forest)}
+
 /* ---------- footer ---------- */
 .foot{margin:56px 0 40px;text-align:center}
 .foot-rule{width:56px;height:2px;background:var(--citrus);margin:0 auto 18px;border-radius:2px}
@@ -227,6 +241,7 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .viz-bar.series-otro{fill:var(--text-muted)}
 .viz-baseline{stroke:var(--border);stroke-width:1}
 .viz-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12.5px;color:var(--text-2)}
+.viz-legend.bordered{margin-top:0;padding:12px 20px;border-top:1px solid var(--border)}
 .viz-legend-item{display:flex;align-items:center;gap:6px}
 .viz-legend-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
 .viz-tooltip{position:absolute;pointer-events:none;background:var(--forest);color:#F4EFE0;font-size:12px;

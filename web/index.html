@@ -46,6 +46,13 @@
     <div class="panel">
       <div class="panel-body">
         <div class="stat-row scroll-y" id="chartCorridas"><div class="empty">Cargando…</div></div>
+        <div class="viz-legend" id="legendTipo">
+          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-1)"></span>JSA Aseptic</div>
+          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-2)"></span>JCC</div>
+          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-3)"></span>JSC</div>
+          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-4)"></span>ICEGEN</div>
+          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--text-muted)"></span>Otro</div>
+        </div>
       </div>
     </div>
   </section>
@@ -115,6 +122,16 @@ function mpDeCorrida(c) {
   return Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0);
 }
 
+// ---------- color por tipo de proceso (misma paleta categorica de "Promedio de MP por tipo de proceso") ----------
+function colorDeTipo(tipo) {
+  const t = TIPO_ORDEN.find(t => t.key === tipo) || TIPO_ORDEN[TIPO_ORDEN.length - 1];
+  return `var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`;
+}
+
+const ICON_MP = '<svg viewBox="0 0 20 20" fill="none"><path d="M4 16V10M10 16V4M16 16V11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const ICON_CORRIDAS = '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 8h14" stroke="currentColor" stroke-width="1.8"/></svg>';
+const ICON_PROMEDIO = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 14 L8 8 L11.5 11 L17 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 5H17V9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 // ---------- barras horizontales (categoria + valor), etiqueta y numero siempre visibles ----------
 function statBarRow(label, valorTexto, pct, colorStyle, labelWidth) {
   return `
@@ -132,20 +149,24 @@ function renderListaCorridas(corridas) {
   const datos = corridas
     .slice()
     .sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio))
-    .map(c => ({ nombre: c.nombre, valor: mpDeCorrida(c) }));
+    .map(c => ({ nombre: c.nombre, valor: mpDeCorrida(c), tipo: c.tipo_proceso }));
 
   if (datos.length === 0) {
     cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
     return;
   }
   const max = Math.max(...datos.map(d => d.valor), 1);
-  cont.innerHTML = datos.map(d => statBarRow(
-    escapeHtml(d.nombre),
-    `${fmtKg(d.valor)} kg`,
-    Math.max(2, (d.valor / max) * 100),
-    "background:var(--citrus)",
-    "190px"
-  )).join("");
+  cont.innerHTML = datos.map(d => {
+    const color = colorDeTipo(d.tipo);
+    const dot = `<span class="viz-legend-dot" style="background:${color};margin-right:8px"></span>`;
+    return statBarRow(
+      `${dot}${escapeHtml(d.nombre)}`,
+      `${fmtKg(d.valor)} kg`,
+      Math.max(2, (d.valor / max) * 100),
+      `background:${color}`,
+      "190px"
+    );
+  }).join("");
 }
 
 // ---------- MP por tipo de proceso: PROMEDIO por corrida (no el total, que solo refleja cuantas corridas hubo de cada tipo) ----------
@@ -285,9 +306,18 @@ async function cargar() {
     const promedio = conValor.length ? mpProcesada / conValor.length : 0;
 
     document.getElementById("kpis").innerHTML = `
-      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num citrus">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, toda la campaña</div></div>
-      <div class="kpi"><div class="kpi-label">Corridas</div><div class="kpi-value num">${corridas.length}</div><div class="kpi-note">registradas en total</div></div>
-      <div class="kpi"><div class="kpi-label">Promedio por corrida</div><div class="kpi-value num">${fmtKg(promedio)}</div><div class="kpi-note">kg de MP</div></div>
+      <div class="kpi with-icon">
+        <div class="kpi-medal citrus">${ICON_MP}</div>
+        <div><div class="kpi-label">MP procesada</div><div class="kpi-value num citrus">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, toda la campaña</div></div>
+      </div>
+      <div class="kpi with-icon">
+        <div class="kpi-medal">${ICON_CORRIDAS}</div>
+        <div><div class="kpi-label">Corridas</div><div class="kpi-value num">${corridas.length}</div><div class="kpi-note">registradas en total</div></div>
+      </div>
+      <div class="kpi with-icon">
+        <div class="kpi-medal">${ICON_PROMEDIO}</div>
+        <div><div class="kpi-label">Promedio por corrida</div><div class="kpi-value num">${fmtKg(promedio)}</div><div class="kpi-note">kg de MP</div></div>
+      </div>
     `;
 
     renderListaCorridas(corridas);
