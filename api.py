@@ -769,14 +769,14 @@ class NuevaAsignacion(BaseModel):
     corrida_id: int
     turno: str
     tipo_almacen_origen: str
-    kg_asignados: float
+    kg_asignados: Optional[float] = None  # None = "kg pendiente" (ver comentario en schema.sql)
     bines_consumidos: Optional[int] = None
     observaciones: Optional[str] = ""
 
 
 @app.post("/api/asignaciones")
 def crear_asignacion(a: NuevaAsignacion):
-    if a.kg_asignados <= 0:
+    if a.kg_asignados is not None and a.kg_asignados <= 0:
         raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
     try:
         with engine.begin() as conn:

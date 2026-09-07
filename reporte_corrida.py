@@ -26,7 +26,7 @@ def _tabla_lotes(lotes):
         f"#{l['lote_numero']}",
         l.get("proveedor") or "—",
         "Bines" if l.get("tipo_almacen_origen") == "BINES" else "Silo" if l.get("tipo_almacen_origen") == "SILO" else "—",
-        fmt_kg(l["kg_asignados"]),
+        fmt_kg(l["kg_asignados"]) if l.get("kg_asignados") is not None else "pendiente",
         fmt_num(l.get("brix_recepcion"), 2),
         fmt_num(l.get("acidez"), 2),
         fmt_num(l.get("ratio"), 2),
@@ -72,14 +72,21 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     buf = BytesIO()
     doc = nuevo_doc(buf, f"Cuadre - {corrida['nombre']}")
 
+    # los lotes con "kg pendiente" (kg_asignados NULL - ya empezaron a
+    # alimentar la corrida pero todavía no se sabe cuánto, típico en Silo
+    # mientras dura la corrida) no aportan nada a ninguna suma hasta que se
+    # les registre el kg real - ver comentario en schema.sql.
+    lotes_con_kg = [l for l in lotes if l.get("kg_asignados") is not None]
+    n_pendientes = len(lotes) - len(lotes_con_kg)
+
     kg_total = float(corrida.get("kg_asignados_total") or 0)
     kg_objetivo = corrida.get("mp_kg_objetivo")
-    kg_silo = sum(float(l["kg_asignados"]) for l in lotes if l.get("tipo_almacen_origen") == "SILO")
-    kg_bines = sum(float(l["kg_asignados"]) for l in lotes if l.get("tipo_almacen_origen") == "BINES")
+    kg_silo = sum(float(l["kg_asignados"]) for l in lotes_con_kg if l.get("tipo_almacen_origen") == "SILO")
+    kg_bines = sum(float(l["kg_asignados"]) for l in lotes_con_kg if l.get("tipo_almacen_origen") == "BINES")
 
-    brix_pond = sum(float(l["kg_asignados"]) * float(l["brix_recepcion"]) for l in lotes if l.get("brix_recepcion") is not None)
-    acidez_pond = sum(float(l["kg_asignados"]) * float(l["acidez"]) for l in lotes if l.get("acidez") is not None)
-    kg_con_calidad = sum(float(l["kg_asignados"]) for l in lotes if l.get("brix_recepcion") is not None)
+    brix_pond = sum(float(l["kg_asignados"]) * float(l["brix_recepcion"]) for l in lotes_con_kg if l.get("brix_recepcion") is not None)
+    acidez_pond = sum(float(l["kg_asignados"]) * float(l["acidez"]) for l in lotes_con_kg if l.get("acidez") is not None)
+    kg_con_calidad = sum(float(l["kg_asignados"]) for l in lotes_con_kg if l.get("brix_recepcion") is not None)
     brix_prom = brix_pond / kg_con_calidad if kg_con_calidad > 0 else None
     ratio_prom = brix_pond / acidez_pond if acidez_pond > 0 else None
 
@@ -106,25 +113,39 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         Paragraph("Resumen", style_section),
     ]
 
+    # Solo se arma una tarjeta cuando de verdad hay un dato que mostrar - una
+    # corrida recién creada (sin MP objetivo de Trazabilidad todavía, sin
+    # productos, sin paradas) no debería mostrar 5 tarjetas en blanco con "—",
+    # eso se ve roto. Las que sí aplican se acomodan solas de a 3 por fila.
     ancho_kpi = (PAGE_W - 2 * MARGIN - 2 * 6) / 3
-    fila1 = [
-        kpi_card("MP consumida", f"{fmt_kg(kg_total)} kg", ancho_kpi),
-        kpi_card("MP objetivo (Trazabilidad)", f"{fmt_kg(float(kg_objetivo))} kg" if kg_objetivo else "—", ancho_kpi),
-        kpi_card("Diferencia", f"{fmt_kg(float(kg_objetivo) - kg_total)} kg" if kg_objetivo else "—", ancho_kpi,
-                 color_valor=(OK if estado == "cuadra" else WARN if estado == "incompleto" else BAD if estado == "excedido" else TEXT)),
-    ]
-    fila2 = [
-        kpi_card("Brix ponderado", fmt_num(brix_prom, 2), ancho_kpi),
-        kpi_card("Ratio ponderado", fmt_num(ratio_prom, 2), ancho_kpi),
-        kpi_card("Rendimiento", f"{rendimiento * 100:.1f} %" if rendimiento else "—", ancho_kpi),
-    ]
-    fila3 = [
-        kpi_card("Producto terminado", f"{fmt_kg(pt_total)} kg" if pt_total else "—", ancho_kpi),
-        kpi_card("Volumen", f"{fmt_kg(litros_total)} L" if litros_total else "—", ancho_kpi),
-        kpi_card("Tiempo parado", (fmt_minutos(min_parado) + (" · hay una en curso" if hay_en_curso else "")) if paradas else "sin paradas", ancho_kpi,
-                 color_valor=(BAD if min_parado > 60 else TEXT)),
-    ]
-    kpi_grid = Table([fila1, fila2, fila3], colWidths=[ancho_kpi] * 3, spaceBefore=4)
+    kpis = [("MP consumida", f"{fmt_kg(kg_total)} kg", TEXT)]
+    if kg_objetivo:
+        kpis.append(("MP objetivo (Trazabilidad)", f"{fmt_kg(float(kg_objetivo))} kg", TEXT))
+        kpis.append(("Diferencia", f"{fmt_kg(float(kg_objetivo) - kg_total)} kg",
+                     OK if estado == "cuadra" else WARN if estado == "incompleto" else BAD if estado == "excedido" else TEXT))
+    if brix_prom is not None:
+        kpis.append(("Brix ponderado", fmt_num(brix_prom, 2), TEXT))
+    if ratio_prom is not None:
+        kpis.append(("Ratio ponderado", fmt_num(ratio_prom, 2), TEXT))
+    if rendimiento:
+        kpis.append(("Rendimiento", f"{rendimiento * 100:.1f} %", TEXT))
+    if pt_total:
+        kpis.append(("Producto terminado", f"{fmt_kg(pt_total)} kg", TEXT))
+    if litros_total:
+        kpis.append(("Volumen", f"{fmt_kg(litros_total)} L", TEXT))
+    kpis.append((
+        "Tiempo parado",
+        (fmt_minutos(min_parado) + (" · hay una en curso" if hay_en_curso else "")) if paradas else "sin paradas",
+        BAD if min_parado > 60 else TEXT,
+    ))
+
+    filas_kpi = []
+    for i in range(0, len(kpis), 3):
+        grupo = kpis[i:i + 3]
+        fila = [kpi_card(label, valor, ancho_kpi, color_valor=color) for label, valor, color in grupo]
+        fila += [""] * (3 - len(fila))  # ultima fila incompleta: relleno en blanco, sin tarjeta
+        filas_kpi.append(fila)
+    kpi_grid = Table(filas_kpi, colWidths=[ancho_kpi] * 3, spaceBefore=4)
     kpi_grid.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
@@ -149,6 +170,13 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
 
     story.append(Paragraph(f"Lotes de MP consumidos ({len(lotes)})", style_section))
     story.append(_tabla_lotes(lotes) if lotes else Paragraph("Sin lotes registrados todavía.", style_footnote))
+    if n_pendientes:
+        story.append(Spacer(1, 3 * mm))
+        story.append(Paragraph(
+            f"{n_pendientes} lote(s) con kg pendiente todavía no se cuentan en los KPIs de arriba ni en el gráfico Silo/Bines - "
+            "se sabrá cuánto entró recién cuando se registre el kg real.",
+            style_footnote,
+        ))
 
     if productos:
         story.append(Spacer(1, 8 * mm))

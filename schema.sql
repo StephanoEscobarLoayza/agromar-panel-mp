@@ -71,7 +71,11 @@ CREATE TABLE asignaciones (
     fecha_proceso       TIMESTAMP NOT NULL,            -- momento real en que se metió este lote a producción
     turno               TEXT CHECK (turno IN ('DÍA', 'NOCHE')),
     tipo_almacen_origen TEXT CHECK (tipo_almacen_origen IN ('SILO', 'BINES')),
-    kg_asignados        NUMERIC(10,2) NOT NULL CHECK (kg_asignados > 0),
+    kg_asignados        NUMERIC(10,2) CHECK (kg_asignados IS NULL OR kg_asignados > 0),
+                                                       -- NULL = "kg pendiente": el lote ya empezó a
+                                                       -- alimentar la corrida pero todavía no se sabe
+                                                       -- cuánto (típico en Silo, se calcula al cierre) -
+                                                       -- se completa después con editar_asignacion
     bines_consumidos    INTEGER,
     brix_produccion     NUMERIC(5,2),                  -- brix medido EN LÍNEA al procesar (puede diferir del de recepción)
     observaciones       TEXT,
@@ -100,6 +104,10 @@ DECLARE
     ya_asignado       NUMERIC;
     saldo_disponible  NUMERIC;
 BEGIN
+    IF NEW.kg_asignados IS NULL THEN
+        RETURN NEW;  -- "kg pendiente" - nada que validar todavía
+    END IF;
+
     SELECT peso_neto_kg INTO peso_total FROM lotes WHERE numero = NEW.lote_numero;
 
     SELECT COALESCE(SUM(kg_asignados), 0) INTO ya_asignado

@@ -144,11 +144,13 @@ async function cargarRecientes() {
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
           data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
         <td class="strong num">${a.lote_numero}</td>
-        <td class="right num" data-celda="kg">${fmtKg(a.kg_asignados)}</td>
+        <td class="right num" data-celda="kg">${a.kg_asignados === null
+          ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)">pendiente</span>'
+          : fmtKg(a.kg_asignados)}</td>
         <td>${a.turno || ""}</td>
         <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtKg(a.saldo_actual_lote)}</td>
         <td class="right" data-celda="acciones" style="white-space:nowrap">
-          <button class="btn-link" data-accion="editar-asig" data-id="${a.id}" data-kg="${a.kg_asignados}" title="Editar">✎</button>
+          <button class="btn-link" data-accion="editar-asig" data-id="${a.id}" data-kg="${a.kg_asignados ?? ""}" title="Editar">✎</button>
           <button class="btn-link btn-link-bad" data-accion="eliminar-asig" data-id="${a.id}" title="Eliminar">✕</button>
         </td>
       </tr>
@@ -251,16 +253,31 @@ function renderCamposPeso() {
 
   camposPeso.innerHTML = `
     <div class="field"><label>Origen</label>${origenSelectorHtml}</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:2px 0 4px">
+      <input type="checkbox" id="kgPendiente" style="width:auto">
+      Todavía no sé el kg — dejar pendiente (lo registro después)
+    </label>
     <div id="camposOrigen"></div>
   `;
   document.getElementById("origen")?.addEventListener("change", renderCamposOrigen);
+  document.getElementById("kgPendiente").addEventListener("change", renderCamposOrigen);
   renderCamposOrigen();
 }
 
 function renderCamposOrigen() {
   const origen = document.getElementById("origen").value;
+  const pendiente = document.getElementById("kgPendiente").checked;
   const saldo = Math.max(Number(lote.kg_saldo), 0);
   const cont = document.getElementById("camposOrigen");
+
+  if (pendiente) {
+    cont.innerHTML = `
+      <div class="hint-line" style="margin-bottom:8px">Se registra el lote como iniciado en esta corrida, sin comprometer un kg todavía. Complétalo después con el kg real (✎ en "Últimas asignaciones").</div>
+      <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
+    `;
+    btnGuardar.disabled = false;
+    return;
+  }
 
   if (origen === "BINES") {
     if (!lote.bines_totales) {
@@ -331,30 +348,34 @@ corridaSel.addEventListener("change", cargarRecientes);
 
 btnGuardar.addEventListener("click", async () => {
   const origen = document.getElementById("origen").value;
+  const pendiente = document.getElementById("kgPendiente")?.checked;
   const obs = document.getElementById("obs")?.value || "";
   let bines = null;
+  let kg = null;
 
-  const binesQuedanEl = document.getElementById("binesQuedan");
-  if (binesQuedanEl) {
-    if (binesQuedanEl.value === "") {
-      mensaje.innerHTML = '<div class="msg bad">Ingresa cuántos bines quedan.</div>';
+  if (!pendiente) {
+    const binesQuedanEl = document.getElementById("binesQuedan");
+    if (binesQuedanEl) {
+      if (binesQuedanEl.value === "") {
+        mensaje.innerHTML = '<div class="msg bad">Ingresa cuántos bines quedan.</div>';
+        return;
+      }
+      const quedan = Number(binesQuedanEl.value);
+      const binesSaldoActual = Number(lote.bines_saldo);
+      if (quedan < 0 || quedan > binesSaldoActual) {
+        mensaje.innerHTML = `<div class="msg bad">Ese lote tiene ${fmtInt(binesSaldoActual)} bin(es) ahora — no puede quedar menos de 0 ni más de eso.</div>`;
+        return;
+      }
+      bines = binesSaldoActual - quedan;
+    }
+
+    kg = Number(document.getElementById("kg").value);
+    if (!kg || kg <= 0) {
+      mensaje.innerHTML = origen === "BINES"
+        ? '<div class="msg bad">Con esos bines que quedan, no hay ningún consumo que registrar.</div>'
+        : '<div class="msg bad">Ingresa un peso mayor a 0.</div>';
       return;
     }
-    const quedan = Number(binesQuedanEl.value);
-    const binesSaldoActual = Number(lote.bines_saldo);
-    if (quedan < 0 || quedan > binesSaldoActual) {
-      mensaje.innerHTML = `<div class="msg bad">Ese lote tiene ${fmtInt(binesSaldoActual)} bin(es) ahora — no puede quedar menos de 0 ni más de eso.</div>`;
-      return;
-    }
-    bines = binesSaldoActual - quedan;
-  }
-
-  const kg = Number(document.getElementById("kg").value);
-  if (!kg || kg <= 0) {
-    mensaje.innerHTML = origen === "BINES"
-      ? '<div class="msg bad">Con esos bines que quedan, no hay ningún consumo que registrar.</div>'
-      : '<div class="msg bad">Ingresa un peso mayor a 0.</div>';
-    return;
   }
 
   btnGuardar.disabled = true;
@@ -368,7 +389,9 @@ btnGuardar.addEventListener("click", async () => {
       bines_consumidos: bines || null,
       observaciones: obs,
     });
-    mensaje.innerHTML = `<div class="msg ok">Asignados ${fmtKg(kg)} kg del lote ${lote.numero}.</div>`;
+    mensaje.innerHTML = pendiente
+      ? `<div class="msg ok">Lote ${lote.numero} marcado como iniciado — kg pendiente.</div>`
+      : `<div class="msg ok">Asignados ${fmtKg(kg)} kg del lote ${lote.numero}.</div>`;
     loteInput.value = "";
     lote = null;
     loteInfo.innerHTML = "";
