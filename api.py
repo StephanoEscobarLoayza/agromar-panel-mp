@@ -12,13 +12,14 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
 from sync_lotes import sincronizar_lotes
+from reporte_corrida import generar_reporte_pdf
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
@@ -598,6 +599,58 @@ def listar_productos_corrida(corrida_id: int):
             {"c": corrida_id},
         )
         return rows(result)
+
+
+@app.get("/api/corridas/{corrida_id}/reporte.pdf")
+def reporte_corrida_pdf(corrida_id: int):
+    """Genera el PDF de cuadre de una corrida: KPIs, lotes de MP consumidos,
+    productos de salida y paradas - todo lo que hoy vive repartido en varias
+    páginas, junto en un documento para imprimir o compartir."""
+    with engine.connect() as conn:
+        corrida = one(conn.execute(text("SELECT * FROM v_cuadre_corridas WHERE id = :id"), {"id": corrida_id}))
+        if corrida is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+
+        lotes = rows(conn.execute(
+            text(
+                """
+                SELECT a.lote_numero, l.proveedor, a.tipo_almacen_origen, a.kg_asignados,
+                       l.brix_recepcion, l.acidez, l.ratio
+                FROM asignaciones a
+                JOIN lotes l ON l.numero = a.lote_numero
+                WHERE a.corrida_id = :c
+                ORDER BY a.creado_en ASC
+                """
+            ),
+            {"c": corrida_id},
+        ))
+        productos = rows(conn.execute(
+            text(
+                "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros "
+                "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
+            ),
+            {"c": corrida_id},
+        ))
+        paradas = rows(conn.execute(
+            text(
+                """
+                SELECT motivo, hora_inicio, hora_fin,
+                       CASE WHEN hora_fin IS NULL THEN NULL
+                            ELSE ROUND(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)
+                       END AS duracion_minutos
+                FROM paradas WHERE corrida_id = :c ORDER BY hora_inicio ASC
+                """
+            ),
+            {"c": corrida_id},
+        ))
+
+    pdf_bytes = generar_reporte_pdf(corrida, lotes, productos, paradas)
+    nombre_archivo = f"cuadre-{corrida['nombre']}.pdf".replace(" ", "-").replace("/", "-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{nombre_archivo}"'},
+    )
 
 
 class NuevoProductoCorrida(BaseModel):
