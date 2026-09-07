@@ -665,8 +665,18 @@ def reporte_corrida_pdf(corrida_id: int):
             ),
             {"c": corrida_id},
         ))
+        mediciones = rows(conn.execute(
+            text(
+                """
+                SELECT tanque, litros, brix_inicial, brix_final, acidez, ph,
+                       ROUND(brix_final / acidez, 2) AS ratio
+                FROM mediciones_tanque WHERE corrida_id = :c ORDER BY creado_en ASC
+                """
+            ),
+            {"c": corrida_id},
+        ))
 
-    pdf_bytes = generar_reporte_pdf(corrida, lotes, productos, paradas)
+    pdf_bytes = generar_reporte_pdf(corrida, lotes, productos, paradas, mediciones)
     nombre_archivo = f"cuadre-{corrida['nombre']}.pdf".replace(" ", "-").replace("/", "-")
     return Response(
         content=pdf_bytes,
@@ -1010,6 +1020,139 @@ def eliminar_parada(parada_id: int):
         )
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Parada no encontrada.")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# mediciones de tanque (Brix/Acidez real medido, no el estimado de los lotes)
+# ---------------------------------------------------------------------------
+@app.get("/api/corridas/{corrida_id}/mediciones-tanque")
+def listar_mediciones_tanque(corrida_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT id, corrida_id, tanque, litros, brix_inicial, brix_final, acidez, ph, observaciones, creado_en,
+                       ROUND(brix_final / acidez, 2) AS ratio
+                FROM mediciones_tanque
+                WHERE corrida_id = :c
+                ORDER BY creado_en ASC
+                """
+            ),
+            {"c": corrida_id},
+        )
+        return rows(result)
+
+
+class NuevaMedicionTanque(BaseModel):
+    corrida_id: int
+    tanque: str
+    litros: Optional[float] = None
+    brix_inicial: Optional[float] = None
+    brix_final: float
+    acidez: float
+    ph: Optional[float] = None
+    observaciones: Optional[str] = ""
+
+
+@app.post("/api/mediciones-tanque")
+def crear_medicion_tanque(m: NuevaMedicionTanque):
+    tanque = m.tanque.strip()
+    if not tanque:
+        raise HTTPException(status_code=400, detail="Escribe qué tanque es (ej. TK1).")
+    if m.brix_final <= 0:
+        raise HTTPException(status_code=400, detail="El Brix final debe ser mayor a 0.")
+    if m.acidez <= 0:
+        raise HTTPException(status_code=400, detail="La acidez debe ser mayor a 0.")
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    INSERT INTO mediciones_tanque
+                        (corrida_id, tanque, litros, brix_inicial, brix_final, acidez, ph, observaciones)
+                    VALUES
+                        (:corrida_id, :tanque, :litros, :brix_inicial, :brix_final, :acidez, :ph, :obs)
+                    RETURNING id
+                    """
+                ),
+                {
+                    "corrida_id": m.corrida_id,
+                    "tanque": tanque,
+                    "litros": m.litros,
+                    "brix_inicial": m.brix_inicial,
+                    "brix_final": m.brix_final,
+                    "acidez": m.acidez,
+                    "ph": m.ph,
+                    "obs": m.observaciones,
+                },
+            )
+            new_id = result.scalar()
+        return {"id": new_id, "ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+
+
+class EditarMedicionTanque(BaseModel):
+    tanque: str
+    litros: Optional[float] = None
+    brix_inicial: Optional[float] = None
+    brix_final: float
+    acidez: float
+    ph: Optional[float] = None
+    observaciones: Optional[str] = ""
+
+
+@app.post("/api/mediciones-tanque/{medicion_id}")
+def editar_medicion_tanque(medicion_id: int, m: EditarMedicionTanque):
+    tanque = m.tanque.strip()
+    if not tanque:
+        raise HTTPException(status_code=400, detail="Escribe qué tanque es (ej. TK1).")
+    if m.brix_final <= 0:
+        raise HTTPException(status_code=400, detail="El Brix final debe ser mayor a 0.")
+    if m.acidez <= 0:
+        raise HTTPException(status_code=400, detail="La acidez debe ser mayor a 0.")
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    UPDATE mediciones_tanque
+                    SET tanque = :tanque, litros = :litros, brix_inicial = :brix_inicial,
+                        brix_final = :brix_final, acidez = :acidez, ph = :ph, observaciones = :obs
+                    WHERE id = :id RETURNING id
+                    """
+                ),
+                {
+                    "id": medicion_id,
+                    "tanque": tanque,
+                    "litros": m.litros,
+                    "brix_inicial": m.brix_inicial,
+                    "brix_final": m.brix_final,
+                    "acidez": m.acidez,
+                    "ph": m.ph,
+                    "obs": m.observaciones,
+                },
+            )
+            if result.scalar() is None:
+                raise HTTPException(status_code=404, detail="Medición no encontrada.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+    return {"ok": True}
+
+
+@app.delete("/api/mediciones-tanque/{medicion_id}")
+def eliminar_medicion_tanque(medicion_id: int):
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("DELETE FROM mediciones_tanque WHERE id = :id RETURNING id"), {"id": medicion_id}
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Medición no encontrada.")
     return {"ok": True}
 
 

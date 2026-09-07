@@ -64,7 +64,23 @@ def _tabla_paradas(paradas):
     )
 
 
-def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: list) -> bytes:
+def _tabla_mediciones(mediciones):
+    filas = [[
+        m.get("tanque") or "—",
+        fmt_kg(m.get("litros")) if m.get("litros") is not None else "—",
+        fmt_num(m.get("brix_inicial"), 2) if m.get("brix_inicial") is not None else "—",
+        fmt_num(m.get("brix_final"), 2),
+        fmt_num(m.get("acidez"), 3),
+        fmt_num(m.get("ph"), 2) if m.get("ph") is not None else "—",
+        fmt_num(m.get("ratio"), 2) if m.get("ratio") is not None else "—",
+    ] for m in mediciones]
+    return tabla(
+        ["Tanque", "Litros", "Brix i.", "Brix f.", "Acidez", "pH", "Ratio"], filas,
+        [22 * mm, 24 * mm, 20 * mm, 20 * mm, 20 * mm, 16 * mm, 16 * mm], align_derecha_desde=1,
+    )
+
+
+def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: list, mediciones: list = None) -> bytes:
     """corrida: fila de v_cuadre_corridas (+ nombre/fechas/tipo_proceso).
     lotes: filas de asignaciones + join a lotes (numero, proveedor, tipo_almacen_origen, kg_asignados, brix_recepcion, acidez, ratio).
     productos: filas de corrida_productos.
@@ -89,6 +105,20 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     kg_con_calidad = sum(float(l["kg_asignados"]) for l in lotes_con_kg if l.get("brix_recepcion") is not None)
     brix_prom = brix_pond / kg_con_calidad if kg_con_calidad > 0 else None
     ratio_prom = brix_pond / acidez_pond if acidez_pond > 0 else None
+
+    # si hay mediciones reales de tanque, mandan sobre el estimado de los
+    # lotes - el estimado no puede capturar el enjuague ni otros ajustes de
+    # estandarización, así que en cuanto hay UNA medición real, esa es la
+    # que se muestra (ver comentario en schema.sql, tabla mediciones_tanque).
+    mediciones = mediciones or []
+    brix_medido = ratio_medido = None
+    if mediciones:
+        litros_pond = sum(float(m.get("litros") or 1) for m in mediciones)
+        brix_pond_med = sum(float(m.get("litros") or 1) * float(m["brix_final"]) for m in mediciones)
+        acidez_pond_med = sum(float(m.get("litros") or 1) * float(m["acidez"]) for m in mediciones)
+        brix_medido = brix_pond_med / litros_pond
+        acidez_medido = acidez_pond_med / litros_pond
+        ratio_medido = brix_medido / acidez_medido if acidez_medido > 0 else None
 
     pt_total = sum(float(p["pt_kg"]) for p in productos if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in productos if p.get("volumen_litros") is not None)
@@ -123,10 +153,13 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         kpis.append(("MP objetivo (Trazabilidad)", f"{fmt_kg(float(kg_objetivo))} kg", TEXT))
         kpis.append(("Diferencia", f"{fmt_kg(float(kg_objetivo) - kg_total)} kg",
                      OK if estado == "cuadra" else WARN if estado == "incompleto" else BAD if estado == "excedido" else TEXT))
-    if brix_prom is not None:
-        kpis.append(("Brix ponderado", fmt_num(brix_prom, 2), TEXT))
-    if ratio_prom is not None:
-        kpis.append(("Ratio ponderado", fmt_num(ratio_prom, 2), TEXT))
+    if brix_medido is not None:
+        kpis.append(("Brix real (medido)", fmt_num(brix_medido, 2), OK))
+        kpis.append(("Ratio real (medido)", fmt_num(ratio_medido, 2), OK))
+    elif brix_prom is not None:
+        kpis.append(("Brix ponderado (estimado)", fmt_num(brix_prom, 2), TEXT))
+        if ratio_prom is not None:
+            kpis.append(("Ratio ponderado (estimado)", fmt_num(ratio_prom, 2), TEXT))
     if rendimiento:
         kpis.append(("Rendimiento", f"{rendimiento * 100:.1f} %", TEXT))
     if pt_total:
@@ -177,6 +210,11 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
             "se sabrá cuánto entró recién cuando se registre el kg real.",
             style_footnote,
         ))
+
+    if mediciones:
+        story.append(Spacer(1, 8 * mm))
+        story.append(Paragraph(f"Tanques medidos ({len(mediciones)})", style_section))
+        story.append(_tabla_mediciones(mediciones))
 
     if productos:
         story.append(Spacer(1, 8 * mm))

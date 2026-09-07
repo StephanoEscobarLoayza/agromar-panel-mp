@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Medición de tanques · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <button type="button" class="nav-dropdown-btn" data-menu="menuRegistro">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2.3" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="2.3" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Registro
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn active" data-menu="menuCalidad">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Calidad
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuParadas">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Paradas
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Medición de tanques</h1>
+    <p class="hero-sub">El Brix/Acidez que de verdad sale de cada tanque, medido con el refractómetro — no el estimado de los lotes.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+
+  <section>
+    <div class="section-head">
+      <h2>Estimado (de los lotes) vs. medido (tanques)</h2>
+      <span class="hint" id="hintComparacion">elige una corrida</span>
+    </div>
+    <div id="comparacion"><div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Elige una corrida abajo para comparar.</div></div></div>
+  </section>
+
+  <section class="split" style="margin-top:22px">
+    <div class="panel">
+      <div class="panel-head"><h3>Nueva medición</h3></div>
+      <div class="form-body">
+        <div class="field">
+          <label for="corrida">Corrida</label>
+          <select id="corrida"></select>
+        </div>
+
+        <div class="two-col">
+          <div class="field"><label for="tanque">Tanque</label><input type="text" id="tanque" placeholder="ej. TK5"></div>
+          <div class="field"><label for="litros">Litros</label><input type="number" id="litros" min="0" step="1" placeholder="3000"></div>
+        </div>
+
+        <div class="two-col">
+          <div class="field"><label for="brixInicial">Brix inicial</label><input type="number" id="brixInicial" step="0.01" placeholder="opcional"></div>
+          <div class="field"><label for="brixFinal">Brix final</label><input type="number" id="brixFinal" step="0.01" placeholder="ej. 12.01"></div>
+        </div>
+
+        <div class="two-col">
+          <div class="field"><label for="acidez">Acidez</label><input type="number" id="acidez" step="0.001" placeholder="ej. 0.89"></div>
+          <div class="field"><label for="ph">pH</label><input type="number" id="ph" step="0.01" placeholder="opcional"></div>
+        </div>
+
+        <div class="hint-line">El Ratio se calcula solo (Brix final ÷ Acidez) — no hace falta escribirlo.</div>
+
+        <div id="mensaje"></div>
+        <button class="btn" id="btnGuardar">Guardar medición</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Tanques de esta corrida</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tanque</th><th class="right">Litros</th><th class="right">Brix i.</th><th class="right">Brix f.</th><th class="right">Acidez</th><th class="right">pH</th><th class="right">Ratio</th><th></th></tr></thead>
+          <tbody id="lista"><tr><td colspan="8" class="empty">Elige una corrida</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<div class="nav-dropdown-menu" id="menuRegistro" hidden>
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+  <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+  <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+  <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+  <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
+</div>
+<div class="nav-dropdown-menu" id="menuCalidad" hidden>
+  <a href="calidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sugeridor de mezcla</a>
+  <a href="mediciones.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.5v4M6 3.2l1 3.6M12 3.2l-1 3.6M6 6.5h6l1.3 8a1.5 1.5 0 0 1-1.5 1.8H6.2A1.5 1.5 0 0 1 4.7 14.5Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Medición de tanques</a>
+</div>
+<div class="nav-dropdown-menu" id="menuParadas" hidden>
+  <a href="paradas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Registrar paradas</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+const corridaSel = document.getElementById("corrida");
+const tanqueInput = document.getElementById("tanque");
+const litrosInput = document.getElementById("litros");
+const brixInicialInput = document.getElementById("brixInicial");
+const brixFinalInput = document.getElementById("brixFinal");
+const acidezInput = document.getElementById("acidez");
+const phInput = document.getElementById("ph");
+const mensaje = document.getElementById("mensaje");
+const btnGuardar = document.getElementById("btnGuardar");
+const lista = document.getElementById("lista");
+const comparacionDiv = document.getElementById("comparacion");
+const hintComparacion = document.getElementById("hintComparacion");
+
+async function cargarCorridas() {
+  const corridas = await apiGet("/api/corridas?abiertas=true");
+  if (corridas.length === 0) {
+    corridaSel.innerHTML = '<option value="">No hay corridas abiertas</option>';
+    lista.innerHTML = '<tr><td colspan="8" class="empty">No hay corridas abiertas</td></tr>';
+    comparacionDiv.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">No hay corridas abiertas.</div></div>';
+    return;
+  }
+  corridaSel.innerHTML = corridas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("");
+  cargarTodo();
+}
+
+function renderComparacion(estimado, medidas) {
+  if (!estimado || !estimado.tiene_registros) {
+    hintComparacion.textContent = "todavía sin consumo de MP registrado";
+    comparacionDiv.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Todavía no hay consumo de MP registrado para esta corrida en "Registrar consumo".</div></div>';
+    return;
+  }
+
+  const acidezEst = estimado.ratio_actual ? estimado.brix_actual / estimado.ratio_actual : null;
+
+  if (medidas.length === 0) {
+    hintComparacion.textContent = "sin mediciones todavía — se ve solo el estimado";
+    comparacionDiv.innerHTML = `
+      <div class="panel" style="margin-top:0">
+        <div class="form-body">
+          <div class="hint-line" style="font-weight:600;color:var(--text-2);text-transform:uppercase;font-size:11px;letter-spacing:.03em">Estimado (de los lotes)</div>
+          <div class="lookup">
+            <div class="lookup-row"><span>Brix ponderado</span><span class="num">${estimado.brix_actual.toFixed(2)}</span></div>
+            <div class="lookup-row"><span>Acidez ponderada</span><span class="num">${acidezEst !== null ? acidezEst.toFixed(3) : "—"}</span></div>
+            <div class="lookup-row"><span>Ratio</span><span class="num">${estimado.ratio_actual !== null ? estimado.ratio_actual.toFixed(2) : "—"}</span></div>
+          </div>
+          <div class="hint-line">Todavía no hay ninguna medición de tanque para esta corrida — agrega una abajo para comparar contra lo real.</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  let litrosTotal = 0, brixPond = 0, acidezPond = 0;
+  medidas.forEach(m => {
+    const w = Number(m.litros) || 1;
+    litrosTotal += w;
+    brixPond += w * Number(m.brix_final);
+    acidezPond += w * Number(m.acidez);
+  });
+  const brixMed = brixPond / litrosTotal;
+  const acidezMed = acidezPond / litrosTotal;
+  const ratioMed = acidezMed > 0 ? brixMed / acidezMed : null;
+  const deltaBrix = brixMed - estimado.brix_actual;
+  const todosConLitros = medidas.every(m => m.litros !== null && m.litros !== undefined);
+
+  hintComparacion.textContent = `${medidas.length} tanque(s) medido(s)`;
+  comparacionDiv.innerHTML = `
+    <div class="panel" style="margin-top:0">
+      <div class="two-col" style="padding:18px 20px 4px">
+        <div>
+          <div class="hint-line" style="font-weight:600;color:var(--text-2);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Estimado (de los lotes)</div>
+          <div class="lookup">
+            <div class="lookup-row"><span>Brix ponderado</span><span class="num">${estimado.brix_actual.toFixed(2)}</span></div>
+            <div class="lookup-row"><span>Acidez ponderada</span><span class="num">${acidezEst !== null ? acidezEst.toFixed(3) : "—"}</span></div>
+            <div class="lookup-row"><span>Ratio</span><span class="num">${estimado.ratio_actual !== null ? estimado.ratio_actual.toFixed(2) : "—"}</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="hint-line" style="font-weight:600;color:var(--ok);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Medido (${medidas.length} tanque${medidas.length > 1 ? "s" : ""}${todosConLitros ? ", " + fmtKg(litrosTotal) + " L" : ""})</div>
+          <div class="lookup">
+            <div class="lookup-row saldo"><span>Brix final promedio</span><span class="num">${brixMed.toFixed(2)}</span></div>
+            <div class="lookup-row saldo"><span>Acidez promedio</span><span class="num">${acidezMed.toFixed(3)}</span></div>
+            <div class="lookup-row saldo"><span>Ratio promedio</span><span class="num">${ratioMed !== null ? ratioMed.toFixed(2) : "—"}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint-line" style="padding:8px 20px 18px">
+        El Brix real sale <b>${Math.abs(deltaBrix).toFixed(2)} puntos ${deltaBrix >= 0 ? "por encima" : "por debajo"}</b> del estimado de los lotes.
+        El reporte de esta corrida ya usa el número medido, no el estimado.
+      </div>
+    </div>
+  `;
+}
+
+async function cargarTodo() {
+  const corridaId = corridaSel.value;
+  if (!corridaId) return;
+  const [estimado, medidas] = await Promise.all([
+    apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=11&ratio_min=11`),
+    apiGet(`/api/corridas/${corridaId}/mediciones-tanque`),
+  ]);
+  renderComparacion(estimado, medidas);
+
+  if (medidas.length === 0) {
+    lista.innerHTML = '<tr><td colspan="8" class="empty">Sin mediciones todavía</td></tr>';
+    return;
+  }
+  lista.innerHTML = medidas.map(m => `
+    <tr data-medicion-id="${m.id}" data-tanque="${escapeHtml(m.tanque)}" data-litros="${m.litros ?? ""}"
+        data-brix-inicial="${m.brix_inicial ?? ""}" data-brix-final="${m.brix_final}" data-acidez="${m.acidez}" data-ph="${m.ph ?? ""}">
+      <td class="strong">${escapeHtml(m.tanque)}</td>
+      <td class="right num">${m.litros !== null ? fmtKg(m.litros) : "—"}</td>
+      <td class="right num">${m.brix_inicial !== null ? Number(m.brix_inicial).toFixed(2) : "—"}</td>
+      <td class="right num">${Number(m.brix_final).toFixed(2)}</td>
+      <td class="right num">${Number(m.acidez).toFixed(3)}</td>
+      <td class="right num">${m.ph !== null ? Number(m.ph).toFixed(2) : "—"}</td>
+      <td class="right num">${m.ratio !== null ? Number(m.ratio).toFixed(2) : "—"}</td>
+      <td class="right" data-celda="acciones" style="white-space:nowrap">
+        <button class="btn-link" data-accion="editar" data-id="${m.id}" title="Editar">✎</button>
+        <button class="btn-link btn-link-bad" data-accion="eliminar" data-id="${m.id}" title="Eliminar">✕</button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+lista.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-accion]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const fila = btn.closest("tr");
+
+  if (btn.dataset.accion === "eliminar") {
+    if (!confirm("¿Eliminar esta medición?")) return;
+    try {
+      await apiDelete(`/api/mediciones-tanque/${id}`);
+      cargarTodo();
+    } catch (e) {
+      alert(e.message);
+    }
+  } else if (btn.dataset.accion === "editar") {
+    const celdas = fila.querySelectorAll("td");
+    celdas[0].innerHTML = `<input type="text" class="edit-tanque" value="${fila.dataset.tanque}" style="width:60px">`;
+    celdas[1].innerHTML = `<input type="number" step="1" class="edit-litros" value="${fila.dataset.litros}" style="width:70px;text-align:right">`;
+    celdas[2].innerHTML = `<input type="number" step="0.01" class="edit-brix-inicial" value="${fila.dataset.brixInicial}" style="width:60px;text-align:right">`;
+    celdas[3].innerHTML = `<input type="number" step="0.01" class="edit-brix-final" value="${fila.dataset.brixFinal}" style="width:60px;text-align:right">`;
+    celdas[4].innerHTML = `<input type="number" step="0.001" class="edit-acidez" value="${fila.dataset.acidez}" style="width:60px;text-align:right">`;
+    celdas[5].innerHTML = `<input type="number" step="0.01" class="edit-ph" value="${fila.dataset.ph}" style="width:55px;text-align:right">`;
+    celdas[6].textContent = "";
+    celdas[7].innerHTML = `
+      <button class="btn-link strong" data-accion="guardar" data-id="${id}">Guardar</button>
+      <button class="btn-link" data-accion="cancelar" data-id="${id}">Cancelar</button>
+    `;
+  } else if (btn.dataset.accion === "cancelar") {
+    cargarTodo();
+  } else if (btn.dataset.accion === "guardar") {
+    const tanque = fila.querySelector(".edit-tanque").value.trim();
+    const litros = fila.querySelector(".edit-litros").value;
+    const brixInicial = fila.querySelector(".edit-brix-inicial").value;
+    const brixFinal = Number(fila.querySelector(".edit-brix-final").value);
+    const acidez = Number(fila.querySelector(".edit-acidez").value);
+    const ph = fila.querySelector(".edit-ph").value;
+    if (!tanque) { alert("Escribe qué tanque es."); return; }
+    if (!brixFinal || brixFinal <= 0) { alert("El Brix final debe ser mayor a 0."); return; }
+    if (!acidez || acidez <= 0) { alert("La acidez debe ser mayor a 0."); return; }
+    try {
+      await apiPost(`/api/mediciones-tanque/${id}`, {
+        tanque, litros: litros === "" ? null : Number(litros),
+        brix_inicial: brixInicial === "" ? null : Number(brixInicial),
+        brix_final: brixFinal, acidez, ph: ph === "" ? null : Number(ph),
+      });
+      cargarTodo();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+});
+
+corridaSel.addEventListener("change", cargarTodo);
+
+btnGuardar.addEventListener("click", async () => {
+  const tanque = tanqueInput.value.trim();
+  const brixFinal = Number(brixFinalInput.value);
+  const acidez = Number(acidezInput.value);
+
+  if (!corridaSel.value) {
+    mensaje.innerHTML = '<div class="msg bad">Elige una corrida.</div>';
+    return;
+  }
+  if (!tanque) {
+    mensaje.innerHTML = '<div class="msg bad">Escribe qué tanque es (ej. TK1).</div>';
+    return;
+  }
+  if (!brixFinal || brixFinal <= 0) {
+    mensaje.innerHTML = '<div class="msg bad">Ingresa el Brix final medido.</div>';
+    return;
+  }
+  if (!acidez || acidez <= 0) {
+    mensaje.innerHTML = '<div class="msg bad">Ingresa la acidez medida.</div>';
+    return;
+  }
+
+  btnGuardar.disabled = true;
+  try {
+    await apiPost("/api/mediciones-tanque", {
+      corrida_id: Number(corridaSel.value),
+      tanque,
+      litros: litrosInput.value ? Number(litrosInput.value) : null,
+      brix_inicial: brixInicialInput.value ? Number(brixInicialInput.value) : null,
+      brix_final: brixFinal,
+      acidez,
+      ph: phInput.value ? Number(phInput.value) : null,
+    });
+    mensaje.innerHTML = `<div class="msg ok">Medición de ${tanque} guardada.</div>`;
+    tanqueInput.value = "";
+    litrosInput.value = "";
+    brixInicialInput.value = "";
+    brixFinalInput.value = "";
+    acidezInput.value = "";
+    phInput.value = "";
+    cargarTodo();
+  } catch (e) {
+    mensaje.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  } finally {
+    btnGuardar.disabled = false;
+  }
+});
+
+cargarCorridas();
+</script>
+</body>
+</html>

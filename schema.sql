@@ -211,6 +211,33 @@ COMMENT ON TABLE paradas IS 'Tiempos muertos registrados durante una corrida - m
 
 CREATE INDEX idx_paradas_corrida ON paradas(corrida_id);
 
+-- ----------------------------------------------------------------------------
+-- MEDICIONES_TANQUE: Brix/Acidez/pH medido de verdad con el refractómetro por
+-- tanque (~3000-5000 L cada uno), durante una corrida. Existe porque el Brix
+-- estimado desde los lotes de MP (recepción) sistemáticamente no coincide con
+-- el real: la extracción concentra el jugo, y en estandarizado se agrega un
+-- enjuague con su propio Brix/Acidez que tampoco viene de ningún lote - no
+-- hay forma de calcular el real desde los lotes, solo de medirlo. Cuando una
+-- corrida tiene al menos una medición, el reporte usa ESTE número, no el
+-- estimado (ver reporte_corrida.py).
+-- ----------------------------------------------------------------------------
+CREATE TABLE mediciones_tanque (
+    id            SERIAL PRIMARY KEY,
+    corrida_id    INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
+    tanque        TEXT NOT NULL,          -- ej "TK1" - texto libre, no un catalogo fijo de tanques
+    litros        NUMERIC(10,2),
+    brix_inicial  NUMERIC(5,2),           -- al empezar a llenar el tanque (opcional)
+    brix_final    NUMERIC(5,2) NOT NULL CHECK (brix_final > 0),
+    acidez        NUMERIC(5,3) NOT NULL CHECK (acidez > 0),
+    ph            NUMERIC(4,2),
+    observaciones TEXT,
+    creado_en     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE mediciones_tanque IS 'Brix/Acidez/pH medido de verdad con el refractómetro por tanque - el número real de producción (incluye enjuague y cualquier ajuste de estandarización), no el estimado desde los lotes de MP.';
+
+CREATE INDEX idx_mediciones_tanque_corrida ON mediciones_tanque(corrida_id);
+
 CREATE VIEW v_cuadre_corridas AS
 SELECT
     c.id,
