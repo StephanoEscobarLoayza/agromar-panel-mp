@@ -20,6 +20,7 @@ from sqlalchemy import create_engine, text
 
 from sync_lotes import sincronizar_lotes
 from reporte_corrida import generar_reporte_pdf
+from reporte_stock import generar_reporte_stock_pdf
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
@@ -65,6 +66,27 @@ def listar_lotes(q: Optional[str] = None):
         else:
             result = conn.execute(text("SELECT * FROM v_saldo_lotes ORDER BY numero DESC"))
         return rows(result)
+
+
+@app.get("/api/lotes/reporte-stock.pdf")
+def reporte_stock_pdf():
+    """Foto en PDF del stock que el sistema calcula en vivo (Silo + Bines) -
+    no es un conteo físico, es exactamente lo que ya muestra v_saldo_lotes."""
+    with engine.connect() as conn:
+        lotes = rows(conn.execute(text(
+            """
+            SELECT numero, proveedor, tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, bines_saldo
+            FROM v_saldo_lotes
+            WHERE kg_saldo > 0
+            ORDER BY tipo_almacen, fecha_ingreso ASC, numero ASC
+            """
+        )))
+    pdf_bytes = generar_reporte_stock_pdf(lotes)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="stock-materia-prima.pdf"'},
+    )
 
 
 def _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, x, brix_min, ratio_min):
