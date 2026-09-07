@@ -100,78 +100,159 @@ def _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_max, 
     return hi
 
 
-@app.get("/api/lotes/sugerir-mezcla")
-def sugerir_mezcla(brix_min: float, ratio_min: float):
-    """Sugiere qué lotes combinar, del más antiguo al más nuevo (FIFO - así
-    es como de verdad se van agarrando en planta), hasta que el Brix y Ratio
-    PONDERADOS por kg lleguen al mínimo pedido. Solo considera lotes 'EN
-    ESPERA' - los que ya están EN PROCESO están comprometidos con otra
-    corrida, y los PROCESADOS no tienen fruta real disponible (su saldo, si
-    lo tienen, es una inconsistencia histórica de Trazabilidad, no inventario
-    real). El último lote que hace falta se corta a la fracción justa que
-    alcanza - no obliga a gastar un lote completo si con una parte ya se
-    llega."""
-    with engine.connect() as conn:
-        result = conn.execute(
-            text(
-                """
-                SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
-                FROM v_saldo_lotes
-                WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
-                      AND UPPER(TRIM(estado_actual)) = 'EN ESPERA'
-                ORDER BY fecha_ingreso ASC, numero ASC
-                """
-            )
-        )
-        candidatos = rows(result)
+MAX_BINES_AJUSTE = 2  # en planta no se mete mas de 2 lotes de bines de ajuste sobre el silo
 
-    pasos = []
-    kg_acum = 0.0
-    brix_pond = 0.0
-    acidez_pond = 0.0
-    cumplido = False
 
-    for l in candidatos:
+def _lote_a_dict(l):
+    return {
+        "numero": l["numero"],
+        "proveedor": l["proveedor"],
+        "fecha_ingreso": l["fecha_ingreso"],
+        "tipo_almacen": l["tipo_almacen"],
+        "brix_lote": float(l["brix_recepcion"]),
+        "acidez_lote": float(l["acidez"]),
+        "ratio_lote": float(l["ratio"]) if l["ratio"] is not None else None,
+        "kg_disponible": float(l["kg_saldo"]),
+    }
+
+
+def _paso_mezcla(l, kg_usado, es_parcial, kg_acum, brix_pond, acidez_pond):
+    brix_mezcla = brix_pond / kg_acum
+    acidez_mezcla = acidez_pond / kg_acum
+    ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
+    paso = _lote_a_dict(l)
+    paso.update({
+        "kg_usado": round(kg_usado, 2),
+        "es_parcial": es_parcial,
+        "kg_acumulado": round(kg_acum, 2),
+        "brix_mezcla": round(brix_mezcla, 2),
+        "acidez_mezcla": round(acidez_mezcla, 3),
+        "ratio_mezcla": round(ratio_mezcla, 2) if ratio_mezcla is not None else None,
+    })
+    return paso
+
+
+def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple):
+    """Agrega lotes de bines de a uno (máximo MAX_BINES_AJUSTE) sobre lo ya
+    acumulado, cortando el último a la fracción exacta que hace falta - así
+    es como de verdad se ajusta en planta, entrando un bin-lote a la vez."""
+    pasos_bines = []
+    cumplido = ya_cumple
+    for l in bines:
+        if cumplido or len(pasos_bines) >= MAX_BINES_AJUSTE:
+            break
         kg_disponible = float(l["kg_saldo"])
         brix_lote = float(l["brix_recepcion"])
         acidez_lote = float(l["acidez"])
-
         kg_parcial = _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_disponible, brix_min, ratio_min)
         kg_usado = kg_parcial if kg_parcial is not None else kg_disponible
-
         kg_acum += kg_usado
         brix_pond += brix_lote * kg_usado
         acidez_pond += acidez_lote * kg_usado
-        brix_mezcla = brix_pond / kg_acum
-        acidez_mezcla = acidez_pond / kg_acum
-        ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
-
-        pasos.append({
-            "numero": l["numero"],
-            "proveedor": l["proveedor"],
-            "fecha_ingreso": l["fecha_ingreso"],
-            "tipo_almacen": l["tipo_almacen"],
-            "kg_disponible": kg_disponible,
-            "kg_usado": round(kg_usado, 2),
-            "es_parcial": kg_parcial is not None and kg_parcial < kg_disponible - 0.005,
-            "brix_lote": brix_lote,
-            "acidez_lote": acidez_lote,
-            "ratio_lote": float(l["ratio"]) if l["ratio"] is not None else None,
-            "kg_acumulado": round(kg_acum, 2),
-            "brix_mezcla": round(brix_mezcla, 2),
-            "acidez_mezcla": round(acidez_mezcla, 3),
-            "ratio_mezcla": round(ratio_mezcla, 2) if ratio_mezcla is not None else None,
-        })
-
+        es_parcial = kg_parcial is not None and kg_parcial < kg_disponible - 0.005
+        pasos_bines.append(_paso_mezcla(l, kg_usado, es_parcial, kg_acum, brix_pond, acidez_pond))
         if kg_parcial is not None:
             cumplido = True
-            break
+    return pasos_bines, cumplido
 
-    return {
-        "cumplido": cumplido,
-        "pasos": pasos,
-        "lotes_evaluados": len(candidatos),
-    }
+
+@app.get("/api/lotes/sugerir-mezcla")
+def sugerir_mezcla(brix_min: float, ratio_min: float):
+    """El silo es la base fija - siempre se está alimentando de ahí, no es
+    una opción a elegir - y los bines son el ajuste que se agrega encima, de
+    a uno, hasta un máximo de 2 (así se mete en planta). Solo se consideran
+    lotes 'EN ESPERA' o, para el silo, el que ya esté 'EN PROCESO' (el que
+    de verdad está alimentando en este momento):
+    - Si hay un lote de Silo EN PROCESO -> esa es la base, sin ambigüedad.
+    - Si no, y hay un solo lote de Silo EN ESPERA -> se usa ese.
+    - Si no, y hay 2+ lotes de Silo EN ESPERA -> no se sabe cuál arranca
+      primero, así que se devuelve una OPCIÓN por cada uno (no se adivina).
+    - Si no hay ningún lote de Silo disponible -> se resuelve solo con bines.
+    Sobre esa base (la que sea), se agregan bines EN ESPERA de a uno, máximo
+    2, cortando el último a la fracción exacta que hace falta."""
+    with engine.connect() as conn:
+        silo_en_proceso = rows(conn.execute(text(
+            """
+            SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
+            FROM v_saldo_lotes
+            WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
+                  AND tipo_almacen = 'SILO' AND UPPER(TRIM(estado_actual)) = 'EN PROCESO'
+            ORDER BY fecha_ingreso ASC, numero ASC
+            """
+        )))
+        silo_en_espera = rows(conn.execute(text(
+            """
+            SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
+            FROM v_saldo_lotes
+            WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
+                  AND tipo_almacen = 'SILO' AND UPPER(TRIM(estado_actual)) = 'EN ESPERA'
+            ORDER BY fecha_ingreso ASC, numero ASC
+            """
+        )))
+        bines = rows(conn.execute(text(
+            """
+            SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
+            FROM v_saldo_lotes
+            WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
+                  AND tipo_almacen = 'BINES' AND UPPER(TRIM(estado_actual)) = 'EN ESPERA'
+            ORDER BY fecha_ingreso ASC, numero ASC
+            """
+        )))
+
+    def escenario(silo_base):
+        """silo_base: un lote de silo (dict de la consulta) o None."""
+        if silo_base is None:
+            kg_acum = brix_pond = acidez_pond = 0.0
+            ya_cumple = False
+            silo_info = None
+        else:
+            kg_acum = float(silo_base["kg_saldo"])
+            brix_pond = float(silo_base["brix_recepcion"]) * kg_acum
+            acidez_pond = float(silo_base["acidez"]) * kg_acum
+            ya_cumple = _cumple_mezcla(0, 0, 0, float(silo_base["brix_recepcion"]), float(silo_base["acidez"]), kg_acum, brix_min, ratio_min)
+            silo_info = _paso_mezcla(silo_base, kg_acum, False, kg_acum, brix_pond, acidez_pond)
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+        return {"silo_base": silo_info, "pasos_bines": pasos_bines, "cumplido": cumplido}
+
+    if silo_en_proceso:
+        # puede (raro) haber mas de un lote de silo en proceso a la vez -
+        # se toman todos juntos como una sola base, ya que ambos estan
+        # alimentando de verdad ahora mismo
+        kg_acum = brix_pond = acidez_pond = 0.0
+        silo_info = None
+        for l in silo_en_proceso:
+            kg = float(l["kg_saldo"])
+            kg_acum += kg
+            brix_pond += float(l["brix_recepcion"]) * kg
+            acidez_pond += float(l["acidez"]) * kg
+            silo_info = _paso_mezcla(l, kg, False, kg_acum, brix_pond, acidez_pond) if silo_info is None else silo_info
+        # si hay mas de uno, se guarda el detalle de cada uno para mostrarlos todos
+        silo_bases_multiples = [_paso_mezcla(l, float(l["kg_saldo"]), False, float(l["kg_saldo"]),
+                                              float(l["brix_recepcion"]) * float(l["kg_saldo"]),
+                                              float(l["acidez"]) * float(l["kg_saldo"])) for l in silo_en_proceso]
+        ya_cumple = kg_acum > 0 and (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+        return {
+            "modo": "unico",
+            "origen_base": "en_proceso",
+            "escenarios": [{"silo_base": silo_bases_multiples, "pasos_bines": pasos_bines, "cumplido": cumplido}],
+        }
+
+    if len(silo_en_espera) == 0:
+        e = escenario(None)
+        return {"modo": "unico", "origen_base": "sin_silo", "escenarios": [{"silo_base": None, "pasos_bines": e["pasos_bines"], "cumplido": e["cumplido"]}]}
+
+    if len(silo_en_espera) == 1:
+        e = escenario(silo_en_espera[0])
+        return {"modo": "unico", "origen_base": "en_espera_unico", "escenarios": [{"silo_base": [e["silo_base"]], "pasos_bines": e["pasos_bines"], "cumplido": e["cumplido"]}]}
+
+    # 2+ lotes de silo en espera y ninguno en proceso: no se sabe cual va a
+    # arrancar primero - se da una opcion independiente por cada uno
+    escenarios = []
+    for base in silo_en_espera:
+        e = escenario(base)
+        escenarios.append({"silo_base": [e["silo_base"]], "pasos_bines": e["pasos_bines"], "cumplido": e["cumplido"]})
+    return {"modo": "opciones", "origen_base": "en_espera_multiple", "escenarios": escenarios}
 
 
 @app.get("/api/lotes/{numero}")
