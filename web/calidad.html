@@ -61,7 +61,7 @@
   <section>
     <div class="section-head">
       <h2>Combinación sugerida</h2>
-      <span class="hint">lotes con saldo, del más antiguo al más nuevo</span>
+      <span class="hint">lotes en espera, del más antiguo al más nuevo</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div id="banner"></div>
@@ -134,7 +134,7 @@ async function buscar() {
 
 function render(r, brixMin, ratioMin) {
   if (r.pasos.length === 0) {
-    banner.innerHTML = '<div class="msg bad">No hay lotes con saldo y con Brix/Acidez registrados para armar una mezcla.</div>';
+    banner.innerHTML = '<div class="msg bad">No hay lotes en espera con Brix/Acidez registrados para armar una mezcla.</div>';
     filasBody.innerHTML = '<tr><td colspan="10" class="empty">Sin datos.</td></tr>';
     return;
   }

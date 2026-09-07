@@ -102,11 +102,15 @@ def _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_max, 
 
 @app.get("/api/lotes/sugerir-mezcla")
 def sugerir_mezcla(brix_min: float, ratio_min: float):
-    """Sugiere qué lotes con saldo combinar, del más antiguo al más nuevo
-    (FIFO - así es como de verdad se van agarrando en planta), hasta que el
-    Brix y Ratio PONDERADOS por kg lleguen al mínimo pedido. El último lote
-    que hace falta se corta a la fracción justa que alcanza - no obliga a
-    gastar un lote completo si con una parte ya se llega."""
+    """Sugiere qué lotes combinar, del más antiguo al más nuevo (FIFO - así
+    es como de verdad se van agarrando en planta), hasta que el Brix y Ratio
+    PONDERADOS por kg lleguen al mínimo pedido. Solo considera lotes 'EN
+    ESPERA' - los que ya están EN PROCESO están comprometidos con otra
+    corrida, y los PROCESADOS no tienen fruta real disponible (su saldo, si
+    lo tienen, es una inconsistencia histórica de Trazabilidad, no inventario
+    real). El último lote que hace falta se corta a la fracción justa que
+    alcanza - no obliga a gastar un lote completo si con una parte ya se
+    llega."""
     with engine.connect() as conn:
         result = conn.execute(
             text(
@@ -114,6 +118,7 @@ def sugerir_mezcla(brix_min: float, ratio_min: float):
                 SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
                 FROM v_saldo_lotes
                 WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
+                      AND UPPER(TRIM(estado_actual)) = 'EN ESPERA'
                 ORDER BY fecha_ingreso ASC, numero ASC
                 """
             )
