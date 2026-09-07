@@ -53,3 +53,44 @@ function escapeHtml(s) {
   div.textContent = s ?? "";
   return div.innerHTML;
 }
+
+// ---------- menús desplegables del nav (Registro / Calidad, y los que se
+// agreguen después) - un botón .nav-dropdown-btn[data-menu="idDelMenu"] abre
+// el <div class="nav-dropdown-menu" id="idDelMenu"> correspondiente, que vive
+// al final del <body> (fuera del hero, que tiene overflow:hidden) y se
+// posiciona con position:fixed según el botón que lo abrió ----------
+document.addEventListener("DOMContentLoaded", () => {
+  const botones = document.querySelectorAll(".nav-dropdown-btn[data-menu]");
+  if (botones.length === 0) return;
+
+  function cerrarTodos() {
+    document.querySelectorAll(".nav-dropdown-menu").forEach((m) => { m.hidden = true; });
+  }
+
+  botones.forEach((btn) => {
+    const menu = document.getElementById(btn.dataset.menu);
+    if (!menu) return;
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const abrir = menu.hidden;
+      cerrarTodos();
+      if (abrir) {
+        const r = btn.getBoundingClientRect();
+        menu.style.left = Math.round(r.left) + "px";
+        menu.style.top = Math.round(r.bottom + 6) + "px";
+        menu.hidden = false;
+      }
+    });
+  });
+
+  document.addEventListener("click", (ev) => {
+    document.querySelectorAll(".nav-dropdown-menu").forEach((menu) => {
+      const btn = document.querySelector(`[data-menu="${menu.id}"]`);
+      if (!menu.hidden && !menu.contains(ev.target) && ev.target !== btn && btn && !btn.contains(ev.target)) {
+        menu.hidden = true;
+      }
+    });
+  });
+  document.addEventListener("scroll", cerrarTodos, true);
+  window.addEventListener("resize", cerrarTodos);
+});

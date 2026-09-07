@@ -62,6 +62,21 @@ nav.tabs a:hover{background:rgba(244,239,224,.08)}
 nav.tabs a.active{background:rgba(244,239,224,.12);color:#F4EFE0}
 .nav-icon{width:15px;height:15px;flex-shrink:0;opacity:.7;transition:opacity .15s}
 nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
+
+/* ---------- menú desplegable del nav (Registro / Calidad) - vive fuera del
+   hero (que tiene overflow:hidden) y se posiciona con position:fixed vía JS,
+   mismo criterio que el .csel-popup de Lotes ---------- */
+.nav-dropdown-btn{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:#CBDCD1;background:none;border:none;cursor:pointer;padding:8px 14px;border-radius:8px;font-family:inherit;transition:background .15s,color .15s}
+.nav-dropdown-btn:hover{background:rgba(244,239,224,.08)}
+.nav-dropdown-btn.active{background:rgba(244,239,224,.12);color:#F4EFE0}
+.nav-dropdown-btn.active .nav-icon{opacity:1}
+.nav-caret{width:9px;height:9px;opacity:.7;flex-shrink:0}
+.nav-dropdown-menu{position:fixed;z-index:200;min-width:215px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;gap:2px}
+.nav-dropdown-menu[hidden]{display:none}
+.nav-dropdown-menu a{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--text-2);text-decoration:none;transition:background .15s,color .15s}
+.nav-dropdown-menu a:hover{background:var(--surface-2)}
+.nav-dropdown-menu a.active{background:var(--citrus-tint);color:var(--citrus);font-weight:600}
+.nav-dropdown-menu .nav-icon{opacity:.85;color:inherit}
 .hero-eyebrow{font-family:'Fraunces',Georgia,serif;font-style:italic;font-weight:500;font-size:15px;color:var(--citrus-light);margin-top:32px;letter-spacing:.02em}
 .hero-title{font-size:38px;font-weight:800;line-height:1.08;letter-spacing:-.01em;margin-top:8px;max-width:620px}
 .hero-title em{font-style:italic;font-weight:500;color:var(--citrus-light)}

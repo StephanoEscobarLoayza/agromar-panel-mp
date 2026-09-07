@@ -66,6 +66,109 @@ def listar_lotes(q: Optional[str] = None):
         return rows(result)
 
 
+def _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, x, brix_min, ratio_min):
+    kg = kg_acum + x
+    if kg <= 0:
+        return False
+    bp = brix_pond + brix_lote * x
+    ap = acidez_pond + acidez_lote * x
+    if ap <= 0:
+        return False
+    return (bp / kg) >= brix_min and (bp / ap) >= ratio_min
+
+
+def _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_max, brix_min, ratio_min):
+    """Cuánto de ESTE lote (entre 0 y su saldo kg_max) hace falta agregar a lo
+    ya acumulado para llegar al Brix/Ratio mínimo - no siempre hace falta el
+    lote completo. Tanto el Brix como el Ratio de una mezcla son funciones
+    monótonas de x (cociente de dos funciones lineales), así que una búsqueda
+    binaria simple encuentra el mínimo exacto sin álgebra propensa a errores."""
+    if not _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_max, brix_min, ratio_min):
+        return None  # ni con el lote completo alcanza
+    if kg_acum == 0:
+        # no hay nada acumulado todavia con que mezclar - el Brix/Ratio de
+        # "una parte" de este lote es igual al del lote entero (es puro), asi
+        # que no existe una fraccion "minima" con sentido: se usa completo.
+        return kg_max
+    lo, hi = 0.0, kg_max
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, mid, brix_min, ratio_min):
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+@app.get("/api/lotes/sugerir-mezcla")
+def sugerir_mezcla(brix_min: float, ratio_min: float):
+    """Sugiere qué lotes con saldo combinar, del más antiguo al más nuevo
+    (FIFO - así es como de verdad se van agarrando en planta), hasta que el
+    Brix y Ratio PONDERADOS por kg lleguen al mínimo pedido. El último lote
+    que hace falta se corta a la fracción justa que alcanza - no obliga a
+    gastar un lote completo si con una parte ya se llega."""
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
+                FROM v_saldo_lotes
+                WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
+                ORDER BY fecha_ingreso ASC, numero ASC
+                """
+            )
+        )
+        candidatos = rows(result)
+
+    pasos = []
+    kg_acum = 0.0
+    brix_pond = 0.0
+    acidez_pond = 0.0
+    cumplido = False
+
+    for l in candidatos:
+        kg_disponible = float(l["kg_saldo"])
+        brix_lote = float(l["brix_recepcion"])
+        acidez_lote = float(l["acidez"])
+
+        kg_parcial = _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_disponible, brix_min, ratio_min)
+        kg_usado = kg_parcial if kg_parcial is not None else kg_disponible
+
+        kg_acum += kg_usado
+        brix_pond += brix_lote * kg_usado
+        acidez_pond += acidez_lote * kg_usado
+        brix_mezcla = brix_pond / kg_acum
+        acidez_mezcla = acidez_pond / kg_acum
+        ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
+
+        pasos.append({
+            "numero": l["numero"],
+            "proveedor": l["proveedor"],
+            "fecha_ingreso": l["fecha_ingreso"],
+            "tipo_almacen": l["tipo_almacen"],
+            "kg_disponible": kg_disponible,
+            "kg_usado": round(kg_usado, 2),
+            "es_parcial": kg_parcial is not None and kg_parcial < kg_disponible - 0.005,
+            "brix_lote": brix_lote,
+            "acidez_lote": acidez_lote,
+            "ratio_lote": float(l["ratio"]) if l["ratio"] is not None else None,
+            "kg_acumulado": round(kg_acum, 2),
+            "brix_mezcla": round(brix_mezcla, 2),
+            "acidez_mezcla": round(acidez_mezcla, 3),
+            "ratio_mezcla": round(ratio_mezcla, 2) if ratio_mezcla is not None else None,
+        })
+
+        if kg_parcial is not None:
+            cumplido = True
+            break
+
+    return {
+        "cumplido": cumplido,
+        "pasos": pasos,
+        "lotes_evaluados": len(candidatos),
+    }
+
+
 @app.get("/api/lotes/{numero}")
 def obtener_lote(numero: int):
     with engine.connect() as conn:

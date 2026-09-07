@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Calidad · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <button type="button" class="nav-dropdown-btn" data-menu="menuRegistro">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2.3" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="2.3" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Registro
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn active" data-menu="menuCalidad">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Calidad
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Calidad</h1>
+    <p class="hero-sub">Encuentra qué lotes mezclar, en orden de llegada, hasta llegar al Brix y Ratio que necesitas.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+  <div class="panel">
+    <div class="panel-head"><h3>Sugeridor de mezcla</h3></div>
+    <div class="form-body">
+      <div class="two-col">
+        <div class="field">
+          <label for="brixMin">Brix mínimo</label>
+          <input type="number" id="brixMin" value="11" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="ratioMin">Ratio mínimo</label>
+          <input type="number" id="ratioMin" value="11" step="0.1" min="0">
+        </div>
+      </div>
+      <button class="btn" id="btnBuscar" style="width:auto;padding:11px 22px">Buscar combinación</button>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <h2>Combinación sugerida</h2>
+      <span class="hint">lotes con saldo, del más antiguo al más nuevo</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div id="banner"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Lote</th><th>Proveedor</th><th>Almacén</th><th>Fecha</th>
+              <th class="right">Kg usado</th><th class="right">Brix</th><th class="right">Acidez</th>
+              <th class="right">Kg acumulado</th><th class="right">Brix mezcla</th><th class="right">Ratio mezcla</th>
+            </tr>
+          </thead>
+          <tbody id="filas"><tr><td colspan="10" class="empty">Elige un mínimo y dale a "Buscar combinación".</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="hint-line" style="margin-top:12px">
+      Ojo con los lotes en Silo: si ya se mezclaron físicamente con otro lote en el mismo silo, el Brix/Acidez real puede ser distinto al de recepción que se usa aquí — confía en una medición directa cuando la tengas.
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<div class="nav-dropdown-menu" id="menuRegistro" hidden>
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+  <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+  <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+  <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+  <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
+</div>
+<div class="nav-dropdown-menu" id="menuCalidad" hidden>
+  <a href="calidad.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sugeridor de mezcla</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+const banner = document.getElementById("banner");
+const filasBody = document.getElementById("filas");
+const btnBuscar = document.getElementById("btnBuscar");
+
+function tagAlmacen(t) {
+  return t === "BINES" ? "Bines" : t === "SILO" ? "Silo" : "Mixto";
+}
+
+async function buscar() {
+  const brixMin = Number(document.getElementById("brixMin").value);
+  const ratioMin = Number(document.getElementById("ratioMin").value);
+  if (!brixMin || !ratioMin) {
+    banner.innerHTML = '<div class="resultado-banner-mini">Ingresa un Brix y un Ratio mínimo mayores a 0.</div>';
+    return;
+  }
+
+  btnBuscar.disabled = true;
+  banner.innerHTML = "";
+  filasBody.innerHTML = '<tr><td colspan="10" class="empty">Calculando…</td></tr>';
+  try {
+    const r = await apiGet(`/api/lotes/sugerir-mezcla?brix_min=${brixMin}&ratio_min=${ratioMin}`);
+    render(r, brixMin, ratioMin);
+  } catch (e) {
+    filasBody.innerHTML = `<tr><td colspan="10"><div class="msg bad">${escapeHtml(e.message)}</div></td></tr>`;
+  } finally {
+    btnBuscar.disabled = false;
+  }
+}
+
+function render(r, brixMin, ratioMin) {
+  if (r.pasos.length === 0) {
+    banner.innerHTML = '<div class="msg bad">No hay lotes con saldo y con Brix/Acidez registrados para armar una mezcla.</div>';
+    filasBody.innerHTML = '<tr><td colspan="10" class="empty">Sin datos.</td></tr>';
+    return;
+  }
+
+  const ultimo = r.pasos[r.pasos.length - 1];
+  banner.innerHTML = r.cumplido
+    ? `<div class="msg ok" style="margin:16px 20px 0">✓ Se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} usando ${r.pasos.length} lote(s) — ${fmtKg(ultimo.kg_acumulado)} kg en total.</div>`
+    : `<div class="msg bad" style="margin:16px 20px 0">✕ Ni usando los ${r.pasos.length} lotes con dato de calidad (de ${r.lotes_evaluados} evaluados) se alcanza ese mínimo — lo más cerca que se llega es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}.</div>`;
+
+  filasBody.innerHTML = r.pasos.map((p, i) => {
+    const esUltimo = i === r.pasos.length - 1 && r.cumplido;
+    const kgTexto = p.es_parcial
+      ? `${fmtKg(p.kg_usado)} <span class="stat-bar-sub">de ${fmtKg(p.kg_disponible)}</span>`
+      : fmtKg(p.kg_usado);
+    return `
+      <tr${esUltimo ? ' style="background:var(--ok-bg)"' : ""}>
+        <td class="strong num">#${p.numero}</td>
+        <td>${escapeHtml(p.proveedor)}</td>
+        <td><span class="tag">${tagAlmacen(p.tipo_almacen)}</span></td>
+        <td>${fmtDate(p.fecha_ingreso)}</td>
+        <td class="right num">${kgTexto}</td>
+        <td class="right num">${p.brix_lote.toFixed(2)}</td>
+        <td class="right num">${p.acidez_lote.toFixed(2)}</td>
+        <td class="right num">${fmtKg(p.kg_acumulado)}</td>
+        <td class="right num">${p.brix_mezcla.toFixed(2)}</td>
+        <td class="right num">${p.ratio_mezcla !== null ? p.ratio_mezcla.toFixed(2) : "—"}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+btnBuscar.addEventListener("click", buscar);
+buscar();
+</script>
+</body>
+</html>
