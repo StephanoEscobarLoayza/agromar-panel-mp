@@ -789,6 +789,147 @@ def eliminar_asignacion(asignacion_id: int):
 
 
 # ---------------------------------------------------------------------------
+# paradas (tiempos muertos de una corrida)
+# ---------------------------------------------------------------------------
+@app.get("/api/corridas/{corrida_id}/paradas")
+def listar_paradas(corrida_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT id, corrida_id, motivo, hora_inicio, hora_fin, observaciones, creado_en,
+                       CASE WHEN hora_fin IS NULL THEN NULL
+                            ELSE ROUND(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)
+                       END AS duracion_minutos
+                FROM paradas
+                WHERE corrida_id = :c
+                ORDER BY hora_inicio DESC
+                """
+            ),
+            {"c": corrida_id},
+        )
+        return rows(result)
+
+
+class NuevaParada(BaseModel):
+    corrida_id: int
+    motivo: str
+    hora_inicio: str
+    hora_fin: Optional[str] = None
+    observaciones: Optional[str] = ""
+
+
+@app.post("/api/paradas")
+def crear_parada(p: NuevaParada):
+    motivo = p.motivo.strip()
+    if not motivo:
+        raise HTTPException(status_code=400, detail="El motivo de la parada no puede estar vacío.")
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    INSERT INTO paradas (corrida_id, motivo, hora_inicio, hora_fin, observaciones)
+                    VALUES (:corrida_id, :motivo, :hora_inicio, :hora_fin, :obs)
+                    RETURNING id
+                    """
+                ),
+                {
+                    "corrida_id": p.corrida_id,
+                    "motivo": motivo,
+                    "hora_inicio": p.hora_inicio,
+                    "hora_fin": p.hora_fin,
+                    "obs": p.observaciones,
+                },
+            )
+            new_id = result.scalar()
+        return {"id": new_id, "ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+
+
+class CerrarParada(BaseModel):
+    hora_fin: str
+
+
+@app.post("/api/paradas/{parada_id}/cerrar")
+def cerrar_parada(parada_id: int, p: CerrarParada):
+    """Marca el fin de una parada que sigue en curso (hora_fin quedó en NULL
+    al crearla porque todavía no se sabía cuánto iba a durar). hora_fin la
+    manda el navegador (hora local de la planta) - NO se usa now() del
+    servidor: hora_inicio se guarda como hora local "de pared" (viene de un
+    <input datetime-local>, sin zona horaria) y el servidor de Render corre
+    en UTC, así que un now() del servidor quedaría ~5 horas adelantado
+    frente a hora_inicio y la duración calculada saldría mal."""
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                UPDATE paradas SET hora_fin = :hora_fin
+                WHERE id = :id AND hora_fin IS NULL
+                RETURNING id
+                """
+            ),
+            {"id": parada_id, "hora_fin": p.hora_fin},
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Parada no encontrada o ya estaba cerrada.")
+    return {"ok": True}
+
+
+class EditarParada(BaseModel):
+    motivo: str
+    hora_inicio: str
+    hora_fin: Optional[str] = None
+    observaciones: Optional[str] = ""
+
+
+@app.post("/api/paradas/{parada_id}")
+def editar_parada(parada_id: int, p: EditarParada):
+    motivo = p.motivo.strip()
+    if not motivo:
+        raise HTTPException(status_code=400, detail="El motivo de la parada no puede estar vacío.")
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    UPDATE paradas SET motivo = :motivo, hora_inicio = :hora_inicio,
+                                        hora_fin = :hora_fin, observaciones = :obs
+                    WHERE id = :id RETURNING id
+                    """
+                ),
+                {
+                    "id": parada_id,
+                    "motivo": motivo,
+                    "hora_inicio": p.hora_inicio,
+                    "hora_fin": p.hora_fin,
+                    "obs": p.observaciones,
+                },
+            )
+            if result.scalar() is None:
+                raise HTTPException(status_code=404, detail="Parada no encontrada.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+    return {"ok": True}
+
+
+@app.delete("/api/paradas/{parada_id}")
+def eliminar_parada(parada_id: int):
+    with engine.begin() as conn:
+        result = conn.execute(
+            text("DELETE FROM paradas WHERE id = :id RETURNING id"), {"id": parada_id}
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Parada no encontrada.")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # front-end estático (todo en el mismo servicio - un solo link para compartir)
 # ---------------------------------------------------------------------------
 app.mount("/", StaticFiles(directory=BASE_DIR / "web", html=True), name="web")

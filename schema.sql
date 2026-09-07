@@ -180,6 +180,29 @@ CREATE TABLE corrida_productos (
 
 COMMENT ON TABLE corrida_productos IS 'Productos de salida de una corrida (soporta producción en paralelo de más de un producto desde el mismo MP).';
 
+-- ----------------------------------------------------------------------------
+-- PARADAS: tiempos muertos durante una corrida (falla mecánica, falta de MP,
+-- limpieza, cambio de producto, etc.). Siempre ligada a la corrida que
+-- estaba en curso - mismo criterio que asignaciones. hora_fin queda NULL
+-- mientras la parada sigue en curso (se "cierra" cuando termina, igual que
+-- una corrida se abre/cierra) o se puede cargar directo si ya se sabe.
+-- ----------------------------------------------------------------------------
+CREATE TABLE paradas (
+    id            SERIAL PRIMARY KEY,
+    corrida_id    INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
+    motivo        TEXT NOT NULL,
+    hora_inicio   TIMESTAMP NOT NULL,
+    hora_fin      TIMESTAMP,              -- null mientras la parada sigue en curso
+    observaciones TEXT,
+    creado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CHECK (hora_fin IS NULL OR hora_fin >= hora_inicio)
+);
+
+COMMENT ON TABLE paradas IS 'Tiempos muertos registrados durante una corrida - motivo, hora de inicio y de fin.';
+
+CREATE INDEX idx_paradas_corrida ON paradas(corrida_id);
+
 CREATE VIEW v_cuadre_corridas AS
 SELECT
     c.id,

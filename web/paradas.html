@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Paradas · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <button type="button" class="nav-dropdown-btn" data-menu="menuRegistro">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2.3" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="2.3" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Registro
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuCalidad">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Calidad
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn active" data-menu="menuParadas">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Paradas
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Paradas</h1>
+    <p class="hero-sub">Motivo, hora de inicio y de fin de cada tiempo muerto — para saber cuánto se pierde y por qué.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+  <section class="split" style="margin-top:0">
+    <div class="panel">
+      <div class="panel-head"><h3>Nueva parada</h3></div>
+      <div class="form-body">
+        <div class="field">
+          <label for="corrida">Corrida</label>
+          <select id="corrida"></select>
+        </div>
+
+        <div class="field">
+          <label for="motivo">Motivo</label>
+          <input type="text" id="motivo" placeholder="ej. falla mecánica, falta de MP, limpieza, cambio de producto">
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label for="horaInicio">Hora de inicio</label>
+            <input type="datetime-local" id="horaInicio">
+          </div>
+          <div class="field">
+            <label for="horaFin">Hora de fin (déjalo vacío si sigue en curso)</label>
+            <input type="datetime-local" id="horaFin">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="obs">Observaciones</label>
+          <input type="text" id="obs" placeholder="opcional">
+        </div>
+
+        <div id="mensaje"></div>
+        <button class="btn" id="btnGuardar">Registrar parada</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Paradas de esta corrida</h3></div>
+      <div class="running-total" id="totalParadas" style="padding:16px 20px 0"><span class="num">—</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Motivo</th><th>Inicio</th><th>Fin</th><th class="right">Duración</th><th></th></tr></thead>
+          <tbody id="lista"><tr><td colspan="5" class="empty">Elige una corrida</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<div class="nav-dropdown-menu" id="menuRegistro" hidden>
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+  <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+  <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+  <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+  <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
+</div>
+<div class="nav-dropdown-menu" id="menuCalidad" hidden>
+  <a href="calidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sugeridor de mezcla</a>
+</div>
+<div class="nav-dropdown-menu" id="menuParadas" hidden>
+  <a href="paradas.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Registrar paradas</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+const corridaSel = document.getElementById("corrida");
+const motivoInput = document.getElementById("motivo");
+const horaInicioInput = document.getElementById("horaInicio");
+const horaFinInput = document.getElementById("horaFin");
+const obsInput = document.getElementById("obs");
+const mensaje = document.getElementById("mensaje");
+const btnGuardar = document.getElementById("btnGuardar");
+const lista = document.getElementById("lista");
+const totalParadas = document.getElementById("totalParadas");
+
+function ahoraLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+function fmtMinutos(min) {
+  if (min === null || min === undefined) return "—";
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function fmtHora(iso) {
+  if (!iso) return "—";
+  return fmtDate(iso);
+}
+
+async function cargarCorridas() {
+  const corridas = await apiGet("/api/corridas?abiertas=true");
+  if (corridas.length === 0) {
+    corridaSel.innerHTML = '<option value="">No hay corridas abiertas</option>';
+    lista.innerHTML = '<tr><td colspan="5" class="empty">No hay corridas abiertas</td></tr>';
+    totalParadas.innerHTML = "";
+    return;
+  }
+  corridaSel.innerHTML = corridas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("");
+  horaInicioInput.value = ahoraLocal();
+  cargarParadas();
+}
+
+async function cargarParadas() {
+  const corridaId = corridaSel.value;
+  if (!corridaId) return;
+  const paradas = await apiGet(`/api/corridas/${corridaId}/paradas`);
+  if (paradas.length === 0) {
+    lista.innerHTML = '<tr><td colspan="5" class="empty">Sin paradas todavía</td></tr>';
+    totalParadas.innerHTML = '<span class="num">0m</span> paradas en esta corrida';
+    return;
+  }
+  const totalMin = paradas.reduce((acc, p) => acc + (p.duracion_minutos || 0), 0);
+  const enCurso = paradas.some(p => p.hora_fin === null);
+  totalParadas.innerHTML = `<span class="num">${fmtMinutos(totalMin)}</span> parados en ${paradas.length} parada(s)${enCurso ? " · hay una en curso" : ""}`;
+
+  lista.innerHTML = paradas.map(p => `
+    <tr data-parada-id="${p.id}" data-motivo="${escapeHtml(p.motivo)}" data-inicio="${p.hora_inicio}" data-fin="${p.hora_fin || ""}">
+      <td data-celda="motivo">${escapeHtml(p.motivo)}</td>
+      <td data-celda="inicio">${fmtHora(p.hora_inicio)}</td>
+      <td data-celda="fin">${p.hora_fin ? fmtHora(p.hora_fin) : '<span class="tag">en curso</span>'}</td>
+      <td class="right num">${fmtMinutos(p.duracion_minutos)}</td>
+      <td class="right" data-celda="acciones" style="white-space:nowrap">
+        ${p.hora_fin === null ? `<button class="btn-link strong" data-accion="cerrar" data-id="${p.id}">Cerrar</button>` : ""}
+        <button class="btn-link" data-accion="editar" data-id="${p.id}" title="Editar">✎</button>
+        <button class="btn-link btn-link-bad" data-accion="eliminar" data-id="${p.id}" title="Eliminar">✕</button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function isoAInputLocal(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+lista.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-accion]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const fila = btn.closest("tr");
+
+  if (btn.dataset.accion === "cerrar") {
+    try {
+      await apiPost(`/api/paradas/${id}/cerrar`, { hora_fin: ahoraLocal() });
+      cargarParadas();
+    } catch (e) {
+      alert(e.message);
+    }
+  } else if (btn.dataset.accion === "eliminar") {
+    if (!confirm("¿Eliminar esta parada?")) return;
+    try {
+      await apiDelete(`/api/paradas/${id}`);
+      cargarParadas();
+    } catch (e) {
+      alert(e.message);
+    }
+  } else if (btn.dataset.accion === "editar") {
+    fila.querySelector('[data-celda="motivo"]').innerHTML =
+      `<input type="text" class="edit-motivo" value="${fila.dataset.motivo}" style="width:100%">`;
+    fila.querySelector('[data-celda="inicio"]').innerHTML =
+      `<input type="datetime-local" class="edit-inicio" value="${isoAInputLocal(fila.dataset.inicio)}">`;
+    fila.querySelector('[data-celda="fin"]').innerHTML =
+      `<input type="datetime-local" class="edit-fin" value="${isoAInputLocal(fila.dataset.fin)}">`;
+    fila.querySelector('[data-celda="acciones"]').innerHTML = `
+      <button class="btn-link strong" data-accion="guardar" data-id="${id}">Guardar</button>
+      <button class="btn-link" data-accion="cancelar" data-id="${id}">Cancelar</button>
+    `;
+  } else if (btn.dataset.accion === "cancelar") {
+    cargarParadas();
+  } else if (btn.dataset.accion === "guardar") {
+    const motivo = fila.querySelector(".edit-motivo").value.trim();
+    const inicio = fila.querySelector(".edit-inicio").value;
+    const fin = fila.querySelector(".edit-fin").value || null;
+    if (!motivo) { alert("El motivo no puede estar vacío."); return; }
+    if (!inicio) { alert("La hora de inicio es obligatoria."); return; }
+    try {
+      await apiPost(`/api/paradas/${id}`, { motivo, hora_inicio: inicio, hora_fin: fin, observaciones: "" });
+      cargarParadas();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+});
+
+corridaSel.addEventListener("change", cargarParadas);
+
+btnGuardar.addEventListener("click", async () => {
+  const motivo = motivoInput.value.trim();
+  const horaInicio = horaInicioInput.value;
+  const horaFin = horaFinInput.value || null;
+
+  if (!corridaSel.value) {
+    mensaje.innerHTML = '<div class="msg bad">Elige una corrida.</div>';
+    return;
+  }
+  if (!motivo) {
+    mensaje.innerHTML = '<div class="msg bad">Escribe el motivo de la parada.</div>';
+    return;
+  }
+  if (!horaInicio) {
+    mensaje.innerHTML = '<div class="msg bad">Ingresa la hora de inicio.</div>';
+    return;
+  }
+
+  btnGuardar.disabled = true;
+  try {
+    await apiPost("/api/paradas", {
+      corrida_id: Number(corridaSel.value),
+      motivo,
+      hora_inicio: horaInicio,
+      hora_fin: horaFin,
+      observaciones: obsInput.value || "",
+    });
+    mensaje.innerHTML = '<div class="msg ok">Parada registrada.</div>';
+    motivoInput.value = "";
+    obsInput.value = "";
+    horaFinInput.value = "";
+    horaInicioInput.value = ahoraLocal();
+    cargarParadas();
+  } catch (e) {
+    mensaje.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  } finally {
+    btnGuardar.disabled = false;
+  }
+});
+
+cargarCorridas();
+</script>
+</body>
+</html>
