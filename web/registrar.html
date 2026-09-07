@@ -145,11 +145,14 @@ recientesBody.addEventListener("click", async (ev) => {
       const binesActual = Number(fila.dataset.bines) || 0;
       const quedanActual = Number(fila.dataset.binesSaldo) || 0; // lo que hay ahora, contando ya esta fila
       const maxBines = quedanActual + binesActual; // lo que habría si esta fila no hubiera consumido nada
-      fila.querySelector('[data-celda="kg"]').innerHTML =
-        `<input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" style="width:56px;text-align:right" placeholder="quedan" title="Bines que quedan ahora">`;
+      fila.querySelector('[data-celda="kg"]').innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
+          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" style="width:48px;text-align:right" title="Bines que quedan ahora">
+          <span style="font-size:11px;color:var(--text-muted)">bines</span>
+        </div>`;
       fila.querySelector('[data-celda="acciones"]').innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">${fmtKg(binesActual * kgPorBin)} kg consumidos</span>
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">consumo: ${binesActual} bines · ${fmtKg(binesActual * kgPorBin)} kg</span>
           <div style="white-space:nowrap">
             <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
             <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -159,7 +162,7 @@ recientesBody.addEventListener("click", async (ev) => {
       fila.querySelector(".edit-bines-input").addEventListener("input", (ev) => {
         const quedan = ev.target.value === "" ? NaN : Number(ev.target.value);
         const consumidos = isNaN(quedan) ? 0 : Math.max(0, maxBines - quedan);
-        document.getElementById(`edit-kg-hint-${id}`).textContent = `${fmtKg(consumidos * kgPorBin)} kg consumidos`;
+        document.getElementById(`edit-kg-hint-${id}`).textContent = `consumo: ${consumidos} bines · ${fmtKg(consumidos * kgPorBin)} kg`;
       });
       return;
     }
