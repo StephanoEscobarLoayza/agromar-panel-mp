@@ -69,6 +69,26 @@
     </div>
   </section>
 
+  <section>
+    <div class="section-head">
+      <h2>¿Se te acabó un bin a media corrida?</h2>
+      <span class="hint">parte de lo que ya registraste en "Registrar consumo", no desde cero</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="form-body">
+        <div class="field">
+          <label for="corridaSelect">Corrida en curso</label>
+          <select id="corridaSelect"><option value="">Cargando…</option></select>
+        </div>
+        <button class="btn" id="btnSiguienteBin" style="width:auto;padding:11px 22px">Calcular siguiente bin</button>
+      </div>
+    </div>
+    <div id="resultadoSiguienteBin" style="margin-top:16px"></div>
+    <div class="hint-line" style="margin-top:12px">
+      Usa el Brix y Ratio mínimo de arriba. Este cálculo toma lo que YA aparece registrado para esta corrida en "Registrar consumo" (Silo + bines ya usados) como punto de partida real, y sugiere el siguiente bin — de a uno, máximo 2 — para llegar al mínimo.
+    </div>
+  </section>
+
   <div class="foot">
     <div class="foot-rule"></div>
     <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
@@ -204,6 +224,108 @@ function render(r, brixMin, ratioMin) {
 
 btnBuscar.addEventListener("click", buscar);
 buscar();
+
+// ---------- "se te acabó un bin a media corrida" ----------
+const corridaSelect = document.getElementById("corridaSelect");
+const btnSiguienteBin = document.getElementById("btnSiguienteBin");
+const resultadoSiguienteBin = document.getElementById("resultadoSiguienteBin");
+
+async function cargarCorridasAbiertas() {
+  try {
+    const corridas = await apiGet("/api/corridas?abiertas=true");
+    corridaSelect.innerHTML = corridas.length
+      ? corridas.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("")
+      : '<option value="">No hay corridas abiertas</option>';
+  } catch (e) {
+    corridaSelect.innerHTML = '<option value="">Error al cargar corridas</option>';
+  }
+}
+
+function tablaHtml(filasHtml) {
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Lote</th><th>Proveedor</th><th>Almacén</th><th>Fecha</th>
+            <th class="right">Kg usado</th><th class="right">Brix</th><th class="right">Acidez</th>
+            <th class="right">Kg acumulado</th><th class="right">Brix mezcla</th><th class="right">Ratio mezcla</th>
+          </tr>
+        </thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function bloqueSiguienteBin(r, brixMin, ratioMin) {
+  if (!r.tiene_registros) {
+    return `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Todavía no hay consumo registrado para "${escapeHtml(r.corrida_nombre)}" — registra lo que ya se metió en "Registrar consumo" antes de calcular el siguiente bin.</div></div>`;
+  }
+
+  const ultimoYaAlimentado = r.ya_alimentado[r.ya_alimentado.length - 1];
+  const resumen = `
+    <div class="lookup" style="margin:16px 20px 0">
+      <div class="lookup-row"><span>Kg ya mezclados</span><span class="num">${fmtKg(ultimoYaAlimentado.kg_acumulado)} kg</span></div>
+      <div class="lookup-row"><span>Brix actual</span><span class="num">${r.brix_actual.toFixed(2)}</span></div>
+      <div class="lookup-row"><span>Ratio actual</span><span class="num">${r.ratio_actual !== null ? r.ratio_actual.toFixed(2) : "—"}</span></div>
+    </div>
+  `;
+
+  let mensajeSiguiente;
+  const filasBines = r.pasos_bines.map((p, i) => filaHtml(p, i === r.pasos_bines.length - 1 && r.cumplido)).join("");
+  if (r.cumplido_ya) {
+    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas — no hace falta agregar más por ahora.</div>`;
+  } else if (r.cumplido) {
+    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${r.pasos_bines.length} lote(s) de bines más se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin}.</div>`;
+  } else if (r.pasos_bines.length === 0) {
+    mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px 0">No hay lotes de bines en espera disponibles para seguir ajustando.</div>';
+  } else {
+    const ultimo = r.pasos_bines[r.pasos_bines.length - 1];
+    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px 0">✕ ni agregando ${r.pasos_bines.length} lote(s) más de bines se alcanza ese mínimo — lo más cerca que se llega es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}.</div>`;
+  }
+
+  return `
+    <div class="panel" style="margin-top:0">
+      <div class="panel-head"><h3>Lo que ya llevas — ${escapeHtml(r.corrida_nombre)}</h3></div>
+      ${resumen}
+      ${tablaHtml(r.ya_alimentado.map((p) => filaHtml(p, false)).join(""))}
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head"><h3>El siguiente bin</h3></div>
+      ${mensajeSiguiente}
+      ${filasBines ? tablaHtml(filasBines) : ""}
+    </div>
+  `;
+}
+
+async function calcularSiguienteBin() {
+  const corridaId = corridaSelect.value;
+  if (!corridaId) {
+    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Elige una corrida.</div></div>';
+    return;
+  }
+  const brixMin = Number(document.getElementById("brixMin").value);
+  const ratioMin = Number(document.getElementById("ratioMin").value);
+  if (!brixMin || !ratioMin) {
+    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Ingresa un Brix y un Ratio mínimo mayores a 0 arriba.</div></div>';
+    return;
+  }
+
+  btnSiguienteBin.disabled = true;
+  resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Calculando…</div></div>';
+  try {
+    const r = await apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=${brixMin}&ratio_min=${ratioMin}`);
+    resultadoSiguienteBin.innerHTML = bloqueSiguienteBin(r, brixMin, ratioMin);
+  } catch (e) {
+    resultadoSiguienteBin.innerHTML = `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">${escapeHtml(e.message)}</div></div>`;
+  } finally {
+    btnSiguienteBin.disabled = false;
+  }
+}
+
+btnSiguienteBin.addEventListener("click", calcularSiguienteBin);
+cargarCorridasAbiertas();
 </script>
 </body>
 </html>

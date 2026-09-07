@@ -255,6 +255,102 @@ def sugerir_mezcla(brix_min: float, ratio_min: float):
     return {"modo": "opciones", "origen_base": "en_espera_multiple", "escenarios": escenarios}
 
 
+def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
+    brix_mezcla = brix_pond / kg_acum
+    acidez_mezcla = acidez_pond / kg_acum
+    ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
+    return {
+        "numero": r["lote_numero"],
+        "proveedor": r["proveedor"],
+        "fecha_ingreso": r["fecha_ingreso"],
+        "tipo_almacen": r["tipo_almacen_origen"],
+        "brix_lote": float(r["brix_recepcion"]),
+        "acidez_lote": float(r["acidez"]),
+        "ratio_lote": float(r["ratio"]) if r["ratio"] is not None else None,
+        "kg_usado": round(kg_usado, 2),
+        "kg_acumulado": round(kg_acum, 2),
+        "brix_mezcla": round(brix_mezcla, 2),
+        "acidez_mezcla": round(acidez_mezcla, 3),
+        "ratio_mezcla": round(ratio_mezcla, 2) if ratio_mezcla is not None else None,
+    }
+
+
+@app.get("/api/corridas/{corrida_id}/sugerir-siguiente-bin")
+def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float):
+    """Para cuando ya estás a mitad de una corrida y un lote de bines se te
+    acaba: a diferencia del sugeridor general (que arranca de cero asumiendo
+    que vas a usar el lote de Silo completo), este parte de lo que YA
+    registraste de verdad en 'Registrar consumo' para esta corrida (Silo +
+    bines ya usados) - ese es el Brix/Ratio acumulado real que ya está
+    mezclado en la máquina - y sugiere el/los siguiente(s) bin(es) que hacen
+    falta para llegar al mínimo, de a uno, máximo 2, igual que en planta."""
+    with engine.connect() as conn:
+        corrida = one(conn.execute(text("SELECT id, nombre FROM corridas WHERE id = :id"), {"id": corrida_id}))
+        if corrida is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+
+        registrado = rows(conn.execute(
+            text(
+                """
+                SELECT a.lote_numero, a.kg_asignados, a.tipo_almacen_origen, a.creado_en,
+                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio
+                FROM asignaciones a
+                JOIN lotes l ON l.numero = a.lote_numero
+                WHERE a.corrida_id = :c
+                ORDER BY a.creado_en ASC
+                """
+            ),
+            {"c": corrida_id},
+        ))
+
+        bines = rows(conn.execute(text(
+            """
+            SELECT numero, proveedor, fecha_ingreso, tipo_almacen, kg_saldo, brix_recepcion, acidez, ratio
+            FROM v_saldo_lotes
+            WHERE kg_saldo > 0 AND brix_recepcion IS NOT NULL AND acidez IS NOT NULL AND acidez > 0
+                  AND tipo_almacen = 'BINES' AND UPPER(TRIM(estado_actual)) = 'EN ESPERA'
+            ORDER BY fecha_ingreso ASC, numero ASC
+            """
+        )))
+
+    kg_acum = brix_pond = acidez_pond = 0.0
+    ya_alimentado = []
+    lotes_sin_calidad = []
+    for r in registrado:
+        kg = float(r["kg_asignados"] or 0)
+        if kg <= 0:
+            continue
+        if r["brix_recepcion"] is None or r["acidez"] is None or float(r["acidez"]) <= 0:
+            lotes_sin_calidad.append(r["lote_numero"])
+            continue
+        kg_acum += kg
+        brix_pond += float(r["brix_recepcion"]) * kg
+        acidez_pond += float(r["acidez"]) * kg
+        ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond))
+
+    if kg_acum == 0:
+        return {
+            "corrida_nombre": corrida["nombre"],
+            "tiene_registros": False,
+            "lotes_sin_calidad": lotes_sin_calidad,
+        }
+
+    ya_cumple = (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
+    pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+
+    return {
+        "corrida_nombre": corrida["nombre"],
+        "tiene_registros": True,
+        "ya_alimentado": ya_alimentado,
+        "lotes_sin_calidad": lotes_sin_calidad,
+        "brix_actual": round(brix_pond / kg_acum, 2),
+        "ratio_actual": round(brix_pond / acidez_pond, 2) if acidez_pond > 0 else None,
+        "cumplido_ya": ya_cumple,
+        "pasos_bines": pasos_bines,
+        "cumplido": cumplido,
+    }
+
+
 @app.get("/api/lotes/{numero}")
 def obtener_lote(numero: int):
     with engine.connect() as conn:
