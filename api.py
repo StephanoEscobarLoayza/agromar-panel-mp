@@ -485,8 +485,9 @@ def crear_corrida(c: NuevaCorrida):
             result = conn.execute(
                 text(
                     """
-                    INSERT INTO corridas (nombre, tipo_proceso, fecha_inicio, estado)
-                    VALUES (:nombre, :tipo_proceso, :fecha_inicio, 'abierta')
+                    INSERT INTO corridas (nombre, tipo_proceso, fecha_inicio, estado, stock_inicio_kg)
+                    VALUES (:nombre, :tipo_proceso, :fecha_inicio, 'abierta',
+                            (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes))
                     RETURNING id
                     """
                 ),
@@ -515,7 +516,8 @@ def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
         result = conn.execute(
             text(
                 """
-                UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada'
+                UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada',
+                       stock_cierre_kg = (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes)
                 WHERE id = :id AND estado = 'abierta'
                 RETURNING id
                 """
@@ -537,7 +539,7 @@ def reabrir_corrida(corrida_id: int):
         result = conn.execute(
             text(
                 """
-                UPDATE corridas SET fecha_final = NULL, estado = 'abierta'
+                UPDATE corridas SET fecha_final = NULL, estado = 'abierta', stock_cierre_kg = NULL
                 WHERE id = :id AND estado = 'cerrada'
                 RETURNING id
                 """

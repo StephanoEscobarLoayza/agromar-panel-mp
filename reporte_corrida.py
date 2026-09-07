@@ -153,6 +153,12 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         kpis.append(("MP objetivo (Trazabilidad)", f"{fmt_kg(float(kg_objetivo))} kg", TEXT))
         kpis.append(("Diferencia", f"{fmt_kg(float(kg_objetivo) - kg_total)} kg",
                      OK if estado == "cuadra" else WARN if estado == "incompleto" else BAD if estado == "excedido" else TEXT))
+    stock_inicio = corrida.get("stock_inicio_kg")
+    stock_cierre = corrida.get("stock_cierre_kg")
+    if stock_inicio is not None:
+        kpis.append(("Stock de MP en piso al inicio", f"{fmt_kg(float(stock_inicio))} kg", TEXT))
+    if stock_cierre is not None:
+        kpis.append(("Stock de MP en piso al cierre", f"{fmt_kg(float(stock_cierre))} kg", TEXT))
     if brix_medido is not None:
         kpis.append(("Brix real (medido)", fmt_num(brix_medido, 2), OK))
         kpis.append(("Ratio real (medido)", fmt_num(ratio_medido, 2), OK))
@@ -175,8 +181,15 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     filas_kpi = []
     for i in range(0, len(kpis), 3):
         grupo = kpis[i:i + 3]
-        fila = [kpi_card(label, valor, ancho_kpi, color_valor=color) for label, valor, color in grupo]
-        fila += [""] * (3 - len(fila))  # ultima fila incompleta: relleno en blanco, sin tarjeta
+        tarjetas = [kpi_card(label, valor, ancho_kpi, color_valor=color) for label, valor, color in grupo]
+        faltan = 3 - len(tarjetas)
+        if faltan == 2:
+            # una sola tarjeta sola en la fila - centrada, no pegada a la izquierda
+            fila = ["", tarjetas[0], ""]
+        elif faltan == 1:
+            fila = tarjetas + [""]
+        else:
+            fila = tarjetas
         filas_kpi.append(fila)
     kpi_grid = Table(filas_kpi, colWidths=[ancho_kpi] * 3, spaceBefore=4)
     kpi_grid.setStyle(TableStyle([
