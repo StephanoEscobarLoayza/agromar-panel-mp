@@ -301,7 +301,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
   if (accion === "finalizar") {
     if (!confirm(`¿Finalizar "${btn.dataset.nombre}"? Se cierra con la fecha y hora de ahora mismo.`)) return;
     try {
-      await apiPost(`/api/corridas/${id}/finalizar`, {});
+      await apiPost(`/api/corridas/${id}/finalizar`, { fecha_final: ahoraLocal() });
       cargar();
     } catch (e) {
       alert(e.message);

@@ -126,12 +126,6 @@ const btnGuardar = document.getElementById("btnGuardar");
 const lista = document.getElementById("lista");
 const totalParadas = document.getElementById("totalParadas");
 
-function ahoraLocal() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-
 function fmtMinutos(min) {
   if (min === null || min === undefined) return "—";
   const h = Math.floor(min / 60);

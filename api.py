@@ -477,18 +477,27 @@ def crear_corrida(c: NuevaCorrida):
         raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
 
 
+class FinalizarCorrida(BaseModel):
+    fecha_final: str
+
+
 @app.post("/api/corridas/{corrida_id}/finalizar")
-def finalizar_corrida(corrida_id: int):
+def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
+    """fecha_final la manda el navegador (hora local de la planta) - NO se
+    usa now() del servidor: fecha_inicio se guarda como hora local "de
+    pared" (viene de un <input datetime-local>, sin zona horaria) y Render
+    corre en UTC, así que un now() del servidor quedaría ~5 horas adelantado
+    frente a fecha_inicio - mismo gotcha ya corregido en paradas/cerrar."""
     with engine.begin() as conn:
         result = conn.execute(
             text(
                 """
-                UPDATE corridas SET fecha_final = now(), estado = 'cerrada'
+                UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada'
                 WHERE id = :id AND estado = 'abierta'
                 RETURNING id
                 """
             ),
-            {"id": corrida_id},
+            {"id": corrida_id, "fecha_final": f.fecha_final},
         )
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Corrida no encontrada o ya estaba cerrada.")

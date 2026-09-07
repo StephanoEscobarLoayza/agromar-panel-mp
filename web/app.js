@@ -54,6 +54,19 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+// Hora local "de pared" en formato para <input type="datetime-local"> -
+// úsala siempre que el backend necesite "la hora de ahora": el servidor
+// (Render) corre en UTC pero las columnas de fecha de esta app son TIMESTAMP
+// sin zona, guardadas como hora local de Perú tal cual la escribe el
+// navegador. Si el servidor pusiera su propio now() en vez de esto, quedaría
+// ~5 horas adelantado frente a cualquier otra hora de la misma fila puesta
+// por el usuario (así se descubrió el bug de las paradas - ver memoria).
+function ahoraLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
 // ---------- menús desplegables del nav (Registro / Calidad, y los que se
 // agreguen después) - un botón .nav-dropdown-btn[data-menu="idDelMenu"] abre
 // el <div class="nav-dropdown-menu" id="idDelMenu"> correspondiente, que vive
