@@ -47,8 +47,15 @@ style_footnote = ParagraphStyle("footnote", parent=styles["Normal"], fontName="H
 
 
 def fmt_kg(n):
+    """Los kg casi nunca traen decimales que de verdad importen (y cuando
+    sí los traen, es la báscula, no un redondeo) - mostrar ".00" en un
+    número que es exacto solo confunde, como si estuviera aproximado.
+    Se muestra el decimal SOLO si el número realmente lo tiene."""
     if n is None:
         return "—"
+    n = float(n)
+    if n == int(n):
+        return f"{int(n):,}"
     return f"{n:,.2f}"
 
 
