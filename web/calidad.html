@@ -284,7 +284,9 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
   let mensajeSiguiente;
   const filasBines = r.pasos_bines.map((p, i) => filaHtml(p, i === r.pasos_bines.length - 1 && r.cumplido)).join("");
   if (r.cumplido_ya) {
-    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas — no hace falta agregar más por ahora.</div>`;
+    mensajeSiguiente = r.pasos_bines.length > 0
+      ? `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. En planta siempre corren 2 bines a la vez, así que este es el siguiente en tu cola para cuando se acabe el que está activo:</div>`
+      : `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas — y no hay más bines en espera para seguir la cola.</div>`;
   } else if (r.cumplido) {
     mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${r.pasos_bines.length} lote(s) de bines más se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin}.</div>`;
   } else if (r.pasos_bines.length === 0) {

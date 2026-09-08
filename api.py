@@ -359,7 +359,25 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float):
         }
 
     ya_cumple = (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
-    pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+
+    if ya_cumple:
+        # ya se llegó al mínimo, pero en planta SIEMPRE corren 2 lotes de
+        # bines a la vez (regla operativa, no de calidad) - así que igual
+        # se muestra cuál sería el siguiente en la cola (el más antiguo en
+        # espera) para cuando el bin activo se acabe, aunque no "haga falta"
+        # para la calidad. Solo informativo: se usa completo, sin cortar a
+        # una fracción mínima (ese concepto no aplica si ya se cumplía).
+        pasos_bines = []
+        if bines:
+            siguiente = bines[0]
+            kg_usado = float(siguiente["kg_saldo"])
+            kg_acum_sig = kg_acum + kg_usado
+            brix_pond_sig = brix_pond + float(siguiente["brix_recepcion"]) * kg_usado
+            acidez_pond_sig = acidez_pond + float(siguiente["acidez"]) * kg_usado
+            pasos_bines = [_paso_mezcla(siguiente, kg_usado, False, kg_acum_sig, brix_pond_sig, acidez_pond_sig)]
+        cumplido = True
+    else:
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
 
     return {
         "corrida_nombre": corrida["nombre"],
