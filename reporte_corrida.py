@@ -1,5 +1,5 @@
 """Genera el PDF de cuadre de una corrida (botón "Reporte PDF" en Corridas).
-Piezas compartidas (paleta, tarjetas KPI, badges, etc.) viven en reporte_base.py."""
+Piezas compartidas (paleta, tarjetas KPI, etc.) viven en reporte_base.py."""
 from datetime import datetime
 from io import BytesIO
 
@@ -7,18 +7,11 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, OK, OK_BG, WARN, WARN_BG, BAD, BAD_BG, TEXT, TEXT_2, SURFACE_2,
+    FOREST_2, CITRUS, OK, BAD, TEXT,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
     encabezado, seccion, tabla, nuevo_doc,
 )
-
-ESTADO_CUADRE_INFO = {
-    "cuadra": ("✓ CUADRA", OK, OK_BG),
-    "incompleto": ("△ INCOMPLETO", WARN, WARN_BG),
-    "excedido": ("✕ EXCEDIDO", BAD, BAD_BG),
-    "sin_objetivo": ("SIN OBJETIVO MP", TEXT_2, SURFACE_2),
-}
 
 
 def _tabla_lotes(lotes):
@@ -96,7 +89,6 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     n_pendientes = len(lotes) - len(lotes_con_kg)
 
     kg_total = float(corrida.get("kg_asignados_total") or 0)
-    kg_objetivo = corrida.get("mp_kg_objetivo")
     kg_silo = sum(float(l["kg_asignados"]) for l in lotes_con_kg if l.get("tipo_almacen_origen") == "SILO")
     kg_bines = sum(float(l["kg_asignados"]) for l in lotes_con_kg if l.get("tipo_almacen_origen") == "BINES")
 
@@ -128,28 +120,25 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     min_parado = sum(p["duracion_minutos"] for p in paradas_cerradas)
     hay_en_curso = any(p.get("duracion_minutos") is None for p in paradas)
 
-    estado = corrida.get("estado_cuadre") or "sin_objetivo"
-    badge_txt, badge_fg, badge_bg = ESTADO_CUADRE_INFO.get(estado, ESTADO_CUADRE_INFO["sin_objetivo"])
-
     periodo = f"{fmt_fecha(corrida.get('fecha_inicio'))}" + (
         f" — {fmt_fecha(corrida.get('fecha_final'))}" if corrida.get("fecha_final") else " · en curso"
     )
     story = [
-        encabezado("Cuadre de corrida", corrida["nombre"], periodo, chip=(badge_txt, badge_fg, badge_bg)),
+        encabezado("Cuadre de corrida", corrida["nombre"], periodo),
         Spacer(1, 10 * mm),
         *seccion("Resumen"),
     ]
 
-    # Solo se arma una tarjeta cuando de verdad hay un dato que mostrar - una
-    # corrida recién creada (sin MP objetivo de Trazabilidad todavía, sin
-    # productos, sin paradas) no debería mostrar 5 tarjetas en blanco con "—",
-    # eso se ve roto. Las que sí aplican se acomodan solas de a 3 por fila.
+    # No hay "objetivo" de MP contra qué cuadrar - una corrida procesa lo que
+    # entra, no una meta fijada de antemano (mismo criterio ya aplicado en
+    # Corridas: se sacó el pill Cuadra/Incompleto/Excedido y la comparación
+    # contra mp_kg_objetivo de Trazabilidad, ver memoria del proyecto). Solo
+    # se arma una tarjeta cuando de verdad hay un dato real que mostrar - una
+    # corrida recién creada (sin productos, sin paradas) no debería mostrar
+    # tarjetas en blanco con "—", eso se ve roto. Las que sí aplican se
+    # acomodan solas de a 3 por fila.
     ancho_kpi = (PAGE_W - 2 * MARGIN - 2 * 6) / 3
     kpis = [("MP consumida", f"{fmt_kg(kg_total)} kg", TEXT)]
-    if kg_objetivo:
-        kpis.append(("MP objetivo (Trazabilidad)", f"{fmt_kg(float(kg_objetivo))} kg", TEXT))
-        kpis.append(("Diferencia", f"{fmt_kg(float(kg_objetivo) - kg_total)} kg",
-                     OK if estado == "cuadra" else WARN if estado == "incompleto" else BAD if estado == "excedido" else TEXT))
     stock_inicio = corrida.get("stock_inicio_kg")
     stock_cierre = corrida.get("stock_cierre_kg")
     if stock_inicio is not None:
