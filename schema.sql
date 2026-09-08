@@ -44,7 +44,7 @@ COMMENT ON COLUMN lotes.ubicacion_manual IS 'Override de producción sobre ubica
 CREATE TABLE corridas (
     id                  SERIAL PRIMARY KEY,
     nombre              TEXT NOT NULL UNIQUE,        -- ej "01-Setiembre JSA Aseptic"
-    tipo_proceso        TEXT,                          -- JSA / JCC / JSC / ICEGEN...
+    tipo_proceso        TEXT,                          -- JSA / JCC / JCC TASTE / JSC / ICEGEN...
     fecha_inicio        TIMESTAMP NOT NULL,
     fecha_final         TIMESTAMP,                     -- null mientras sigue abierta
     fecha_proceso_ref   DATE,                          -- "F. Proceso" que reporta Trazabilidad, para mostrar en listas

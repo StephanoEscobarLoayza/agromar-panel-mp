@@ -43,7 +43,7 @@ if not DATABASE_URL:
 
 engine = create_engine(DATABASE_URL)
 
-TIPOS_PROCESO = ["ICEGEN", "JSA", "JCC", "JSC"]  # orden: los mas especificos primero
+TIPOS_PROCESO = ["ICEGEN", "JSA", "JCC TASTE", "JCC", "JSC"]  # orden: los mas especificos primero (JCC TASTE antes que JCC, si no "JCC" la agarra primero por ser substring)
 
 ETIQUETAS = {
     "mp_kg_objetivo": ["mp kg"],

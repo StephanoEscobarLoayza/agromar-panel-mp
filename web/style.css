@@ -9,7 +9,7 @@
   --shadow-lg:0 4px 10px rgba(27,35,29,.08), 0 16px 32px rgba(27,35,29,.10);
   --row-alt:rgba(120,140,125,.08);
   /* paleta categorica validada (dataviz skill) - identidad de tipo de proceso */
-  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100;
+  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100; --series-5:#8457d1;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -21,7 +21,7 @@
     --foot-accent:#F2A93C;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
     --shadow-lg:0 4px 10px rgba(0,0,0,.35), 0 16px 32px rgba(0,0,0,.45);
-    --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+    --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500; --series-5:#9b72e0;
   }
 }
 :root[data-theme="dark"]{
@@ -33,7 +33,7 @@
   --foot-accent:#F2A93C;
   --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
   --shadow-lg:0 4px 10px rgba(0,0,0,.35), 0 16px 32px rgba(0,0,0,.45);
-  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500; --series-5:#9b72e0;
 }
 *{box-sizing:border-box}
 html{color-scheme:light dark}
@@ -261,6 +261,7 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .viz-bar.series-2{fill:var(--series-2)}
 .viz-bar.series-3{fill:var(--series-3)}
 .viz-bar.series-4{fill:var(--series-4)}
+.viz-bar.series-5{fill:var(--series-5)}
 .viz-bar.series-otro{fill:var(--text-muted)}
 .viz-baseline{stroke:var(--border);stroke-width:1}
 .viz-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12.5px;color:var(--text-2)}
@@ -282,6 +283,7 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .stat-bar-fill.series-2{background:var(--series-2)}
 .stat-bar-fill.series-3{background:var(--series-3)}
 .stat-bar-fill.series-4{background:var(--series-4)}
+.stat-bar-fill.series-5{background:var(--series-5)}
 .stat-bar-fill.series-otro{background:var(--text-muted)}
 .stat-bar-value{width:104px;text-align:right;flex-shrink:0;font-weight:600;white-space:nowrap}
 .hero-figure{font-size:15px;color:var(--text-2)}
