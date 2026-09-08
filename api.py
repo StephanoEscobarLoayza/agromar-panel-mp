@@ -73,13 +73,16 @@ def listar_lotes(q: Optional[str] = None):
 @app.get("/api/lotes/reporte-stock.pdf")
 def reporte_stock_pdf():
     """Foto en PDF del stock que el sistema calcula en vivo (Silo + Bines) -
-    no es un conteo físico, es exactamente lo que ya muestra v_saldo_lotes."""
+    no es un conteo físico, es exactamente lo que ya muestra v_saldo_lotes.
+    Solo cuenta lotes "EN PROCESO" o "EN ESPERA" (mismo criterio que el
+    Sugeridor de mezcla) - un lote "PROCESADO" con algo de saldo casi
+    siempre es ruido de medición de Trazabilidad, no MP real disponible."""
     with engine.connect() as conn:
         lotes = rows(conn.execute(text(
             """
             SELECT numero, proveedor, tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, bines_saldo
             FROM v_saldo_lotes
-            WHERE kg_saldo > 0
+            WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')
             ORDER BY tipo_almacen, fecha_ingreso ASC, numero ASC
             """
         )))
@@ -837,6 +840,20 @@ def crear_asignacion(a: NuevaAsignacion):
                 },
             )
             new_id = result.scalar()
+            # Registrar consumo y el "estado" del lote (En proceso/En espera/
+            # Procesado) eran dos cosas totalmente desconectadas - el saldo se
+            # actualizaba solo, pero el estado se quedaba en lo que decía la
+            # última sincronización de Trazabilidad (o en nada), así que un
+            # lote podía llevar miles de kg ya registrados y seguir viéndose
+            # "En espera", o (el caso real que encontró Stephano) la hoja de
+            # Google podía marcarlo "Procesado" mientras acá casi no se le
+            # había registrado nada. Ahora, apenas se registra CUALQUIER
+            # consumo de un lote, se marca "EN PROCESO" a mano - mismo campo
+            # que ya se podía tocar desde Lotes, solo que ahora se dispara solo.
+            conn.execute(
+                text("UPDATE lotes SET estado_manual = 'EN PROCESO' WHERE numero = :n"),
+                {"n": a.lote_numero},
+            )
         return {"id": new_id, "ok": True}
     except HTTPException:
         raise

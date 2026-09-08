@@ -87,12 +87,14 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
 
     story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER, spaceBefore=4, spaceAfter=10))
 
-    story.append(Paragraph(f"Lotes con saldo, del más antiguo al más nuevo ({len(lotes)})", style_section))
+    story.append(Paragraph(f"Lotes en proceso o en espera, del más antiguo al más nuevo ({len(lotes)})", style_section))
     story.append(_tabla_stock(lotes) if lotes else Paragraph("No hay lotes con saldo en este momento.", style_footnote))
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
-        "Esto es lo que el sistema calcula en vivo (peso neto menos lo ya asignado a corridas) - no reemplaza un conteo físico real.",
+        "Esto es lo que el sistema calcula en vivo (peso neto menos lo ya asignado a corridas) - no reemplaza un conteo físico real. "
+        "Solo se cuentan lotes \"En proceso\" o \"En espera\" - un lote \"Procesado\" con algo de saldo casi siempre es ruido de "
+        "medición de Trazabilidad, no materia prima real disponible para usar.",
         style_footnote,
     ))
 
