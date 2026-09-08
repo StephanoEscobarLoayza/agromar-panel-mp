@@ -7,7 +7,9 @@ Correr local:
     pip install -r requirements.txt
     python -m uvicorn api:app --reload --port 8000
 """
+import asyncio
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -406,15 +408,64 @@ def actualizar_ubicacion_lote(numero: int, body: ActualizarUbicacionLote):
     return {"ok": True}
 
 
+SYNC_INTERVAL_SEGUNDOS = 20 * 60  # cada 20 minutos
+
+# Estado en memoria del último sync (manual o automático) - se reinicia con
+# cada despliegue, pero eso solo significa que el mensaje "última sincronización"
+# queda en blanco hasta el próximo sync (a lo sumo 20 min) - no se pierde nada
+# de la tabla lotes, que sigue intacta.
+_estado_sync = {"ultima": None, "resultado": None, "error": None}
+
+
+def _correr_sync(marcar_error_como_502=False):
+    try:
+        resultado = sincronizar_lotes(engine)
+        _estado_sync["ultima"] = datetime.now(timezone.utc).isoformat()
+        _estado_sync["resultado"] = resultado
+        _estado_sync["error"] = None
+        return resultado
+    except Exception as e:
+        _estado_sync["ultima"] = datetime.now(timezone.utc).isoformat()
+        _estado_sync["error"] = str(e)
+        if marcar_error_como_502:
+            raise HTTPException(status_code=502, detail=f"No se pudo sincronizar: {e}")
+        raise
+
+
+async def _sync_periodico():
+    """Corre sincronizar_lotes() solo, cada SYNC_INTERVAL_SEGUNDOS - primero
+    apenas arranca el servicio (o después de cada deploy), y de ahí en
+    adelante en bucle. Usa to_thread porque sincronizar_lotes() es una
+    función normal (bloqueante: descarga el CSV y hace queries síncronas) -
+    sin esto, trabarla en el loop de asyncio congelaría el resto de la app
+    mientras dura la descarga."""
+    while True:
+        try:
+            await asyncio.to_thread(_correr_sync)
+        except Exception as e:
+            print(f"[sync automático] error: {e}")
+        await asyncio.sleep(SYNC_INTERVAL_SEGUNDOS)
+
+
+@app.on_event("startup")
+async def iniciar_sync_periodico():
+    asyncio.create_task(_sync_periodico())
+
+
+@app.get("/api/sync/estado")
+def sync_estado():
+    """Para que la página muestre 'última sincronización: hace X min' y
+    confirme que el sync automático de verdad está corriendo, no solo que
+    se supone que corre."""
+    return _estado_sync
+
+
 @app.post("/api/sync/lotes")
 def sync_lotes_endpoint():
     """Trae los lotes nuevos/actualizados desde el Google Sheet de
-    recepción - lo mismo que hace `python sync_lotes.py`, pero desde un
-    botón en la página en vez de la terminal."""
-    try:
-        return sincronizar_lotes(engine)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"No se pudo sincronizar: {e}")
+    recepción ahora mismo, sin esperar al próximo sync automático - lo mismo
+    que hace `python sync_lotes.py`, pero desde un botón en la página."""
+    return _correr_sync(marcar_error_como_502=True)
 
 
 # ---------------------------------------------------------------------------

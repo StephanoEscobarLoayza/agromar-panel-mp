@@ -53,8 +53,12 @@
         Trae los lotes nuevos o actualizados desde la hoja de Google Sheets
         de recepción de camiones ("NJ ORGANICA VAL"). Los lotes que ya
         existen se actualizan (por ejemplo, uno que estaba "en espera" y
-        ya se pesó); nunca se borra nada.
+        ya se pesó); nunca se borra nada. <strong>Esto ya corre solo cada
+        20 minutos</strong> — usa el botón solo si no quieres esperar.
       </p>
+      <div class="lookup" id="estadoAuto" style="margin-bottom:14px">
+        <div class="lookup-row"><span>Última sincronización</span><span class="num">cargando…</span></div>
+      </div>
       <button class="btn" id="btnSync">Sincronizar ahora</button>
       <div id="resultado"></div>
     </div>
@@ -86,6 +90,39 @@
 <script>
 const btn = document.getElementById("btnSync");
 const resultado = document.getElementById("resultado");
+const estadoAuto = document.getElementById("estadoAuto");
+
+function fmtHaceTiempo(iso) {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "justo ahora";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  return `hace ${h} h ${min % 60} min`;
+}
+
+async function cargarEstadoAuto() {
+  try {
+    const e = await apiGet("/api/sync/estado");
+    if (!e.ultima) {
+      estadoAuto.innerHTML = '<div class="lookup-row"><span>Última sincronización</span><span class="num">todavía no corrió — espera unos minutos</span></div>';
+      return;
+    }
+    if (e.error) {
+      estadoAuto.innerHTML = `
+        <div class="lookup-row"><span>Última sincronización</span><span class="num">${fmtHaceTiempo(e.ultima)}</span></div>
+        <div class="lookup-row"><span>Resultado</span><span class="num" style="color:var(--bad)">falló: ${escapeHtml(e.error)}</span></div>
+      `;
+      return;
+    }
+    const r = e.resultado || {};
+    estadoAuto.innerHTML = `
+      <div class="lookup-row"><span>Última sincronización</span><span class="num">${fmtHaceTiempo(e.ultima)}</span></div>
+      <div class="lookup-row saldo"><span>Resultado</span><span class="num">${r.insertados ?? 0} nuevos, ${r.actualizados ?? 0} actualizados</span></div>
+    `;
+  } catch (e) {
+    estadoAuto.innerHTML = '<div class="lookup-row"><span>Última sincronización</span><span class="num">—</span></div>';
+  }
+}
 
 btn.addEventListener("click", async () => {
   btn.disabled = true;
@@ -98,6 +135,7 @@ btn.addEventListener("click", async () => {
         Listo — ${r.insertados} lotes nuevos, ${r.actualizados} actualizados
         ${r.omitidos ? `, ${r.omitidos} todavía sin pesar (se traen solos cuando ya tengan el peso)` : ""}.
       </div>`;
+    cargarEstadoAuto();
   } catch (e) {
     resultado.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
   } finally {
@@ -105,6 +143,8 @@ btn.addEventListener("click", async () => {
     btn.textContent = "Sincronizar ahora";
   }
 });
+
+cargarEstadoAuto();
 </script>
 </body>
 </html>
