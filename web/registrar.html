@@ -174,7 +174,7 @@ recientesBody.addEventListener("click", async (ev) => {
       const maxBines = quedanActual + binesActual; // lo que habría si esta fila no hubiera consumido nada
       fila.querySelector('[data-celda="kg"]').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
-          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" style="width:48px;text-align:right" title="Bines que quedan ahora">
+          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" style="width:64px;text-align:right" title="Bines que quedan ahora">
           <span style="font-size:11px;color:var(--text-muted)">bines</span>
         </div>`;
       fila.querySelector('[data-celda="acciones"]').innerHTML = `
