@@ -127,9 +127,10 @@ function tagAlmacen(t) {
 }
 
 function filaHtml(p, resaltada) {
-  const kgTexto = p.es_parcial
-    ? `${fmtKg(p.kg_usado)} <span class="stat-bar-sub">de ${fmtKg(p.kg_disponible)}</span>`
-    : fmtKg(p.kg_usado);
+  // los bines siempre se meten completos (nunca a fracción - en planta
+  // siempre entran 2 lotes de bines a la vez), así que kg_usado ya es el
+  // total del lote.
+  const kgTexto = fmtKg(p.kg_usado);
   return `
     <tr${resaltada ? ' style="background:var(--ok-bg)"' : ""}>
       <td class="strong num">#${p.numero}</td>
@@ -284,9 +285,14 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
   let mensajeSiguiente;
   const filasBines = r.pasos_bines.map((p, i) => filaHtml(p, i === r.pasos_bines.length - 1 && r.cumplido)).join("");
   if (r.cumplido_ya) {
-    mensajeSiguiente = r.pasos_bines.length > 0
-      ? `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. En planta siempre corren 2 bines a la vez, así que este es el siguiente en tu cola para cuando se acabe el que está activo:</div>`
-      : `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas — y no hay más bines en espera para seguir la cola.</div>`;
+    if (r.pasos_bines.length === 0) {
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas — y no hay más bines en espera para seguir la cola.</div>`;
+    } else if (r.cumplido) {
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. En planta siempre corren 2 bines a la vez, así que ${r.pasos_bines.length > 1 ? "estos son los siguientes en tu cola" : "este es el siguiente en tu cola"} para cuando se acabe el que está activo — la mezcla se mantiene sobre el mínimo.</div>`;
+    } else {
+      const ultimo = r.pasos_bines[r.pasos_bines.length - 1];
+      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: en planta siempre corren 2 bines a la vez, y metiendo ${r.pasos_bines.length > 1 ? "estos 2 lotes de tu cola" : "el siguiente lote de tu cola"} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, por debajo del mínimo.</div>`;
+    }
   } else if (r.cumplido) {
     mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${r.pasos_bines.length} lote(s) de bines más se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin}.</div>`;
   } else if (r.pasos_bines.length === 0) {

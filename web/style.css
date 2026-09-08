@@ -229,6 +229,7 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .msg{font-size:13.5px;padding:10px 12px;border-radius:8px}
 .msg.ok{background:var(--ok-bg);color:var(--ok)}
+.msg.warn{background:var(--warn-bg);color:var(--warn)}
 .msg.bad{background:var(--bad-bg);color:var(--bad)}
 .search-row{margin-bottom:16px}
 

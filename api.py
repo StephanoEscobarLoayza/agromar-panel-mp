@@ -89,41 +89,7 @@ def reporte_stock_pdf():
     )
 
 
-def _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, x, brix_min, ratio_min):
-    kg = kg_acum + x
-    if kg <= 0:
-        return False
-    bp = brix_pond + brix_lote * x
-    ap = acidez_pond + acidez_lote * x
-    if ap <= 0:
-        return False
-    return (bp / kg) >= brix_min and (bp / ap) >= ratio_min
-
-
-def _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_max, brix_min, ratio_min):
-    """Cuánto de ESTE lote (entre 0 y su saldo kg_max) hace falta agregar a lo
-    ya acumulado para llegar al Brix/Ratio mínimo - no siempre hace falta el
-    lote completo. Tanto el Brix como el Ratio de una mezcla son funciones
-    monótonas de x (cociente de dos funciones lineales), así que una búsqueda
-    binaria simple encuentra el mínimo exacto sin álgebra propensa a errores."""
-    if not _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_max, brix_min, ratio_min):
-        return None  # ni con el lote completo alcanza
-    if kg_acum == 0:
-        # no hay nada acumulado todavia con que mezclar - el Brix/Ratio de
-        # "una parte" de este lote es igual al del lote entero (es puro), asi
-        # que no existe una fraccion "minima" con sentido: se usa completo.
-        return kg_max
-    lo, hi = 0.0, kg_max
-    for _ in range(60):
-        mid = (lo + hi) / 2
-        if _cumple_mezcla(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, mid, brix_min, ratio_min):
-            hi = mid
-        else:
-            lo = mid
-    return hi
-
-
-MAX_BINES_AJUSTE = 2  # en planta no se mete mas de 2 lotes de bines de ajuste sobre el silo
+MAX_BINES_AJUSTE = 2  # en planta siempre entran 2 lotes de bines a la vez sobre el silo
 
 
 def _lote_a_dict(l):
@@ -155,27 +121,25 @@ def _paso_mezcla(l, kg_usado, es_parcial, kg_acum, brix_pond, acidez_pond):
     return paso
 
 
-def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple):
-    """Agrega lotes de bines de a uno (máximo MAX_BINES_AJUSTE) sobre lo ya
-    acumulado, cortando el último a la fracción exacta que hace falta - así
-    es como de verdad se ajusta en planta, entrando un bin-lote a la vez."""
+def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min):
+    """Agrega hasta MAX_BINES_AJUSTE lotes de bines COMPLETOS (nunca corta a
+    una fracción) - en planta siempre entran 2 lotes de bines a la vez, sin
+    importar si con uno solo ya alcanzaría el mínimo: la prioridad es
+    procesar más materia prima, no la mínima posible para llegar al
+    Brix/Ratio (Stephano lo aclaró explícitamente: quedarse corto con un
+    bin parcial cuando podría meter más es ineficiente para la producción)."""
     pasos_bines = []
-    cumplido = ya_cumple
     for l in bines:
-        if cumplido or len(pasos_bines) >= MAX_BINES_AJUSTE:
+        if len(pasos_bines) >= MAX_BINES_AJUSTE:
             break
         kg_disponible = float(l["kg_saldo"])
         brix_lote = float(l["brix_recepcion"])
         acidez_lote = float(l["acidez"])
-        kg_parcial = _kg_minimo(brix_pond, acidez_pond, kg_acum, brix_lote, acidez_lote, kg_disponible, brix_min, ratio_min)
-        kg_usado = kg_parcial if kg_parcial is not None else kg_disponible
-        kg_acum += kg_usado
-        brix_pond += brix_lote * kg_usado
-        acidez_pond += acidez_lote * kg_usado
-        es_parcial = kg_parcial is not None and kg_parcial < kg_disponible - 0.005
-        pasos_bines.append(_paso_mezcla(l, kg_usado, es_parcial, kg_acum, brix_pond, acidez_pond))
-        if kg_parcial is not None:
-            cumplido = True
+        kg_acum += kg_disponible
+        brix_pond += brix_lote * kg_disponible
+        acidez_pond += acidez_lote * kg_disponible
+        pasos_bines.append(_paso_mezcla(l, kg_disponible, False, kg_acum, brix_pond, acidez_pond))
+    cumplido = kg_acum > 0 and (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
     return pasos_bines, cumplido
 
 
@@ -226,15 +190,13 @@ def sugerir_mezcla(brix_min: float, ratio_min: float):
         """silo_base: un lote de silo (dict de la consulta) o None."""
         if silo_base is None:
             kg_acum = brix_pond = acidez_pond = 0.0
-            ya_cumple = False
             silo_info = None
         else:
             kg_acum = float(silo_base["kg_saldo"])
             brix_pond = float(silo_base["brix_recepcion"]) * kg_acum
             acidez_pond = float(silo_base["acidez"]) * kg_acum
-            ya_cumple = _cumple_mezcla(0, 0, 0, float(silo_base["brix_recepcion"]), float(silo_base["acidez"]), kg_acum, brix_min, ratio_min)
             silo_info = _paso_mezcla(silo_base, kg_acum, False, kg_acum, brix_pond, acidez_pond)
-        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min)
         return {"silo_base": silo_info, "pasos_bines": pasos_bines, "cumplido": cumplido}
 
     if silo_en_proceso:
@@ -253,8 +215,7 @@ def sugerir_mezcla(brix_min: float, ratio_min: float):
         silo_bases_multiples = [_paso_mezcla(l, float(l["kg_saldo"]), False, float(l["kg_saldo"]),
                                               float(l["brix_recepcion"]) * float(l["kg_saldo"]),
                                               float(l["acidez"]) * float(l["kg_saldo"])) for l in silo_en_proceso]
-        ya_cumple = kg_acum > 0 and (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
-        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min)
         return {
             "modo": "unico",
             "origen_base": "en_proceso",
@@ -360,24 +321,11 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float):
 
     ya_cumple = (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
 
-    if ya_cumple:
-        # ya se llegó al mínimo, pero en planta SIEMPRE corren 2 lotes de
-        # bines a la vez (regla operativa, no de calidad) - así que igual
-        # se muestra cuál sería el siguiente en la cola (el más antiguo en
-        # espera) para cuando el bin activo se acabe, aunque no "haga falta"
-        # para la calidad. Solo informativo: se usa completo, sin cortar a
-        # una fracción mínima (ese concepto no aplica si ya se cumplía).
-        pasos_bines = []
-        if bines:
-            siguiente = bines[0]
-            kg_usado = float(siguiente["kg_saldo"])
-            kg_acum_sig = kg_acum + kg_usado
-            brix_pond_sig = brix_pond + float(siguiente["brix_recepcion"]) * kg_usado
-            acidez_pond_sig = acidez_pond + float(siguiente["acidez"]) * kg_usado
-            pasos_bines = [_paso_mezcla(siguiente, kg_usado, False, kg_acum_sig, brix_pond_sig, acidez_pond_sig)]
-        cumplido = True
-    else:
-        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, ya_cumple)
+    # en planta SIEMPRE corren 2 lotes de bines a la vez, sin importar si la
+    # mezcla ya llegó al mínimo o no (regla operativa, no de calidad) - por
+    # eso siempre se muestra el siguiente bin (o los 2 siguientes) de la
+    # cola, completos, aunque ya no "haga falta" para la calidad.
+    pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min)
 
     return {
         "corrida_nombre": corrida["nombre"],
