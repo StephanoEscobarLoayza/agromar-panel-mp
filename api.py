@@ -812,6 +812,31 @@ def crear_asignacion(a: NuevaAsignacion):
         raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
     try:
         with engine.begin() as conn:
+            # Un mismo lote no puede quedar registrado 2 veces en la misma
+            # corrida - antes no había ninguna validación y era fácil
+            # duplicarlo sin darse cuenta (typeas el número de nuevo,
+            # doble clic en Guardar), lo que infla el kg consumido y deja el
+            # lote repetido como 2 filas en "Lotes de MP consumidos" del
+            # reporte. Si de verdad hay más kg que sumarle a un lote que ya
+            # está en esta corrida, se hace editando esa fila (✎ en
+            # "Últimas asignaciones"), no creando otra.
+            ya_existe = conn.execute(
+                text(
+                    "SELECT kg_asignados, turno FROM asignaciones "
+                    "WHERE lote_numero = :n AND corrida_id = :c"
+                ),
+                {"n": a.lote_numero, "c": a.corrida_id},
+            ).mappings().first()
+            if ya_existe is not None:
+                kg_txt = f"{float(ya_existe['kg_asignados']):,.2f} kg" if ya_existe["kg_asignados"] is not None else "kg pendiente"
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"El lote {a.lote_numero} ya está registrado en esta corrida "
+                        f"({kg_txt}, turno {ya_existe['turno']}) - para agregar más kg, "
+                        'edítalo en "Últimas asignaciones" (✎) en vez de crear otro registro.'
+                    ),
+                )
             if a.tipo_almacen_origen == "BINES" and a.bines_consumidos:
                 totales, disponibles = bines_disponibles(conn, a.lote_numero)
                 if disponibles is not None and a.bines_consumidos > disponibles:

@@ -114,6 +114,7 @@
 <script src="app.js"></script>
 <script>
 let lote = null; // ultimo lote encontrado (con saldo, bines_totales, etc.)
+let asignacionesRecientes = []; // asignaciones de la corrida elegida - para avisar si el lote ya está
 
 const corridaSel = document.getElementById("corrida");
 const turnoSel = document.getElementById("turno");
@@ -138,6 +139,7 @@ async function cargarRecientes() {
   const corridaId = corridaSel.value;
   if (!corridaId) return;
   const asigs = await apiGet(`/api/corridas/${corridaId}/asignaciones`);
+  asignacionesRecientes = asigs;
   if (asigs.length === 0) {
     recientesBody.innerHTML = '<tr><td colspan="5" class="empty">Sin asignaciones todavía</td></tr>';
   } else {
@@ -157,6 +159,7 @@ async function cargarRecientes() {
       </tr>
     `).join("");
   }
+  if (lote) renderCamposPeso(); // por si cambiaron de corrida con un lote ya buscado - revalida el duplicado
 }
 
 recientesBody.addEventListener("click", async (ev) => {
@@ -245,6 +248,23 @@ recientesBody.addEventListener("click", async (ev) => {
 function renderCamposPeso() {
   mensaje.innerHTML = "";
   if (!lote) { camposPeso.innerHTML = ""; btnGuardar.disabled = true; return; }
+
+  // un lote no puede quedar 2 veces en la misma corrida (ver comentario en
+  // crear_asignacion en api.py) - se avisa acá mismo, apenas se encuentra el
+  // lote, en vez de dejar llenar todo el formulario para recién fallar al
+  // guardar.
+  const yaAsignado = asignacionesRecientes.find(a => a.lote_numero === lote.numero);
+  if (yaAsignado) {
+    const kgTxt = yaAsignado.kg_asignados === null ? "kg pendiente" : `${fmtKg(yaAsignado.kg_asignados)} kg`;
+    camposPeso.innerHTML = `
+      <div class="msg warn">
+        Este lote ya está registrado en esta corrida (${kgTxt}, turno ${escapeHtml(yaAsignado.turno || "—")}).
+        Si necesitas sumarle más kg, edítalo con ✎ en "Últimas asignaciones" en vez de crear otro registro.
+      </div>
+    `;
+    btnGuardar.disabled = true;
+    return;
+  }
 
   const saldo = Math.max(Number(lote.kg_saldo), 0);
   const origenes = lote.tipo_almacen === "MIXTO" ? ["BINES", "SILO"] : [lote.tipo_almacen];
