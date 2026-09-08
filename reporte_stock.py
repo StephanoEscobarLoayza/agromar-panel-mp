@@ -6,12 +6,12 @@ from datetime import datetime
 from io import BytesIO
 
 from reportlab.lib.units import mm
-from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, TEXT_2, BORDER,
-    PAGE_W, MARGIN, style_section, style_kpi_label, style_footnote,
-    fmt_kg, fmt_num, fmt_fecha, Banda, header_footer, kpi_card, encabezado, tabla, nuevo_doc,
+    FOREST_2, CITRUS, TEXT_2,
+    PAGE_W, MARGIN, style_kpi_label, style_footnote,
+    fmt_kg, fmt_num, fmt_fecha, Banda, header_footer, kpi_card, encabezado, seccion, tabla, nuevo_doc,
 )
 
 
@@ -50,9 +50,12 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     ahora = datetime.now()
 
     story = [
-        encabezado("Stock de materia prima", f"Foto del sistema al {ahora.strftime('%d/%m/%Y')}, {ahora.strftime('%H:%M')}"),
+        encabezado(
+            "Inventario de planta", "Stock de materia prima",
+            f"Foto del sistema al {ahora.strftime('%d/%m/%Y')}, {ahora.strftime('%H:%M')}",
+        ),
         Spacer(1, 10 * mm),
-        Paragraph("Resumen", style_section),
+        *seccion("Resumen"),
     ]
 
     ancho_kpi = (PAGE_W - 2 * MARGIN - 3 * 6) / 4
@@ -73,7 +76,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     story.append(Spacer(1, 4 * mm))
 
     if kg_silo > 0 or kg_bines > 0:
-        story.append(Paragraph("Stock por almacén", style_section))
+        story.extend(seccion("Stock por almacén"))
         ancho_barra = PAGE_W - 2 * MARGIN - 30 * mm
         maximo = max(kg_silo, kg_bines)
         fila = [
@@ -85,9 +88,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
         story.append(t)
         story.append(Spacer(1, 4 * mm))
 
-    story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER, spaceBefore=4, spaceAfter=10))
-
-    story.append(Paragraph(f"Lotes en proceso o en espera, del más antiguo al más nuevo ({len(lotes)})", style_section))
+    story.extend(seccion(f"Lotes en proceso o en espera, del más antiguo al más nuevo ({len(lotes)})"))
     story.append(_tabla_stock(lotes) if lotes else Paragraph("No hay lotes con saldo en este momento.", style_footnote))
 
     story.append(Spacer(1, 10 * mm))

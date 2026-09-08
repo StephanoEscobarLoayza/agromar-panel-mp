@@ -4,13 +4,13 @@ from datetime import datetime
 from io import BytesIO
 
 from reportlab.lib.units import mm
-from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, OK, OK_BG, WARN, WARN_BG, BAD, BAD_BG, TEXT, TEXT_2, SURFACE_2, BORDER,
-    PAGE_W, MARGIN, style_section, style_kpi_label, style_cell, style_footnote,
-    fmt_kg, fmt_num, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card, badge,
-    encabezado, tabla, nuevo_doc,
+    FOREST_2, CITRUS, OK, OK_BG, WARN, WARN_BG, BAD, BAD_BG, TEXT, TEXT_2, SURFACE_2,
+    PAGE_W, MARGIN, style_kpi_label, style_footnote,
+    fmt_kg, fmt_num, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
+    encabezado, seccion, tabla, nuevo_doc,
 )
 
 ESTADO_CUADRE_INFO = {
@@ -131,16 +131,13 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     estado = corrida.get("estado_cuadre") or "sin_objetivo"
     badge_txt, badge_fg, badge_bg = ESTADO_CUADRE_INFO.get(estado, ESTADO_CUADRE_INFO["sin_objetivo"])
 
+    periodo = f"{fmt_fecha(corrida.get('fecha_inicio'))}" + (
+        f" — {fmt_fecha(corrida.get('fecha_final'))}" if corrida.get("fecha_final") else " · en curso"
+    )
     story = [
-        encabezado(
-            "Cuadre de corrida",
-            f"{corrida['nombre']} · {fmt_fecha(corrida.get('fecha_inicio'))}" +
-            (f" — {fmt_fecha(corrida.get('fecha_final'))}" if corrida.get("fecha_final") else " · en curso"),
-        ),
+        encabezado("Cuadre de corrida", corrida["nombre"], periodo, chip=(badge_txt, badge_fg, badge_bg)),
         Spacer(1, 10 * mm),
-        badge(badge_txt, badge_fg, badge_bg),
-        Spacer(1, 6 * mm),
-        Paragraph("Resumen", style_section),
+        *seccion("Resumen"),
     ]
 
     # Solo se arma una tarjeta cuando de verdad hay un dato que mostrar - una
@@ -200,7 +197,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     story.append(Spacer(1, 6 * mm))
 
     if kg_silo > 0 or kg_bines > 0:
-        story.append(Paragraph("MP por almacén de origen", style_section))
+        story.extend(seccion("MP por almacén de origen"))
         ancho_barra = PAGE_W - 2 * MARGIN - 30 * mm
         maximo = max(kg_silo, kg_bines)
         fila = [
@@ -212,9 +209,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(t)
         story.append(Spacer(1, 4 * mm))
 
-    story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER, spaceBefore=4, spaceAfter=10))
-
-    story.append(Paragraph(f"Lotes de MP consumidos ({len(lotes)})", style_section))
+    story.extend(seccion(f"Lotes de MP consumidos ({len(lotes)})"))
     story.append(_tabla_lotes(lotes) if lotes else Paragraph("Sin lotes registrados todavía.", style_footnote))
     if n_pendientes:
         story.append(Spacer(1, 3 * mm))
@@ -226,17 +221,17 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
 
     if mediciones:
         story.append(Spacer(1, 8 * mm))
-        story.append(Paragraph(f"Tanques medidos ({len(mediciones)})", style_section))
+        story.extend(seccion(f"Tanques medidos ({len(mediciones)})"))
         story.append(_tabla_mediciones(mediciones))
 
     if productos:
         story.append(Spacer(1, 8 * mm))
-        story.append(Paragraph(f"Productos de salida ({len(productos)})", style_section))
+        story.extend(seccion(f"Productos de salida ({len(productos)})"))
         story.append(_tabla_productos(productos))
 
     if paradas:
         story.append(Spacer(1, 8 * mm))
-        story.append(Paragraph(f"Paradas registradas ({len(paradas)})", style_section))
+        story.extend(seccion(f"Paradas registradas ({len(paradas)})"))
         story.append(_tabla_paradas(paradas))
 
     story.append(Spacer(1, 10 * mm))

@@ -10,7 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Flowable
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Flowable, HRFlowable
 
 # ---------------------------------------------------------------------------
 # paleta - copiada 1:1 de las variables --root de web/style.css, para que el
@@ -38,10 +38,7 @@ PAGE_W, PAGE_H = A4
 MARGIN = 16 * mm
 
 styles = getSampleStyleSheet()
-style_h1 = ParagraphStyle("h1", parent=styles["Heading1"], fontName="Helvetica-Bold", fontSize=20, textColor=colors.white, spaceAfter=2)
-style_eyebrow = ParagraphStyle("eyebrow", parent=styles["Normal"], fontName="Helvetica-Oblique", fontSize=9.5, textColor=CITRUS_TINT, spaceAfter=4)
-style_sub = ParagraphStyle("sub", parent=styles["Normal"], fontName="Helvetica", fontSize=10, textColor=colors.white)
-style_section = ParagraphStyle("section", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=13, textColor=TEXT, spaceBefore=14, spaceAfter=6)
+style_section = ParagraphStyle("section", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=13, textColor=TEXT, spaceBefore=16, spaceAfter=3)
 style_kpi_label = ParagraphStyle("kpiLabel", parent=styles["Normal"], fontName="Helvetica", fontSize=8.5, textColor=TEXT_2)
 style_kpi_value = ParagraphStyle("kpiValue", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=17, textColor=TEXT, leading=20)
 style_cell = ParagraphStyle("cell", parent=styles["Normal"], fontName="Helvetica", fontSize=9, textColor=TEXT)
@@ -141,16 +138,25 @@ def header_footer(canvas_obj, doc, texto_pie):
 
 
 def kpi_card(label, valor, ancho, color_valor=TEXT):
-    contenido = [[Paragraph(label, style_kpi_label)],
+    """Ficha de dato tipo hoja técnica: sin caja completa (eso se ve más
+    "widget web" que reporte impreso) - una línea de acento arriba (del
+    mismo color que el valor, si el valor tiene un color semántico; forest
+    neutro si no) y una línea delgada abajo, con la etiqueta en mayúsculas
+    y algo de tracking."""
+    acento = color_valor if color_valor is not TEXT else FOREST_2
+    contenido = [[Paragraph(label.upper(), style_kpi_label)],
                  [Paragraph(f'<font color="#{color_valor.hexval()[2:]}">{valor}</font>', style_kpi_value)]]
-    t = Table(contenido, colWidths=[ancho], cornerRadii=[6, 6, 6, 6])
+    t = Table(contenido, colWidths=[ancho])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-        ("BOX", (0, 0), (-1, -1), 0.75, BORDER),
-        ("TOPPADDING", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("LEFTPADDING", (0, 0), (-1, -1), 12),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("LINEABOVE", (0, 0), (-1, 0), 2, acento),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.5, BORDER),
+        ("TOPPADDING", (0, 0), (-1, 0), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 3),
+        ("TOPPADDING", (0, 1), (-1, 1), 0),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 10),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
     ]))
     return t
 
@@ -170,26 +176,116 @@ def badge(texto, fg, bg):
     return t
 
 
-def encabezado(titulo, subtitulo):
-    """Banda verde del header - misma para todos los reportes, solo cambia
-    el titulo (H1) y la linea de subtitulo debajo del wordmark."""
-    header_tbl = Table(
-        [[Paragraph("agro<font color='#E8890C'>·</font>mar", ParagraphStyle("wordmark", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=15, textColor=colors.white))],
-         [Paragraph("Panel de cuadre — planta de jugos", style_eyebrow)],
-         [Paragraph(titulo, style_h1)],
-         [Paragraph(subtitulo, style_sub)]],
-        colWidths=[PAGE_W - 2 * MARGIN],
-    )
-    header_tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), FOREST),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
-        ("LEFTPADDING", (0, 0), (-1, -1), 16),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 16),
-        ("TOPPADDING", (0, 2), (-1, 2), 6),
-        ("BOTTOMPADDING", (0, 3), (-1, 3), 14),
-    ]))
-    return header_tbl
+def _tracked(c, x, y, text, font, size, tracking=1.0, color=None):
+    """Dibuja texto con tracking (espaciado entre letras) manual - reportlab
+    no lo soporta de forma nativa. Da el aire de "sello"/ficha técnica que
+    tienen las etiquetas pequeñas en mayúscula de un reporte de ingeniería."""
+    if color is not None:
+        c.setFillColor(color)
+    c.setFont(font, size)
+    cx = x
+    for ch in text:
+        c.drawString(cx, y, ch)
+        cx += c.stringWidth(ch, font, size) + tracking
+    return cx
+
+
+class Encabezado(Flowable):
+    """Letterhead del reporte: banda forest de fondo con dos cuñas
+    diagonales (forest claro + citrus) en la esquina superior derecha a modo
+    de acento geométrico, wordmark, tipo de documento como eyebrow (con
+    tracking, como un sello), el título real del documento en grande, y una
+    fila inferior con el periodo a la izquierda y un chip de estado a la
+    derecha (si aplica). Se dibuja directo con el canvas (no con una Table)
+    para tener control fino sobre la geometría."""
+
+    def __init__(self, ancho, tipo_doc, titulo, periodo, chip=None, alto=40 * mm):
+        super().__init__()
+        self.width = ancho
+        self.height = alto
+        self.tipo_doc = tipo_doc
+        self.titulo = titulo
+        self.periodo = periodo
+        self.chip = chip
+
+    def draw(self):
+        c = self.canv
+        w, h = self.width, self.height
+        pad = 16
+        c.saveState()
+
+        c.setFillColor(FOREST)
+        c.rect(0, 0, w, h, fill=1, stroke=0)
+
+        # cuñas diagonales decorativas, esquina superior derecha
+        c.setFillColor(FOREST_2)
+        p = c.beginPath()
+        p.moveTo(w * 0.66, h); p.lineTo(w, h); p.lineTo(w, h * 0.32); p.close()
+        c.drawPath(p, fill=1, stroke=0)
+        c.setFillColor(CITRUS)
+        p2 = c.beginPath()
+        p2.moveTo(w * 0.84, h); p2.lineTo(w, h); p2.lineTo(w, h * 0.6); p2.close()
+        c.drawPath(p2, fill=1, stroke=0)
+
+        # wordmark
+        c.setFont("Helvetica-Bold", 13)
+        c.setFillColor(colors.white)
+        c.drawString(pad, h - 20, "agro")
+        wm = c.stringWidth("agro", "Helvetica-Bold", 13)
+        c.setFillColor(CITRUS)
+        c.drawString(pad + wm, h - 20, "·")
+        dot = c.stringWidth("·", "Helvetica-Bold", 13)
+        c.setFillColor(colors.white)
+        c.drawString(pad + wm + dot, h - 20, "mar")
+
+        # tipo de documento - eyebrow con tracking, como un sello
+        _tracked(c, pad, h - 33, self.tipo_doc.upper(), "Helvetica-Bold", 8, tracking=1.1, color=CITRUS_TINT)
+
+        # título real del documento (se achica solo si no entra)
+        size_titulo = 22
+        while c.stringWidth(self.titulo, "Helvetica-Bold", size_titulo) > (w - 2 * pad - 40) and size_titulo > 13:
+            size_titulo -= 1
+        c.setFont("Helvetica-Bold", size_titulo)
+        c.setFillColor(colors.white)
+        c.drawString(pad, h - 60, self.titulo)
+
+        # fila inferior: periodo (izq) + chip de estado (der)
+        y_periodo = 14
+        c.setFont("Helvetica", 10)
+        c.setFillColor(colors.white)
+        c.drawString(pad, y_periodo, self.periodo)
+
+        if self.chip:
+            texto, fg, bg = self.chip
+            c.setFont("Helvetica-Bold", 9)
+            tw = c.stringWidth(texto, "Helvetica-Bold", 9)
+            chip_w, chip_h = tw + 20, 16
+            chip_x, chip_y = w - pad - chip_w, y_periodo - 3
+            c.setFillColor(bg)
+            c.roundRect(chip_x, chip_y, chip_w, chip_h, 4, fill=1, stroke=0)
+            c.setFillColor(fg)
+            c.drawCentredString(chip_x + chip_w / 2, chip_y + 5, texto)
+
+        c.restoreState()
+
+
+def encabezado(tipo_doc, titulo, periodo, chip=None):
+    """tipo_doc: eyebrow pequeño (ej. "Cuadre de corrida"). titulo: el
+    nombre real del documento (ej. la corrida) - es el H1. periodo: fecha o
+    rango debajo. chip: tupla (texto, fg, bg) opcional, ej. el estado de
+    cuadre, se dibuja como chip a la derecha del periodo."""
+    return Encabezado(PAGE_W - 2 * MARGIN, tipo_doc, titulo, periodo, chip)
+
+
+def seccion(titulo):
+    """Encabezado de sección: título en negrita + una doble regla delgada
+    debajo (forest + un tramo corto citrus), en vez de solo texto en negrita
+    - separa las secciones sin necesitar otra tarjeta o caja."""
+    return [
+        Paragraph(titulo, style_section),
+        HRFlowable(width="100%", thickness=1.3, color=FOREST_2, spaceBefore=1, spaceAfter=1),
+        HRFlowable(width="26%", thickness=1.3, color=CITRUS, spaceBefore=0, spaceAfter=8, hAlign="LEFT"),
+    ]
 
 
 def tabla(headers, filas, col_widths, align_derecha_desde=None):
