@@ -659,9 +659,10 @@ def reporte_corrida_pdf(corrida_id: int):
             text(
                 """
                 SELECT a.lote_numero, l.proveedor, a.tipo_almacen_origen, a.kg_asignados,
-                       l.brix_recepcion, l.acidez, l.ratio
+                       l.brix_recepcion, l.acidez, l.ratio, v.kg_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
+                JOIN v_saldo_lotes v ON v.numero = a.lote_numero
                 WHERE a.corrida_id = :c
                 ORDER BY a.creado_en ASC
                 """

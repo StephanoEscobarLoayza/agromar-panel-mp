@@ -30,6 +30,17 @@ def _tabla_lotes(lotes):
     )
 
 
+def _tabla_lotes_simple(lotes, con_saldo=False):
+    """Lista chica de lotes (solo número + proveedor, y el saldo si aplica) -
+    para las dos sub-listas de "Estado de estos lotes hoy" (terminados / con
+    saldo para la siguiente corrida)."""
+    if con_saldo:
+        filas = [[f"#{l['lote_numero']}", l.get("proveedor") or "—", f"{fmt_kg(float(l['kg_saldo']))} kg"] for l in lotes]
+        return tabla(["Lote", "Proveedor", "Saldo hoy"], filas, [22 * mm, 91 * mm, 60 * mm], align_derecha_desde=2)
+    filas = [[f"#{l['lote_numero']}", l.get("proveedor") or "—"] for l in lotes]
+    return tabla(["Lote", "Proveedor"], filas, [22 * mm, 151 * mm])
+
+
 def _tabla_productos(productos):
     filas = [[
         p.get("producto") or "—",
@@ -207,6 +218,31 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
             "se sabrá cuánto entró recién cuando se registre el kg real.",
             style_footnote,
         ))
+
+    if lotes:
+        # cuáles de estos lotes ya no tienen nada más que dar (terminaron) y
+        # cuáles siguen con saldo que va a seguir alimentando la SIGUIENTE
+        # corrida - es una foto de ahora mismo (cuando se genera el reporte),
+        # no de cuando cerró esta corrida, porque el saldo de un lote sigue
+        # moviéndose mientras otras corridas lo usan.
+        lotes_terminados = [l for l in lotes if float(l.get("kg_saldo") or 0) <= 0.01]
+        lotes_con_saldo = [l for l in lotes if float(l.get("kg_saldo") or 0) > 0.01]
+
+        story.append(Spacer(1, 8 * mm))
+        story.extend(seccion("Estado de estos lotes hoy"))
+        story.append(Paragraph(
+            "Foto de ahora mismo, no de cuando cerró esta corrida - el saldo de un lote sigue "
+            "cambiando mientras otras corridas lo van usando.",
+            style_footnote,
+        ))
+        story.append(Spacer(1, 4 * mm))
+        story.append(Paragraph(f"Terminados ({len(lotes_terminados)})", style_kpi_label))
+        story.append(Spacer(1, 2 * mm))
+        story.append(_tabla_lotes_simple(lotes_terminados) if lotes_terminados else Paragraph("Ninguno todavía.", style_footnote))
+        story.append(Spacer(1, 6 * mm))
+        story.append(Paragraph(f"Con saldo para la siguiente corrida ({len(lotes_con_saldo)})", style_kpi_label))
+        story.append(Spacer(1, 2 * mm))
+        story.append(_tabla_lotes_simple(lotes_con_saldo, con_saldo=True) if lotes_con_saldo else Paragraph("Ninguno - todos terminaron.", style_footnote))
 
     if mediciones:
         story.append(Spacer(1, 8 * mm))
