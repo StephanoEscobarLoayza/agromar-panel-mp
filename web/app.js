@@ -42,6 +42,23 @@ function fmtKg(n) {
   return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Si un numero de KPI no entra en su tarjeta (ej. el total de MP de toda la
+// campaña, que va creciendo), el navegador lo cortaba o lo partia en
+// cualquier lado (a veces justo despues de un solo digito - se ve peor que
+// simplemente achicar la letra). Se llama despues de pintar cada tanda de
+// tarjetas KPI - achica el font-size del numero hasta que quepa en una
+// sola linea, nunca lo envuelve.
+function ajustarKpiValues(root) {
+  (root || document).querySelectorAll(".kpi-value").forEach(el => {
+    el.style.fontSize = "";
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth + 1 && size > 13) {
+      size -= 1;
+      el.style.fontSize = size + "px";
+    }
+  });
+}
+
 function fmtInt(n) {
   if (n === null || n === undefined) return "—";
   return Number(n).toLocaleString("es-PE");

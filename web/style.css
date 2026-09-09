@@ -97,7 +97,7 @@ nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
 .kpi-medal.citrus{background:var(--citrus-tint)}
 .kpi-medal.citrus svg{stroke:var(--citrus)}
 .kpi-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
-.kpi-value{font-size:26px;font-weight:600;margin-top:6px;overflow-wrap:anywhere}
+.kpi-value{font-size:26px;font-weight:600;margin-top:6px;white-space:nowrap}
 .kpi-value.citrus{color:var(--citrus)}
 .kpi-note{font-size:12px;color:var(--text-2);margin-top:4px}
 
