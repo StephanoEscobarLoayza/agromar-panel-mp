@@ -797,6 +797,27 @@ def bines_disponibles(conn, lote_numero: int, excluir_asignacion_id: Optional[in
     return (row["bines_totales"], disponibles)
 
 
+def _marcar_estado_por_consumo(conn, lote_numero: int):
+    """Se llama SIEMPRE que se registra o corrige un consumo. Antes esto
+    ponía "EN PROCESO" a ciegas, sin importar si esa misma asignación dejaba
+    el lote en 0 kg de saldo - un lote que se termina de golpe se quedaba
+    pegado en "En proceso" para siempre, porque nada más volvía a tocar
+    estado_manual después. Y como estado_manual TAPA a estado_fuente (el
+    Sheet de Trazabilidad), la sincronización automática de cada 20 min no
+    lo arreglaba sola aunque el Sheet sí dijera "Procesado" del otro lado -
+    Stephano lo notó ("el sincronizador jala de Drive y lo pone en proceso
+    de nuevo"). Ahora se recalcula el saldo real después del cambio y se
+    guarda el estado que corresponde de verdad."""
+    saldo = conn.execute(
+        text("SELECT kg_saldo FROM v_saldo_lotes WHERE numero = :n"), {"n": lote_numero}
+    ).scalar()
+    nuevo_estado = "PROCESADO" if saldo is not None and float(saldo) <= 0.01 else "EN PROCESO"
+    conn.execute(
+        text("UPDATE lotes SET estado_manual = :v WHERE numero = :n"),
+        {"v": nuevo_estado, "n": lote_numero},
+    )
+
+
 class NuevaAsignacion(BaseModel):
     lote_numero: int
     corrida_id: int
@@ -874,12 +895,9 @@ def crear_asignacion(a: NuevaAsignacion):
             # "En espera", o (el caso real que encontró Stephano) la hoja de
             # Google podía marcarlo "Procesado" mientras acá casi no se le
             # había registrado nada. Ahora, apenas se registra CUALQUIER
-            # consumo de un lote, se marca "EN PROCESO" a mano - mismo campo
+            # consumo de un lote, se marca su estado a mano - mismo campo
             # que ya se podía tocar desde Lotes, solo que ahora se dispara solo.
-            conn.execute(
-                text("UPDATE lotes SET estado_manual = 'EN PROCESO' WHERE numero = :n"),
-                {"n": a.lote_numero},
-            )
+            _marcar_estado_por_consumo(conn, a.lote_numero)
         return {"id": new_id, "ok": True}
     except HTTPException:
         raise
@@ -926,6 +944,11 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
             )
             if result.scalar() is None:
                 raise HTTPException(status_code=404, detail="Asignación no encontrada.")
+            # mismo criterio que al crear: recalcula si el lote quedó en 0
+            # kg de saldo tras la corrección (Procesado) o si le sigue
+            # quedando algo (En proceso) - una edición también puede ser la
+            # que complete el "kg pendiente" que lo termina de golpe.
+            _marcar_estado_por_consumo(conn, lote_numero)
     except HTTPException:
         raise
     except Exception as e:
