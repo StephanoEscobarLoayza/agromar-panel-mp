@@ -139,7 +139,7 @@ td.empty{padding:20px}
 .btn-link.strong{color:var(--citrus)}
 .btn-link-bad{color:var(--bad)}
 .btn-link-bad:hover{color:var(--bad)}
-.productos-panel{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.productos-panel,.finalizar-panel{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
 .prod-lista{display:flex;flex-direction:column;gap:8px}
 .prod-fila{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border-radius:10px;padding:10px 14px;font-size:13px}
 .prod-detalle{color:var(--text-muted);font-size:12px;margin-left:10px}

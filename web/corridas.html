@@ -160,6 +160,17 @@ function corridaCard(c) {
       </div>
       <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
       <div class="corrida-acciones">${acciones.join("")}</div>
+      <div class="finalizar-panel" id="fin-panel-${c.id}" style="display:none">
+        <div class="field">
+          <label>Fecha y hora en que de verdad terminó</label>
+          <input type="datetime-local" id="fin-fecha-${c.id}">
+        </div>
+        <div id="fin-msg-${c.id}"></div>
+        <div class="two-col" style="margin-top:8px">
+          <button class="btn-link strong" data-accion="confirmar-finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Confirmar cierre</button>
+          <button class="btn-link" data-accion="cancelar-finalizar" data-id="${c.id}">Cancelar</button>
+        </div>
+      </div>
       <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
         <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
         <div class="two-col" style="margin-top:10px">
@@ -302,12 +313,25 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
   const id = btn.dataset.id;
 
   if (accion === "finalizar") {
-    if (!confirm(`¿Finalizar "${btn.dataset.nombre}"? Se cierra con la fecha y hora de ahora mismo.`)) return;
+    const panel = document.getElementById(`fin-panel-${id}`);
+    const abrir = panel.style.display === "none";
+    panel.style.display = abrir ? "block" : "none";
+    if (abrir) document.getElementById(`fin-fecha-${id}`).value = ahoraLocal();
+  } else if (accion === "cancelar-finalizar") {
+    document.getElementById(`fin-panel-${id}`).style.display = "none";
+  } else if (accion === "confirmar-finalizar") {
+    const fecha = document.getElementById(`fin-fecha-${id}`).value;
+    const msg = document.getElementById(`fin-msg-${id}`);
+    if (!fecha) {
+      msg.innerHTML = '<div class="msg bad">Elige la fecha y hora de cierre.</div>';
+      return;
+    }
+    if (!confirm(`¿Finalizar "${btn.dataset.nombre}" con cierre el ${fecha.replace("T", " ")}?`)) return;
     try {
-      await apiPost(`/api/corridas/${id}/finalizar`, { fecha_final: ahoraLocal() });
+      await apiPost(`/api/corridas/${id}/finalizar`, { fecha_final: fecha });
       cargar();
     } catch (e) {
-      alert(e.message);
+      msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
     }
   } else if (accion === "reabrir") {
     if (!confirm(`¿Reabrir "${btn.dataset.nombre}"? Vuelve a aparecer como corrida activa en "Registrar consumo" hasta que la finalices de nuevo.`)) return;
