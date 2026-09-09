@@ -80,7 +80,7 @@ def reporte_stock_pdf():
     with engine.connect() as conn:
         lotes = rows(conn.execute(text(
             """
-            SELECT numero, proveedor, tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, bines_saldo
+            SELECT numero, proveedor, tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, bines_saldo, peso_neto_kg
             FROM v_saldo_lotes
             WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')
             ORDER BY tipo_almacen, fecha_ingreso ASC, numero ASC
@@ -485,7 +485,19 @@ def listar_corridas(abiertas: bool = False):
                 )
             )
         else:
-            result = conn.execute(text("SELECT * FROM v_cuadre_corridas ORDER BY fecha_inicio DESC"))
+            # rendimiento no vive en la vista v_cuadre_corridas (es de la
+            # tabla corridas directo) - se agrega acá para "Producto
+            # terminado" en Dashboards, que lo usa para estimar el PT kg de
+            # las corridas que nunca tuvieron tambores cargados a mano (casi
+            # todas, las importadas de Trazabilidad).
+            result = conn.execute(text(
+                """
+                SELECT v.*, c.rendimiento
+                FROM v_cuadre_corridas v
+                JOIN corridas c ON c.id = v.id
+                ORDER BY v.fecha_inicio DESC
+                """
+            ))
         return rows(result)
 
 

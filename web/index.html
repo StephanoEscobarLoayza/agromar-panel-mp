@@ -281,20 +281,23 @@ function renderPorProveedor(lotes) {
   )).join("");
 }
 
-// ---------- producto terminado: total + rendimiento, y detalle por corrida ----------
-function renderProductoTerminado(productos) {
+// ---------- producto terminado: total + detalle por corrida ----------
+// La inmensa mayoría de las corridas vienen de Trazabilidad y nunca
+// tuvieron "Productos de salida" cargado a mano (eso solo se usa en
+// corridas nuevas, desde la app) - por eso este apartado no puede
+// depender solo de esos tambores, o queda como si el resto de la
+// campaña no hubiera producido nada. Para las que no tienen ese detalle,
+// se ESTIMA el PT con el rendimiento que sí trae cada hoja de Trazabilidad
+// (PT kg = rendimiento × MP kg).
+//
+// A propósito NO hay un "rendimiento promedio" único de toda la campaña:
+// distintos tipos de proceso miden cosas distintas con esa palabra (JSA
+// mide jugo simple, ~55-60% - JCC TASTE mide concentrado, ~9%) y
+// mezclarlos en un solo % no significa nada real. El rendimiento se
+// muestra corrida por corrida, cada una contra sí misma.
+function renderProductoTerminado(productos, corridas) {
   const kpisCont = document.getElementById("kpisProducto");
   const listaCont = document.getElementById("porCorridaProducto");
-
-  if (productos.length === 0) {
-    kpisCont.innerHTML = "";
-    listaCont.innerHTML = '<div class="empty">Todavía no hay productos de salida registrados — se completa cuando producción cargue tambores en una corrida (botón "Productos de salida").</div>';
-    return;
-  }
-
-  const ptTotal = productos.reduce((suma, p) => suma + Number(p.pt_kg || 0), 0);
-  const litrosTotal = productos.reduce((suma, p) => suma + Number(p.volumen_litros || 0), 0);
-  const conLitros = productos.some(p => p.volumen_litros != null && p.volumen_litros !== "");
 
   const porCorrida = {};
   for (const p of productos) {
@@ -306,10 +309,23 @@ function renderProductoTerminado(productos) {
     const litrosTxt = p.volumen_litros != null && p.volumen_litros !== "" ? ` (${fmtKg(p.volumen_litros)} L)` : "";
     porCorrida[p.corrida_id].items.push(`${p.producto} ${fmtKg(p.pt_kg)} kg${litrosTxt}`);
   }
-  const filas = Object.values(porCorrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  for (const c of corridas || []) {
+    if (porCorrida[c.id]) continue; // ya tiene tambores reales cargados, no se pisa con una estimación
+    const mpKg = mpDeCorrida(c);
+    if (!c.rendimiento || !mpKg) continue; // sin rendimiento de Trazabilidad no hay con qué estimar
+    porCorrida[c.id] = { nombre: c.nombre, fecha: c.fecha_inicio, mpKg, pt: c.rendimiento * mpKg, litros: 0, items: [] };
+  }
 
-  const rendimientos = filas.filter(f => f.mpKg > 0).map(f => f.pt / f.mpKg);
-  const rendimientoProm = rendimientos.length ? rendimientos.reduce((a, b) => a + b, 0) / rendimientos.length : null;
+  if (Object.keys(porCorrida).length === 0) {
+    kpisCont.innerHTML = "";
+    listaCont.innerHTML = '<div class="empty">Todavía no hay producto terminado que mostrar.</div>';
+    return;
+  }
+
+  const filas = Object.values(porCorrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const ptTotal = filas.reduce((suma, f) => suma + f.pt, 0);
+  const litrosTotal = filas.reduce((suma, f) => suma + f.litros, 0);
+  const conLitros = filas.some(f => f.litros > 0);
 
   // rendimiento en litros: solo con las corridas que ya tienen volumen cargado -
   // no se estima con un factor aproximado, es litros reales / mp kg real de esas corridas
@@ -319,22 +335,25 @@ function renderProductoTerminado(productos) {
     : null;
 
   kpisCont.innerHTML = `
-    <div class="kpi"><div class="kpi-label">Producto terminado</div><div class="kpi-value num citrus">${fmtKg(ptTotal)}</div><div class="kpi-note">kg, toda la campaña</div></div>
-    <div class="kpi"><div class="kpi-label">Rendimiento promedio</div><div class="kpi-value num">${rendimientoProm !== null ? (rendimientoProm * 100).toFixed(1) + "%" : "—"}</div><div class="kpi-note">PT kg / MP kg</div></div>
+    <div class="kpi"><div class="kpi-label">Producto terminado</div><div class="kpi-value num citrus">${fmtKg(ptTotal)}</div><div class="kpi-note">kg, toda la campaña - junta jugo simple y concentrado, no es un solo producto</div></div>
     ${conLitros ? `
-    <div class="kpi"><div class="kpi-label">Litros obtenidos</div><div class="kpi-value num citrus">${fmtKg(litrosTotal)}</div><div class="kpi-note">L, toda la campaña</div></div>
+    <div class="kpi"><div class="kpi-label">Litros obtenidos</div><div class="kpi-value num citrus">${fmtKg(litrosTotal)}</div><div class="kpi-note">L, solo corridas con volumen cargado</div></div>
     <div class="kpi"><div class="kpi-label">Rendimiento en litros</div><div class="kpi-value num">${litrosPorKg !== null ? litrosPorKg.toFixed(2) : "—"}</div><div class="kpi-note">L por kg de MP</div></div>
     ` : ""}
   `;
 
   const max = Math.max(...filas.map(f => f.pt), 1);
-  listaCont.innerHTML = filas.map(f => statBarRow(
-    `${escapeHtml(f.nombre)} <span class="stat-bar-sub">${escapeHtml(f.items.join(" · "))}</span>`,
-    `${fmtKg(f.pt)} kg`,
-    Math.max(2, (f.pt / max) * 100),
-    "background:var(--forest-2)",
-    "170px"
-  )).join("");
+  listaCont.innerHTML = filas.map(f => {
+    const rendimiento = f.mpKg > 0 ? `${((f.pt / f.mpKg) * 100).toFixed(1)}% rendimiento` : "";
+    const detalle = f.items.length ? escapeHtml(f.items.join(" · ")) : "estimado con el rendimiento de Trazabilidad";
+    return statBarRow(
+      `${escapeHtml(f.nombre)} <span class="stat-bar-sub">${rendimiento ? rendimiento + " · " : ""}${detalle}</span>`,
+      `${fmtKg(f.pt)} kg`,
+      Math.max(2, (f.pt / max) * 100),
+      "background:var(--forest-2)",
+      "170px"
+    );
+  }).join("");
 }
 
 async function cargar() {
@@ -367,7 +386,7 @@ async function cargar() {
     renderPorProveedor(lotes);
     renderPorEstado(lotes);
     renderListaSaldo(lotes);
-    renderProductoTerminado(productos);
+    renderProductoTerminado(productos, corridas);
   } catch (e) {
     document.getElementById("kpis").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
   }

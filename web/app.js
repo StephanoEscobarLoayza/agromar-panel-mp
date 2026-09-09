@@ -32,8 +32,14 @@ async function apiDelete(path) {
 }
 
 function fmtKg(n) {
+  // los kg casi nunca traen decimales que de verdad importen - mostrar
+  // ".00" en un numero exacto solo confunde (y en numeros grandes, como el
+  // total de MP de toda la campaña, ese ".00" de mas hace que se salga de
+  // su tarjeta). Mismo criterio que fmt_kg() en reporte_base.py (PDFs).
   if (n === null || n === undefined) return "—";
-  return Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  n = Number(n);
+  if (Number.isInteger(n)) return n.toLocaleString("es-PE");
+  return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtInt(n) {

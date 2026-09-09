@@ -90,13 +90,14 @@ nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
 .kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--citrus),var(--forest-2))}
 .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
 .kpi.with-icon{display:flex;gap:12px;align-items:flex-start}
+.kpi.with-icon>div{min-width:0}
 .kpi.with-icon::before{content:none}
 .kpi-medal{width:38px;height:38px;border-radius:11px;background:var(--forest-tint);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .kpi-medal svg{width:19px;height:19px;stroke:var(--forest-2)}
 .kpi-medal.citrus{background:var(--citrus-tint)}
 .kpi-medal.citrus svg{stroke:var(--citrus)}
 .kpi-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
-.kpi-value{font-size:26px;font-weight:600;margin-top:6px}
+.kpi-value{font-size:26px;font-weight:600;margin-top:6px;overflow-wrap:anywhere}
 .kpi-value.citrus{color:var(--citrus)}
 .kpi-note{font-size:12px;color:var(--text-2);margin-top:4px}
 

@@ -20,6 +20,8 @@ def _tag_almacen(t):
 
 
 def _tabla_stock(lotes):
+    """Lotes con saldo PARCIAL de verdad - ya se les asignó algo a alguna
+    corrida y todavía les queda un resto."""
     filas = [[
         f"#{l['numero']}",
         l.get("proveedor") or "—",
@@ -35,6 +37,23 @@ def _tabla_stock(lotes):
     )
 
 
+def _tabla_completos(lotes):
+    """Lotes SIN TOCAR todavía - el "saldo" acá es el peso completo tal
+    como llegó, no el resto de haber usado algo. No es lo mismo que un
+    saldo parcial, por eso van en su propia tabla."""
+    filas = [[
+        f"#{l['numero']}",
+        l.get("proveedor") or "—",
+        _tag_almacen(l.get("tipo_almacen")),
+        fmt_fecha(l.get("fecha_ingreso")),
+        fmt_kg(l.get("peso_neto_kg")),
+    ] for l in lotes]
+    return tabla(
+        ["Lote", "Proveedor", "Almacén", "Ingreso", "Peso"], filas,
+        [18 * mm, 60 * mm, 20 * mm, 26 * mm, 30 * mm], align_derecha_desde=4,
+    )
+
+
 def generar_reporte_stock_pdf(lotes: list) -> bytes:
     """lotes: filas de v_saldo_lotes con kg_saldo > 0 (numero, proveedor,
     tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, bines_saldo)."""
@@ -46,6 +65,14 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     kg_total = kg_silo + kg_bines
     en_proceso = sum(1 for l in lotes if (l.get("estado_actual") or "").upper() == "EN PROCESO")
     en_espera = sum(1 for l in lotes if (l.get("estado_actual") or "").upper() == "EN ESPERA")
+
+    # "saldo" en sentido estricto es lo que sobra de un lote YA EMPEZADO -
+    # un lote que todavía no se tocó (kg_saldo == su peso neto completo) no
+    # tiene ningún sobrante, está completo tal como llegó. Mezclar los dos
+    # en una sola lista de "lotes con saldo" confunde (Stephano lo notó) -
+    # se separan en dos tablas.
+    lotes_completos = [l for l in lotes if abs(float(l["kg_saldo"]) - float(l["peso_neto_kg"])) < 0.01]
+    lotes_parciales = [l for l in lotes if abs(float(l["kg_saldo"]) - float(l["peso_neto_kg"])) >= 0.01]
 
     ahora = datetime.now()
 
@@ -63,7 +90,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
         kpi_card("Stock total", f"{fmt_kg(kg_total)} kg", ancho_kpi),
         kpi_card("En Silo", f"{fmt_kg(kg_silo)} kg", ancho_kpi),
         kpi_card("En Bines", f"{fmt_kg(kg_bines)} kg", ancho_kpi),
-        kpi_card("Lotes con saldo", fmt_num(len(lotes), 0), ancho_kpi),
+        kpi_card("Lotes en planta", fmt_num(len(lotes), 0), ancho_kpi),
     ]
     kpi_grid = Table([fila1], colWidths=[ancho_kpi] * 4, spaceBefore=4)
     kpi_grid.setStyle(TableStyle([
@@ -72,7 +99,11 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     ]))
     story.append(kpi_grid)
     story.append(Spacer(1, 4 * mm))
-    story.append(Paragraph(f"{en_proceso} lote(s) en proceso ahora mismo · {en_espera} en espera.", style_kpi_label))
+    story.append(Paragraph(
+        f"{en_proceso} lote(s) en proceso ahora mismo · {en_espera} en espera · "
+        f"{len(lotes_completos)} completo(s) sin tocar · {len(lotes_parciales)} con saldo parcial.",
+        style_kpi_label,
+    ))
     story.append(Spacer(1, 4 * mm))
 
     if kg_silo > 0 or kg_bines > 0:
@@ -88,8 +119,22 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
         story.append(t)
         story.append(Spacer(1, 4 * mm))
 
-    story.extend(seccion(f"Lotes en proceso o en espera, del más antiguo al más nuevo ({len(lotes)})"))
-    story.append(_tabla_stock(lotes) if lotes else Paragraph("No hay lotes con saldo en este momento.", style_footnote))
+    story.extend(seccion(f"Lotes con saldo parcial, del más antiguo al más nuevo ({len(lotes_parciales)})"))
+    story.append(Paragraph(
+        "Ya se les asignó algo a alguna corrida y todavía les queda un resto por usar.",
+        style_footnote,
+    ))
+    story.append(Spacer(1, 3 * mm))
+    story.append(_tabla_stock(lotes_parciales) if lotes_parciales else Paragraph("Ninguno en este momento.", style_footnote))
+
+    story.append(Spacer(1, 8 * mm))
+    story.extend(seccion(f"Lotes completos, todavía sin tocar ({len(lotes_completos)})"))
+    story.append(Paragraph(
+        "Llegaron a planta pero todavía no se les registró ningún consumo - el peso de acá es el completo, no un sobrante.",
+        style_footnote,
+    ))
+    story.append(Spacer(1, 3 * mm))
+    story.append(_tabla_completos(lotes_completos) if lotes_completos else Paragraph("Ninguno en este momento.", style_footnote))
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
