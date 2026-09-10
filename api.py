@@ -30,6 +30,7 @@ from reporte_base import ahora_peru
 from reporte_corrida import generar_reporte_pdf
 from reporte_periodo import generar_reporte_periodo_pdf
 from reporte_stock import generar_reporte_stock_pdf
+from reporte_trazabilidad import generar_trazabilidad_xlsx
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
@@ -909,6 +910,59 @@ def reporte_periodo_pdf(desde: str, hasta: str):
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{nombre}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.get("/api/corridas/{corrida_id}/trazabilidad.xlsx")
+def trazabilidad_corrida_xlsx(corrida_id: int):
+    """Exporta UNA corrida al formato de la hoja de Trazabilidad de planta:
+    encabezado de fechas, tabla de lotes de MP con totales, bloque de resumen
+    (MP kg, rendimiento, masa de jugo simple, ratio...) y saldos por lote.
+    Lo que la app no guarda (GRP, N° Guía, descuentos por brix, cáscara/semilla,
+    GNC) sale en blanco para llenarlo a mano al cierre."""
+    with engine.connect() as conn:
+        corrida = one(conn.execute(text(
+            """
+            SELECT v.*, c.tipo_proceso, c.brix_promedio_tk, c.rendimiento, c.fecha_proceso_ref
+            FROM v_cuadre_corridas v JOIN corridas c ON c.id = v.id
+            WHERE v.id = :id
+            """
+        ), {"id": corrida_id}))
+        if corrida is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+
+        lotes = rows(conn.execute(text(
+            """
+            SELECT a.lote_numero, a.kg_asignados, a.bines_consumidos, a.brix_produccion,
+                   a.tipo_almacen_origen, a.fecha_proceso,
+                   l.proveedor, l.procedencia, l.guia, l.fecha_ingreso, l.brix_recepcion,
+                   l.peso_neto_kg, l.bines_totales,
+                   s.kg_saldo, s.bines_saldo, s.kg_consumidos, s.estado_actual
+            FROM asignaciones a
+            JOIN lotes l ON l.numero = a.lote_numero
+            LEFT JOIN v_saldo_lotes s ON s.numero = a.lote_numero
+            WHERE a.corrida_id = :c
+            ORDER BY a.fecha_proceso, a.lote_numero
+            """
+        ), {"c": corrida_id}))
+        productos = rows(conn.execute(text(
+            "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros "
+            "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
+        ), {"c": corrida_id}))
+        mediciones = rows(conn.execute(text(
+            "SELECT litros, brix_inicial, brix_final FROM mediciones_tanque "
+            "WHERE corrida_id = :c ORDER BY creado_en"
+        ), {"c": corrida_id}))
+
+    xlsx_bytes = generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones)
+    nombre = f"trazabilidad-{corrida['nombre']}.xlsx".replace(" ", "-").replace("/", "-")
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
             "Cache-Control": "no-store",
         },
     )

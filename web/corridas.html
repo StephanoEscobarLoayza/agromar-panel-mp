@@ -173,6 +173,8 @@ function corridaCard(c) {
   acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
   acciones.push(`<a class="btn-link" href="/api/corridas/${c.id}/reporte.pdf" target="_blank" rel="noopener" style="text-decoration:none"
     onclick="this.href='/api/corridas/${c.id}/reporte.pdf?t='+Date.now()">Reporte PDF</a>`);
+  acciones.push(`<a class="btn-link" href="/api/corridas/${c.id}/trazabilidad.xlsx" style="text-decoration:none"
+    onclick="this.href='/api/corridas/${c.id}/trazabilidad.xlsx?t='+Date.now()">Trazabilidad (Excel)</a>`);
   if (Number(c.kg_asignados_total) === 0) {
     acciones.push(`<button class="btn-link btn-link-bad" data-accion="eliminar-corrida" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Eliminar</button>`);
   }
