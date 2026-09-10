@@ -81,25 +81,25 @@
 </form>
 
 <script>
-// motas de luz flotando lento (tipo polen en un huerto) - da algo de vida sin
-// distraer. Se apaga si el equipo pidió menos movimiento o si la pestaña no
-// está visible.
+// motas de luz flotando (tipo polen en un huerto) - siempre se mueven; si el
+// equipo pidió "menos movimiento" solo van más lento, no se congelan. Se pausa
+// cuando la pestaña no está visible (para no gastar batería en balde).
 (function motas() {
   const cv = document.getElementById("motes");
   if (!cv || !cv.getContext) return;
   const ctx = cv.getContext("2d");
-  const menosMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const factorMov = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0.4 : 1;
   let w = 0, h = 0, dpr = 1, parts = [], raf = null, t = null;
 
   function nueva() {
     return {
       x: Math.random() * w, y: Math.random() * h,
       r: 0.8 + Math.random() * 2.4,
-      vy: -(0.08 + Math.random() * 0.26),
+      vy: -(0.22 + Math.random() * 0.55) * factorMov,
       sway: Math.random() * Math.PI * 2,
-      swaySpeed: 0.005 + Math.random() * 0.012,
-      swayAmp: 0.20 + Math.random() * 0.55,
-      a: 0.12 + Math.random() * 0.34,
+      swaySpeed: (0.008 + Math.random() * 0.016) * factorMov,
+      swayAmp: (0.35 + Math.random() * 0.75) * factorMov,
+      a: 0.16 + Math.random() * 0.38,
       citrus: Math.random() < 0.22,
     };
   }
@@ -136,12 +136,10 @@
   }
 
   medir();
-  if (!menosMovimiento) {
-    raf = requestAnimationFrame(paso);
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && !raf) raf = requestAnimationFrame(paso);
-    });
-  }
+  raf = requestAnimationFrame(paso);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !raf) raf = requestAnimationFrame(paso);
+  });
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(medir, 200); });
 })();
 
