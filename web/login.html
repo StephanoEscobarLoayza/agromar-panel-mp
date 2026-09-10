@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Entrar · Agromar</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login-bg{position:fixed;inset:0;z-index:0;
+    background:var(--forest) url("/login-bg.jpg") center/cover no-repeat;
+    filter:blur(6px) saturate(1.05);transform:scale(1.09)}
+  .login-bg::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(155deg,rgba(18,53,36,.55),rgba(18,53,36,.84))}
+  .login-dots{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background-image:radial-gradient(rgba(244,239,224,.09) 1px,transparent 1.4px);background-size:16px 16px;opacity:.5;
+    mask-image:linear-gradient(120deg,#000 0%,#000 38%,transparent 72%)}
+  .login-card{position:relative;z-index:2;width:100%;max-width:380px;
+    background:var(--surface);border:1px solid var(--border);border-radius:18px;
+    box-shadow:0 24px 60px rgba(0,0,0,.35);padding:32px 30px 28px}
+  .login-mark{display:flex;align-items:baseline;gap:2px;font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:28px}
+  .login-mark .agro{color:var(--citrus)}
+  .login-mark .mar{color:var(--text)}
+  .login-mark .dot{width:8px;height:8px;border-radius:50%;background:var(--citrus);display:inline-block;margin:0 3px 5px}
+  .login-sub{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
+  .login-title{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;margin:22px 0 4px}
+  .login-hint{font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+  .login-card label{font-size:12px;color:var(--text-2);font-weight:600;display:block;margin-bottom:6px}
+  #msg .msg{margin-top:14px}
+  .login-foot{margin-top:20px;font-size:11px;color:var(--text-muted);text-align:center;letter-spacing:.06em;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<div class="login-bg" id="loginBg"></div>
+<div class="login-dots"></div>
+
+<form class="login-card" id="form" autocomplete="on">
+  <div>
+    <div class="login-mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+    <div class="login-sub">Industrial</div>
+  </div>
+
+  <div class="login-title">Panel de cuadre de producción</div>
+  <div class="login-hint">Ingresa la contraseña del equipo para continuar.</div>
+
+  <div class="field">
+    <label for="password">Contraseña</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" autofocus>
+  </div>
+
+  <div id="msg"></div>
+
+  <button class="btn" id="btn" type="submit" style="margin-top:16px">Entrar</button>
+
+  <div class="login-foot">Del campo a planta, cuadrado al kilo.</div>
+</form>
+
+<script>
+const form = document.getElementById("form");
+const pass = document.getElementById("password");
+const btn = document.getElementById("btn");
+const msg = document.getElementById("msg");
+
+form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if (!pass.value) {
+    msg.innerHTML = '<div class="msg bad">Escribe la contraseña.</div>';
+    return;
+  }
+  btn.disabled = true;
+  msg.innerHTML = "";
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pass.value }),
+    });
+    if (res.ok) {
+      const destino = new URLSearchParams(location.search).get("next") || "/";
+      location.href = destino.startsWith("/") ? destino : "/";
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    msg.innerHTML = `<div class="msg bad">${body.detail || "No se pudo entrar."}</div>`;
+  } catch (e) {
+    msg.innerHTML = '<div class="msg bad">Sin conexión. Intenta de nuevo.</div>';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

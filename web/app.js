@@ -1,8 +1,20 @@
 // Helpers compartidos por las 3 páginas.
 
+// Si la sesión expiró (o nunca se entró), el backend responde 401 - se manda
+// al login sin dejar que la página siga intentando con datos a medias.
+function _siNoAutenticado(res) {
+  if (res.status === 401) {
+    location.href = "/login.html?next=" + encodeURIComponent(location.pathname);
+    return new Promise(() => {});  // nunca resuelve: corta la cadena
+  }
+  return null;
+}
+
 async function apiGet(path) {
   const res = await fetch(path);
   if (!res.ok) {
+    const corte = _siNoAutenticado(res);
+    if (corte) return corte;
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || `Error ${res.status}`);
   }
@@ -15,6 +27,10 @@ async function apiPost(path, data) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+  if (!res.ok) {
+    const corte = _siNoAutenticado(res);
+    if (corte) return corte;
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(body.detail || `Error ${res.status}`);
@@ -24,12 +40,35 @@ async function apiPost(path, data) {
 
 async function apiDelete(path) {
   const res = await fetch(path, { method: "DELETE" });
+  if (!res.ok) {
+    const corte = _siNoAutenticado(res);
+    if (corte) return corte;
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(body.detail || `Error ${res.status}`);
   }
   return body;
 }
+
+// "Cerrar sesión" en el pie de cada página - solo aparece si el login está activo.
+document.addEventListener("DOMContentLoaded", () => {
+  fetch("/api/sesion").then(r => r.json()).then(s => {
+    if (!s || !s.auth) return;
+    const foot = document.querySelector(".foot");
+    if (!foot) return;
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "btn-link";
+    link.textContent = "Cerrar sesión";
+    link.style.cssText = "margin-top:14px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)";
+    link.addEventListener("click", async () => {
+      await fetch("/api/logout", { method: "POST" }).catch(() => {});
+      location.href = "/login.html";
+    });
+    foot.appendChild(link);
+  }).catch(() => {});
+});
 
 function fmtKg(n) {
   // los kg casi nunca traen decimales que de verdad importen - mostrar

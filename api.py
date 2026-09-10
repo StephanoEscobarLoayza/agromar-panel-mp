@@ -8,6 +8,8 @@ Correr local:
     python -m uvicorn api:app --reload --port 8000
 """
 import asyncio
+import hashlib
+import hmac
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +18,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
@@ -37,6 +40,70 @@ app = FastAPI(title="Panel de cuadre - Agromar")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# autenticación - una sola contraseña compartida para todo el equipo.
+# Se activa SOLO si están seteadas APP_PASSWORD y APP_SESSION_SECRET (env vars
+# en Render). Si no están, la app funciona sin login como antes - así se puede
+# desplegar el código sin dejar a nadie afuera hasta decidir prender el candado.
+# ---------------------------------------------------------------------------
+APP_PASSWORD = (os.environ.get("APP_PASSWORD") or "").strip()
+_SESSION_SECRET = (os.environ.get("APP_SESSION_SECRET") or "").strip()
+AUTH_ON = bool(APP_PASSWORD and _SESSION_SECRET)
+_COOKIE_NAME = "agromar_auth"
+_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días sin volver a entrar
+_COOKIE_SECURE = os.environ.get("APP_INSECURE_COOKIE") != "1"  # =1 solo para probar en http local
+# rutas visibles sin login (para que la pantalla de login cargue y pueda enviar)
+_RUTAS_LIBRES = {"/login.html", "/api/login", "/api/sesion", "/style.css", "/app.js", "/favicon.svg"}
+
+
+def _token_sesion():
+    return hmac.new(_SESSION_SECRET.encode(), b"agromar-ok", hashlib.sha256).hexdigest()
+
+
+@app.middleware("http")
+async def _guardia_auth(request, call_next):
+    if not AUTH_ON:
+        return await call_next(request)
+    path = request.url.path
+    if path in _RUTAS_LIBRES:
+        return await call_next(request)
+    cookie = request.cookies.get(_COOKIE_NAME, "")
+    if cookie and hmac.compare_digest(cookie, _token_sesion()):
+        return await call_next(request)
+    if path.startswith("/api/"):
+        return JSONResponse({"detail": "No autenticado"}, status_code=401)
+    return RedirectResponse(url="/login.html", status_code=303)
+
+
+class LoginPayload(BaseModel):
+    password: str
+
+
+@app.get("/api/sesion")
+def estado_sesion():
+    return {"auth": AUTH_ON}
+
+
+@app.post("/api/login")
+def login(p: LoginPayload):
+    if not AUTH_ON:
+        return {"ok": True}
+    if not hmac.compare_digest(p.password.strip(), APP_PASSWORD):
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie(
+        _COOKIE_NAME, _token_sesion(), max_age=_COOKIE_MAX_AGE,
+        httponly=True, samesite="lax", secure=_COOKIE_SECURE, path="/",
+    )
+    return resp
+
+
+@app.post("/api/logout")
+def logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(_COOKIE_NAME, path="/")
+    return resp
 
 
 def rows(result):
