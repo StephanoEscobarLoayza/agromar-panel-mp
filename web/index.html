@@ -306,8 +306,7 @@ function renderProductoTerminado(productos, corridas) {
     }
     porCorrida[p.corrida_id].pt += Number(p.pt_kg || 0);
     porCorrida[p.corrida_id].litros += Number(p.volumen_litros || 0);
-    const litrosTxt = p.volumen_litros != null && p.volumen_litros !== "" ? ` (${fmtKg(p.volumen_litros)} L)` : "";
-    porCorrida[p.corrida_id].items.push(`${p.producto} ${fmtKg(p.pt_kg)} kg${litrosTxt}`);
+    porCorrida[p.corrida_id].items.push(p.producto); // el kg/L ya se ve en la fila misma, no hace falta repetirlo acá
   }
   for (const c of corridas || []) {
     if (porCorrida[c.id]) continue; // ya tiene tambores reales cargados, no se pisa con una estimación
@@ -345,8 +344,8 @@ function renderProductoTerminado(productos, corridas) {
 
   const max = Math.max(...filas.map(f => f.pt), 1);
   listaCont.innerHTML = filas.map(f => {
-    const rendimiento = f.mpKg > 0 ? `${((f.pt / f.mpKg) * 100).toFixed(1)}% rendimiento` : "";
-    const detalle = f.items.length ? escapeHtml(f.items.join(" · ")) : "estimado con el rendimiento de Trazabilidad";
+    const rendimiento = f.mpKg > 0 ? `${((f.pt / f.mpKg) * 100).toFixed(1)}%` : "";
+    const detalle = f.items.length ? escapeHtml(f.items.join(", ")) : "estimado";
     return statBarRow(
       `${escapeHtml(f.nombre)} <span class="stat-bar-sub">${rendimiento ? rendimiento + " · " : ""}${detalle}</span>`,
       `${fmtKg(f.pt)} kg`,
