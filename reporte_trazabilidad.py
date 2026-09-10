@@ -1,12 +1,14 @@
 """Arma el .xlsx de "Trazabilidad" de UNA corrida, con el mismo formato que la
-hoja de planta: encabezado de fechas, barra de título, tabla de lotes de MP con
-su fila de totales, bloque de resumen (MP kg, rendimiento, masa de jugo simple,
-ratio...) y las tablas de saldo por lote.
+hoja de planta: encabezado de fechas, barra de título, tabla de lotes de MP,
+bloque de resumen (MP kg, rendimiento, masa de jugo simple, ratio...) y las
+tablas de saldo por lote.
 
-Lo que la app tiene se llena solo; lo que no está en la app (GRP, N° Guía,
-Brix producción línea si no se cargó, descuentos por brix, cáscara / semilla,
-consumo de GNC) queda en blanco para completarlo a mano - igual que esa hoja
-se termina de llenar a mano al cierre de la corrida."""
+Los datos que la app tiene entran como números; TODO lo que se calcula entra
+como fórmula de Excel (referencias a celdas), para que si Stephano corrige un
+dato de entrada -por ejemplo el % de descuento a brix que le pasa su jefe- o
+llena a mano un campo que la app no guarda, la hoja recalcule sola, igual que
+la de planta. Lo que no está en la app (GRP, N° Guía, % descuento a brix,
+cáscara / semilla, GNC) sale en blanco para llenarlo a mano al cierre."""
 import unicodedata
 from datetime import date, datetime
 from io import BytesIO
@@ -24,6 +26,7 @@ _MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO",
 _TITULO_FILL = PatternFill("solid", fgColor="FFE39B")
 _HEAD_FILL = PatternFill("solid", fgColor="D9EAD3")
 _TOTAL_FILL = PatternFill("solid", fgColor="F2F2F2")
+_SEC_FILL = PatternFill("solid", fgColor="E8EEF6")
 _BOLD = Font(bold=True)
 _HEAD_FONT = Font(bold=True, size=9)
 _BORDE = Border(*[Side("thin", color="B7B7B7")] * 4)
@@ -60,7 +63,7 @@ def _es_pt(nombre):
 def _set(ws, celda, valor, *, fmt=None, bold=False, fill=None, borde=False, centro=False):
     c = ws[celda] if isinstance(celda, str) else celda
     c.value = valor
-    if fmt and valor is not None:
+    if fmt and valor is not None and valor != "":
         c.number_format = fmt
     if bold:
         c.font = _BOLD
@@ -77,11 +80,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
     """corrida: fila de v_cuadre_corridas + corridas (nombre, tipo_proceso,
     fecha_inicio, fecha_final, mp_kg_objetivo, kg_asignados_total,
     brix_promedio_tk, rendimiento, fecha_proceso_ref).
-    lotes: una fila por asignación, con join a lotes y v_saldo_lotes
-    (lote_numero, kg_asignados, bines_consumidos, brix_produccion,
-    tipo_almacen_origen, fecha_proceso, proveedor, procedencia, guia,
-    fecha_ingreso, brix_recepcion, peso_neto_kg, bines_totales, kg_saldo,
-    bines_saldo, kg_consumidos, estado_actual).
+    lotes: una fila por asignación, con join a lotes y v_saldo_lotes.
     productos: corrida_productos. mediciones: mediciones_tanque."""
     wb = Workbook()
     ws = wb.active
@@ -111,7 +110,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
 
     _set(ws, "B6", titulo, bold=True, fill=_TITULO_FILL)
     ws["B6"].font = Font(bold=True, size=12)
-    ws.merge_cells("B6:H6")
+    ws.merge_cells("B6:P6")
 
     # ---------- tabla de lotes de MP ----------
     cols = [
@@ -120,15 +119,13 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
         "Brix Calidad recepción", "Brix Producción línea", "% Descuento a brix 10.5°B",
         "Descuento", "kg descuento",
     ]
-    HFILA = 8
+    HFILA = 7
     for i, nombre in enumerate(cols, start=1):
         _set(ws, ws.cell(row=HFILA, column=i), nombre,
              fill=_HEAD_FILL, borde=True, centro=True)
         ws.cell(row=HFILA, column=i).font = _HEAD_FONT
 
     r = HFILA + 1
-    total_peso = 0.0
-    brix_pond = 0.0
     for l in lotes:
         peso = _f(l.get("kg_asignados"))   # None = kg pendiente -> celda en blanco
         brix = _f(l.get("brix_recepcion"))
@@ -140,6 +137,11 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
             silo_bines = f"{bc} bines" if bc else "Bines"
         else:
             silo_bines = "—"
+        # I = Peso Neto (dato), N = % descuento a brix (a mano, lo pasa el jefe)
+        # K = Peso con descuento = Peso Neto - (% descuento * Peso Neto)   [=I-(N*I)]
+        # P = kg descuento = % descuento * Peso Neto                       [=N*I]
+        pcd = f'=IF(I{r}="","",I{r}-(N{r}*I{r}))'
+        kdesc = f'=IF(OR(I{r}="",N{r}=""),"",N{r}*I{r})'
         fila = [
             proceso,
             l.get("lote_numero"),
@@ -149,46 +151,53 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
             _f(l.get("fecha_proceso")),
             l.get("procedencia") or "",
             l.get("proveedor") or "",
-            peso,                              # Peso Neto = kg que entraron de este lote
-            silo_bines,
-            peso,                              # Peso con descuento = Peso Neto (la app no maneja descuento por brix)
-            brix,                              # Brix Calidad recepción
-            _f(l.get("brix_produccion")),      # Brix Producción línea
-            None, None, None,                  # % dscto, Descuento, kg descuento
+            peso,                              # I  Peso Neto (kg que entraron de este lote)
+            silo_bines,                        # J  Silo / Bines
+            pcd,                               # K  Peso con descuento (fórmula)
+            brix,                              # L  Brix Calidad recepción
+            _f(l.get("brix_produccion")),      # M  Brix Producción línea
+            None,                              # N  % Descuento a brix (a mano)
+            None,                              # O  Descuento
+            kdesc,                             # P  kg descuento (fórmula)
         ]
         for i, v in enumerate(fila, start=1):
             c = _set(ws, ws.cell(row=r, column=i), v, borde=True)
             if i in (5, 6):
                 c.number_format = _FMT_FECHA
-            elif i in (9, 11):
+            elif i in (9, 11, 15, 16):
                 c.number_format = _FMT_KG
             elif i in (12, 13):
                 c.number_format = _FMT_BRIX
-        total_peso += peso or 0.0
-        if brix is not None and peso:
-            brix_pond += brix * peso
+            elif i == 14:
+                c.number_format = _FMT_PCT
         r += 1
 
-    # fila de totales
-    _set(ws, ws.cell(row=r, column=8), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
-    for cidx in (9, 11):
-        _set(ws, ws.cell(row=r, column=cidx), round(total_peso, 2),
-             fmt=_FMT_KG, bold=True, fill=_TOTAL_FILL, borde=True)
-    for cidx in (10, 12, 13):
-        ws.cell(row=r, column=cidx).fill = _TOTAL_FILL
-        ws.cell(row=r, column=cidx).border = _BORDE
-    brix_prom_recep = (brix_pond / total_peso) if total_peso else None
-    _set(ws, ws.cell(row=r + 1, column=7), "Promedio ponderado de brix proceso", bold=True)
-    _set(ws, ws.cell(row=r + 1, column=12),
-         round(brix_prom_recep, 2) if brix_prom_recep is not None else None, fmt=_FMT_BRIX, bold=True)
+    n_lotes = r - (HFILA + 1)
+    prim, ult = HFILA + 1, r - 1           # primera y última fila de lotes
 
-    # ---------- valores del bloque de resumen ----------
+    # ---- fila de totales ----
+    _set(ws, ws.cell(row=r, column=8), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
+    for col in (9, 11, 16):                 # Peso Neto, Peso con descuento, kg descuento
+        letra = get_column_letter(col)
+        val = f"=SUM({letra}{prim}:{letra}{ult})" if n_lotes else 0
+        _set(ws, ws.cell(row=r, column=col), val, fmt=_FMT_KG, bold=True, fill=_TOTAL_FILL, borde=True)
+    for col in (10, 12, 13, 14, 15):
+        ws.cell(row=r, column=col).fill = _TOTAL_FILL
+        ws.cell(row=r, column=col).border = _BORDE
+    # brix ponderado por Peso Neto (I) - I/L son números o vacío, nunca texto
+    pp = r + 1
+    _set(ws, ws.cell(row=pp, column=7), "Promedio ponderado de brix proceso", bold=True)
+    if n_lotes:
+        _set(ws, ws.cell(row=pp, column=12),
+             f'=IF(SUM(I{prim}:I{ult})=0,"",SUMPRODUCT(I{prim}:I{ult},L{prim}:L{ult})/SUM(I{prim}:I{ult}))',
+             fmt=_FMT_BRIX, bold=True)
+
+    # ---------- datos de entrada del bloque de resumen ----------
     prod_pt = [p for p in productos if _es_pt(p.get("producto"))]
-    mp_kg = round(total_peso, 2) or _f(corrida.get("mp_kg_objetivo")) or _f(corrida.get("kg_asignados_total")) or 0.0
-    volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in prod_pt)
-    tambores = sum(_f(p.get("tambores")) or 0 for p in prod_pt)
+    volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in prod_pt) or None
+    tambores = (sum(_f(p.get("tambores")) or 0 for p in prod_pt)) or None
     peso_tambor = next((_f(p.get("peso_neto_tambor_kg")) for p in prod_pt if p.get("peso_neto_tambor_kg")), None)
-    pt_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in prod_pt)
+    pt_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in prod_pt) or None
 
     peso_med = [(_f(m.get("litros")) or 0.0, _f(m["brix_final"]))
                 for m in mediciones if m.get("brix_final") is not None]
@@ -198,76 +207,68 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
         brix_tk = sum(b for _, b in peso_med) / len(peso_med)
     else:
         brix_tk = _f(corrida.get("brix_promedio_tk"))
+    mp_fallback = _f(corrida.get("mp_kg_objetivo")) or _f(corrida.get("kg_asignados_total")) or 0.0
 
-    masa_js = volumen * DENSIDAD_APARENTE if volumen else 0.0
-    rendimiento = (pt_kg / mp_kg) if (pt_kg and mp_kg) else None
-    rend_js_tk = (masa_js / mp_kg) if (masa_js and mp_kg) else None
-    ratio_kg_m3 = (masa_js / pt_kg) if (masa_js and pt_kg) else None
-    vol_pct = (volumen / mp_kg) if (volumen and mp_kg) else None
+    # ---------- bloque de resumen (fórmulas) + tablas de saldo ----------
+    SEC = r + 3
+    _set(ws, ws.cell(row=SEC, column=2), "RESUMEN", bold=True, fill=_SEC_FILL)
+    _set(ws, ws.cell(row=SEC, column=8), "Stock inicial al siguiente proceso", bold=True, fill=_SEC_FILL)
 
-    fila0 = r + 3
-    resumen = [
-        ("MP kg", round(mp_kg, 2), _FMT_KG, None, None),
-        ("HR pulpeado", HR_PULPEADO, "0", None, None),
-        ("MP kg/hr", (mp_kg / HR_PULPEADO) if mp_kg else None, _FMT_KG, None, None),
-        ("Volumen  litros", round(volumen, 2) or None, _FMT_KG, vol_pct, _FMT_PCT),
-        ("Tambores  und", tambores or None, "0", None, None),
-        ("Peso Neto del tambor  kg", peso_tambor, _FMT_KG, None, None),
-        ("PT  kg", round(pt_kg, 2) or None, _FMT_KG, None, None),
-        ("Rendimiento", rendimiento, _FMT_PCT, None, None),
-        ("Brix Promedio TK", round(brix_tk, 2) if brix_tk is not None else None, _FMT_BRIX, None, None),
-        ("Densidad Aparente  kg/l", DENSIDAD_APARENTE, "0.00000", None, None),
-        ("Masa del Jugo Simple  kg", round(masa_js, 2) or None, _FMT_KG, None, None),
-        ("Rendimiento de Jugo Simple Tanques", rend_js_tk, _FMT_PCT, None, None),
-        ("Semilla", None, _FMT_KG, None, None),
-        ("Cáscara", None, _FMT_KG, None, None),
-        ("Cáscara / Semilla", None, _FMT_KG, None, None),
-        ("Consumo de GNC  m³", None, _FMT_KG, None, None),
-        ("Ratio  kg/m³", round(ratio_kg_m3, 3) if ratio_kg_m3 is not None else None, "0.000", None, None),
-    ]
-    for i, (label, val, fmt, extra, extra_fmt) in enumerate(resumen):
-        rr = fila0 + i
-        _set(ws, ws.cell(row=rr, column=2), label, bold=True)
-        _set(ws, ws.cell(row=rr, column=4), val, fmt=fmt)
-        if extra is not None:
-            _set(ws, ws.cell(row=rr, column=5), extra, fmt=extra_fmt or _FMT_PCT)
+    m0 = SEC + 1
+    (rMP, rHR, rMPh, rVol, rTam, rPesoTam, rPT, rRend,
+     rBrix, rDens, rMasa, rRJS, rSem, rCas, rCS, rGNC, rRatio) = range(m0, m0 + 17)
 
-    # ---------- tablas de saldo por lote (stock inicial al siguiente proceso) ----------
+    def val(fila, etiqueta, valor, fmt=None):
+        _set(ws, ws.cell(row=fila, column=2), etiqueta, bold=True)
+        _set(ws, ws.cell(row=fila, column=4), valor, fmt=fmt)
+
+    val(rMP, "MP kg", (f"=K{r}" if n_lotes else (round(mp_fallback, 2) or None)), _FMT_KG)
+    val(rHR, "HR pulpeado", HR_PULPEADO, "0")
+    val(rMPh, "MP kg/hr", f'=IF(D{rHR}=0,"",D{rMP}/D{rHR})', _FMT_KG)
+    val(rVol, "Volumen  litros", round(volumen, 2) if volumen else None, _FMT_KG)
+    _set(ws, ws.cell(row=rVol, column=5), f'=IF(OR(D{rVol}="",D{rMP}=0),"",D{rVol}/D{rMP})', fmt=_FMT_PCT)
+    val(rTam, "Tambores  und", tambores, "0")
+    val(rPesoTam, "Peso Neto del tambor  kg", peso_tambor, _FMT_KG)
+    val(rPT, "PT  kg",
+        (f"=D{rTam}*D{rPesoTam}" if (tambores and peso_tambor) else (round(pt_kg, 2) if pt_kg else None)),
+        _FMT_KG)
+    val(rRend, "Rendimiento", f'=IF(OR(D{rPT}="",D{rMP}=0),"",D{rPT}/D{rMP})', _FMT_PCT)
+    val(rBrix, "Brix Promedio TK", round(brix_tk, 2) if brix_tk is not None else None, _FMT_BRIX)
+    val(rDens, "Densidad Aparente  kg/l", DENSIDAD_APARENTE, "0.00000")
+    val(rMasa, "Masa del Jugo Simple  kg", f'=IF(D{rVol}="","",D{rVol}*D{rDens})', _FMT_KG)
+    val(rRJS, "Rendimiento de Jugo Simple Tanques", f'=IF(OR(D{rMasa}="",D{rMP}=0),"",D{rMasa}/D{rMP})', _FMT_PCT)
+    val(rSem, "Semilla", None, _FMT_KG)
+    val(rCas, "Cáscara", None, _FMT_KG)
+    val(rCS, "Cáscara / Semilla", f'=IF(OR(D{rCas}="",D{rSem}="",D{rSem}=0),"",D{rCas}/D{rSem})', _FMT_KG)
+    val(rGNC, "Consumo de GNC  m³", None, _FMT_KG)
+    val(rRatio, "Ratio  kg/m³", f'=IF(OR(D{rMasa}="",D{rPT}="",D{rPT}=0),"",D{rMasa}/D{rPT})', "0.000")
+
+    # ---- tabla de saldo por lote (a la derecha, desde col H) ----
     con_saldo = [l for l in lotes if (_f(l.get("kg_saldo")) or 0) > 0.01]
-    scol = 8  # columna H
-    _set(ws, ws.cell(row=fila0 - 1, column=scol), "Stock inicial al siguiente proceso", bold=True)
+    sc = 8  # H
     sh = ["Lote", "Peso Neto", "Peso procesado", "Peso saldo", "Bines saldo", "Bines totales"]
     for k, nombre in enumerate(sh):
-        _set(ws, ws.cell(row=fila0, column=scol + k), nombre,
-             fill=_HEAD_FILL, borde=True, centro=True)
-        ws.cell(row=fila0, column=scol + k).font = _HEAD_FONT
-    total_saldo = 0.0
+        _set(ws, ws.cell(row=m0, column=sc + k), nombre, fill=_HEAD_FILL, borde=True, centro=True)
+        ws.cell(row=m0, column=sc + k).font = _HEAD_FONT
     j = 0
     for j, l in enumerate(con_saldo, start=1):
-        rr = fila0 + j
-        saldo = _f(l.get("kg_saldo")) or 0.0
-        total_saldo += saldo
-        vals = [
-            l.get("lote_numero"),
-            _f(l.get("peso_neto_kg")),
-            _f(l.get("kg_consumidos")),
-            round(saldo, 2),
-            _f(l.get("bines_saldo")),
-            _f(l.get("bines_totales")),
-        ]
-        for k, v in enumerate(vals):
-            c = _set(ws, ws.cell(row=rr, column=scol + k), v, borde=True)
-            if k in (1, 2, 3):
-                c.number_format = _FMT_KG
-    _set(ws, ws.cell(row=fila0 + j + 1, column=scol + 2), "TOTAL", bold=True, borde=True)
-    _set(ws, ws.cell(row=fila0 + j + 1, column=scol + 3), round(total_saldo, 2),
-         fmt=_FMT_KG, bold=True, borde=True)
-    if not con_saldo:
-        _set(ws, ws.cell(row=fila0 + 1, column=scol), "Sin saldo pendiente.", )
+        rr = m0 + j
+        _set(ws, ws.cell(row=rr, column=sc), l.get("lote_numero"), borde=True)
+        _set(ws, ws.cell(row=rr, column=sc + 1), _f(l.get("peso_neto_kg")), fmt=_FMT_KG, borde=True)
+        _set(ws, ws.cell(row=rr, column=sc + 2), _f(l.get("kg_consumidos")), fmt=_FMT_KG, borde=True)
+        _set(ws, ws.cell(row=rr, column=sc + 3), f"=I{rr}-J{rr}", fmt=_FMT_KG, borde=True)  # saldo = neto - procesado
+        _set(ws, ws.cell(row=rr, column=sc + 4), _f(l.get("bines_saldo")), borde=True)
+        _set(ws, ws.cell(row=rr, column=sc + 5), _f(l.get("bines_totales")), borde=True)
+    if con_saldo:
+        tr = m0 + j + 1
+        _set(ws, ws.cell(row=tr, column=sc + 2), "TOTAL", bold=True, borde=True)
+        _set(ws, ws.cell(row=tr, column=sc + 3), f"=SUM(K{m0 + 1}:K{m0 + j})", fmt=_FMT_KG, bold=True, borde=True)
+    else:
+        _set(ws, ws.cell(row=m0 + 1, column=sc), "Sin saldo pendiente.")
 
     # ---------- anchos de columna ----------
-    anchos = {1: 12, 2: 8, 3: 7, 4: 12, 5: 12, 6: 12, 7: 26, 8: 40, 9: 13, 10: 12,
-              11: 14, 12: 12, 13: 12, 14: 14, 15: 11, 16: 12}
+    anchos = {1: 12, 2: 30, 3: 7, 4: 12, 5: 12, 6: 12, 7: 26, 8: 40, 9: 13, 10: 12,
+              11: 15, 12: 12, 13: 12, 14: 13, 15: 11, 16: 12}
     for i, w in anchos.items():
         ws.column_dimensions[get_column_letter(i)].width = w
 
