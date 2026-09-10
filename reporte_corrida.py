@@ -46,7 +46,7 @@ def _cuenta_como_pt(producto: dict) -> bool:
     """El enjuague sale de la línea pero no es producto terminado - no suma al
     PT kg, ni al rendimiento, ni al volumen de la corrida. Cualquier fila cuyo
     nombre mencione "enjuague" (con o sin tildes, mayúsculas, etc.) se deja
-    fuera de esos totales - igual se muestra en la tabla de productos, marcada.
+    fuera de esos totales. Igual se muestra normal en la tabla de productos.
     Todo lo demás (Jugo Simple Aséptico, Jugo Concentrado Congelado, etc.) sí
     cuenta."""
     nombre = "".join(
@@ -57,18 +57,13 @@ def _cuenta_como_pt(producto: dict) -> bool:
 
 
 def _tabla_productos(productos):
-    filas = []
-    for p in productos:
-        nombre = p.get("producto") or "—"
-        if not _cuenta_como_pt(p):
-            nombre += " (no cuenta como PT)"
-        filas.append([
-            nombre,
-            fmt_num(p.get("tambores"), 0),
-            fmt_kg(p.get("peso_neto_tambor_kg")),
-            fmt_kg(p.get("pt_kg")),
-            fmt_kg(p.get("volumen_litros")),
-        ])
+    filas = [[
+        p.get("producto") or "—",
+        fmt_num(p.get("tambores"), 0),
+        fmt_kg(p.get("peso_neto_tambor_kg")),
+        fmt_kg(p.get("pt_kg")),
+        fmt_kg(p.get("volumen_litros")),
+    ] for p in productos]
     return tabla(
         ["Producto", "Tambores", "Peso/tambor", "PT kg", "Litros"], filas,
         [45 * mm, 25 * mm, 30 * mm, 30 * mm, 30 * mm], align_derecha_desde=1,
@@ -154,7 +149,6 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # el enjuague sale de la línea pero no es producto terminado - se deja fuera
     # del PT kg, del rendimiento y del volumen (ver _cuenta_como_pt).
     productos_pt = [p for p in productos if _cuenta_como_pt(p)]
-    hay_no_pt = len(productos_pt) < len(productos)
     pt_total = sum(float(p["pt_kg"]) for p in productos_pt if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in productos_pt if p.get("volumen_litros") is not None)
     rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
@@ -287,13 +281,6 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Productos de salida ({len(productos)})"))
         story.append(_tabla_productos(productos))
-        if hay_no_pt:
-            story.append(Spacer(1, 3 * mm))
-            story.append(Paragraph(
-                "El enjuague sale de la línea pero no es producto terminado - no suma "
-                "al PT kg, ni al rendimiento, ni al volumen de arriba.",
-                style_footnote,
-            ))
 
     if paradas:
         story.append(Spacer(1, 8 * mm))
