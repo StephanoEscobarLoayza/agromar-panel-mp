@@ -955,8 +955,21 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
             "SELECT litros, brix_inicial, brix_final FROM mediciones_tanque "
             "WHERE corrida_id = :c ORDER BY creado_en"
         ), {"c": corrida_id}))
+        # todo el stock de MP con saldo disponible (mismo criterio que el
+        # reporte de stock) - el módulo lo parte en dos: lo que dejó ESTA
+        # corrida (saldo parcial) y los demás lotes completos que siguen en piso.
+        stock = rows(conn.execute(text(
+            """
+            SELECT numero, proveedor, procedencia, fecha_ingreso, peso_neto_kg,
+                   kg_consumidos, kg_saldo, bines_saldo, bines_totales, estado_actual
+            FROM v_saldo_lotes
+            WHERE kg_saldo > 0.01
+              AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')
+            ORDER BY numero
+            """
+        )))
 
-    xlsx_bytes = generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones)
+    xlsx_bytes = generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock)
     nombre = f"trazabilidad-{corrida['nombre']}.xlsx".replace(" ", "-").replace("/", "-")
     return Response(
         content=xlsx_bytes,
