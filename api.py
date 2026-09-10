@@ -11,7 +11,9 @@ import asyncio
 import hashlib
 import hmac
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
@@ -24,6 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
 from sync_lotes import sincronizar_lotes
+from reporte_base import ahora_peru
 from reporte_corrida import generar_reporte_pdf
 from reporte_stock import generar_reporte_stock_pdf
 
@@ -1396,6 +1399,117 @@ def eliminar_medicion_tanque(medicion_id: int):
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Medición no encontrada.")
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# exportar todo a Excel (.xlsx) - respaldo y para cuadrar contra Trazabilidad
+# sin abrir la base. Una hoja por tabla, con los datos tal cual están ahora.
+# ---------------------------------------------------------------------------
+def _celda_xlsx(v):
+    """Ajusta un valor de la DB para que Excel lo entienda bien: Decimal -> float,
+    y las fechas con zona (creado_en, TIMESTAMPTZ en UTC) a hora de Perú sin zona
+    (mismo criterio que los reportes PDF)."""
+    if v is None:
+        return None
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, datetime) and v.tzinfo is not None:
+        return v.astimezone(timezone(timedelta(hours=-5))).replace(tzinfo=None)
+    if isinstance(v, (datetime, date)):
+        return v
+    return v
+
+
+def _hoja_xlsx(wb, nombre, result):
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    ws = wb.create_sheet(nombre[:31])  # Excel: máximo 31 chars por nombre de hoja
+    cols = list(result.keys())
+    ws.append(cols)
+    n = 0
+    for row in result:
+        ws.append([_celda_xlsx(v) for v in row])
+        n += 1
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    ws.freeze_panes = "A2"
+    for i, col in enumerate(cols, 1):
+        ws.column_dimensions[get_column_letter(i)].width = min(42, max(12, len(str(col)) + 3))
+    return n
+
+
+@app.get("/api/export.xlsx")
+def exportar_xlsx():
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    with engine.connect() as conn:
+        _hoja_xlsx(wb, "Lotes", conn.execute(text(
+            "SELECT * FROM v_saldo_lotes ORDER BY numero"
+        )))
+        _hoja_xlsx(wb, "Corridas", conn.execute(text(
+            """
+            SELECT v.*, c.estado, c.rendimiento, c.brix_promedio_tk
+            FROM v_cuadre_corridas v JOIN corridas c ON c.id = v.id
+            ORDER BY v.fecha_inicio
+            """
+        )))
+        _hoja_xlsx(wb, "Consumos", conn.execute(text(
+            """
+            SELECT a.id, c.nombre AS corrida, a.lote_numero, l.proveedor,
+                   a.turno, a.tipo_almacen_origen, a.bines_consumidos, a.kg_asignados,
+                   a.creado_en, a.observaciones
+            FROM asignaciones a
+            JOIN corridas c ON c.id = a.corrida_id
+            JOIN lotes l ON l.numero = a.lote_numero
+            ORDER BY a.creado_en
+            """
+        )))
+        _hoja_xlsx(wb, "Mediciones de tanque", conn.execute(text(
+            """
+            SELECT c.nombre AS corrida, m.tanque, m.litros, m.brix_inicial, m.brix_final,
+                   m.acidez, m.ph, ROUND(m.brix_final / m.acidez, 2) AS ratio,
+                   m.creado_en, m.observaciones
+            FROM mediciones_tanque m
+            JOIN corridas c ON c.id = m.corrida_id
+            ORDER BY c.fecha_inicio, m.creado_en
+            """
+        )))
+        _hoja_xlsx(wb, "Productos de salida", conn.execute(text(
+            """
+            SELECT c.nombre AS corrida, p.producto, p.tambores, p.peso_neto_tambor_kg,
+                   p.pt_kg, p.volumen_litros, p.observaciones
+            FROM corrida_productos p
+            JOIN corridas c ON c.id = p.corrida_id
+            ORDER BY c.fecha_inicio, p.producto
+            """
+        )))
+        _hoja_xlsx(wb, "Paradas", conn.execute(text(
+            """
+            SELECT c.nombre AS corrida, p.motivo, p.hora_inicio, p.hora_fin,
+                   CASE WHEN p.hora_fin IS NULL THEN NULL
+                        ELSE ROUND(EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60)
+                   END AS duracion_min,
+                   p.observaciones
+            FROM paradas p
+            JOIN corridas c ON c.id = p.corrida_id
+            ORDER BY c.fecha_inicio, p.hora_inicio
+            """
+        )))
+
+    buf = BytesIO()
+    wb.save(buf)
+    nombre = f"agromar-datos-{ahora_peru().strftime('%Y-%m-%d')}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

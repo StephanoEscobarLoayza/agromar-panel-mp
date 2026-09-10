@@ -65,6 +65,20 @@
     </div>
   </div>
 
+  <div class="panel" style="margin-top:20px">
+    <div class="panel-head"><h3>Descargar todo en Excel</h3></div>
+    <div class="form-body">
+      <p class="hint-line">
+        Baja un archivo <strong>.xlsx</strong> con una hoja por tabla —
+        lotes, corridas, consumos, mediciones de tanque, productos de salida
+        y paradas — con los datos tal cual están ahora. Sirve de respaldo y
+        para cuadrar contra Trazabilidad sin abrir la base.
+      </p>
+      <a class="btn" href="/api/export.xlsx" style="text-decoration:none;display:block"
+         onclick="this.href='/api/export.xlsx?t='+Date.now()">Descargar Excel</a>
+    </div>
+  </div>
+
   <div class="foot">
     <div class="foot-rule"></div>
     <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
