@@ -86,12 +86,13 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(grid)
-    story.append(Spacer(1, 4 * mm))
-    if pt_total:
+    if corridas:
+        story.append(Spacer(1, 4 * mm))
         story.append(Paragraph(
-            "Producto terminado y volumen: solo de las corridas del período que ya tienen "
-            "tambores cargados a mano. El rendimiento se muestra corrida por corrida (cada "
-            "hoja de Trazabilidad lo mide a su manera según el proceso).",
+            "Producto terminado y volumen: solo de las corridas con tambores cargados a mano. "
+            "El rendimiento (columna «Rend.») se muestra corrida por corrida: sale de PT kg ÷ MP kg "
+            "si la corrida ya tiene tambores, o del que trae su hoja de Trazabilidad; «—» si aún no "
+            "hay ninguno de los dos. No se promedia — cada proceso mide el rendimiento a su manera.",
             style_footnote,
         ))
 
@@ -103,14 +104,21 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         for p in prod_pt:
             if p.get("pt_kg") is not None:
                 pt_por_corrida[p["corrida"]] = pt_por_corrida.get(p["corrida"], 0) + float(p["pt_kg"])
-        filas = [[
-            c.get("nombre") or "—",
-            fmt_fecha(c.get("fecha_inicio")),
-            c.get("tipo_proceso") or "—",
-            fmt_kg(_mp_de_corrida(c)),
-            fmt_kg(pt_por_corrida[c["nombre"]]) if c.get("nombre") in pt_por_corrida else "—",
-            _rend_txt(c.get("rendimiento")),
-        ] for c in corridas]
+        filas = []
+        for c in corridas:
+            pt_c = pt_por_corrida.get(c.get("nombre"))
+            mp_c = _mp_de_corrida(c)
+            # el rendimiento sale de los tambores cargados (PT kg / MP kg) si los
+            # hay; si no, del que trae la hoja de Trazabilidad de esa corrida
+            rend = (pt_c / mp_c) if (pt_c and mp_c > 0) else c.get("rendimiento")
+            filas.append([
+                c.get("nombre") or "—",
+                fmt_fecha(c.get("fecha_inicio")),
+                c.get("tipo_proceso") or "—",
+                fmt_kg(mp_c),
+                fmt_kg(pt_c) if pt_c else "—",
+                _rend_txt(rend),
+            ])
         story.append(tabla(
             ["Corrida", "Fecha", "Tipo", "MP kg", "PT kg", "Rend."], filas,
             [52 * mm, 24 * mm, 24 * mm, 26 * mm, 24 * mm, 18 * mm], align_derecha_desde=3,
