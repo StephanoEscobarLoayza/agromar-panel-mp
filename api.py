@@ -47,9 +47,10 @@ app.add_middleware(
 # en Render). Si no están, la app funciona sin login como antes - así se puede
 # desplegar el código sin dejar a nadie afuera hasta decidir prender el candado.
 # ---------------------------------------------------------------------------
+APP_USER = (os.environ.get("APP_USER") or "").strip()
 APP_PASSWORD = (os.environ.get("APP_PASSWORD") or "").strip()
 _SESSION_SECRET = (os.environ.get("APP_SESSION_SECRET") or "").strip()
-AUTH_ON = bool(APP_PASSWORD and _SESSION_SECRET)
+AUTH_ON = bool(APP_USER and APP_PASSWORD and _SESSION_SECRET)
 _COOKIE_NAME = "agromar_auth"
 _COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días sin volver a entrar
 _COOKIE_SECURE = os.environ.get("APP_INSECURE_COOKIE") != "1"  # =1 solo para probar en http local
@@ -77,6 +78,7 @@ async def _guardia_auth(request, call_next):
 
 
 class LoginPayload(BaseModel):
+    usuario: str = ""
     password: str
 
 
@@ -89,8 +91,10 @@ def estado_sesion():
 def login(p: LoginPayload):
     if not AUTH_ON:
         return {"ok": True}
-    if not hmac.compare_digest(p.password.strip(), APP_PASSWORD):
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
+    ok_usuario = hmac.compare_digest(p.usuario.strip(), APP_USER)
+    ok_clave = hmac.compare_digest(p.password.strip(), APP_PASSWORD)
+    if not (ok_usuario and ok_clave):
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
     resp = JSONResponse({"ok": True})
     resp.set_cookie(
         _COOKIE_NAME, _token_sesion(), max_age=_COOKIE_MAX_AGE,
