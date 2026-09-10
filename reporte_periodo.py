@@ -42,7 +42,8 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
     (nombre, fecha_inicio, tipo_proceso, mp_kg_objetivo, kg_asignados_total,
     rendimiento) del período. productos: corrida_productos del período
     (corrida, producto, pt_kg, volumen_litros). proveedores: [(proveedor, kg)]
-    ya agregado. paradas: [(motivo, veces, minutos)] ya agregado."""
+    ya agregado. paradas: filas de paradas del período (hora_inicio,
+    area_proceso, tipo_parada, minutos)."""
     buf = BytesIO()
     doc = nuevo_doc(buf, f"Resumen de producción {desde} a {hasta}")
 
@@ -50,7 +51,7 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
     prod_pt = [p for p in productos if _es_pt(p.get("producto"))]
     pt_total = sum(float(p["pt_kg"]) for p in prod_pt if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in prod_pt if p.get("volumen_litros") is not None)
-    min_parado = sum(float(m or 0) for _, _, m in paradas)
+    min_parado = sum(float(p.get("minutos") or 0) for p in paradas)
 
     periodo = f"{fmt_fecha(desde)} — {fmt_fecha(hasta)}"
     story = [
@@ -167,17 +168,46 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         tt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
         story.append(tt)
 
-    # --- paradas ---
+    # --- paradas: total + cortes por área, por tipo y por día ---
     story.append(Spacer(1, 8 * mm))
     story.extend(seccion("Paradas del período"))
-    if paradas:
-        filas = [[m or "—", str(int(n)), fmt_minutos(mins)] for m, n, mins in paradas]
-        story.append(tabla(
-            ["Motivo", "Veces", "Tiempo"], filas,
-            [92 * mm, 25 * mm, 40 * mm], align_derecha_desde=1,
-        ))
-    else:
+    if not paradas:
         story.append(Paragraph("Sin paradas registradas en este período.", style_footnote))
+    else:
+        n_paradas = len(paradas)
+        story.append(Paragraph(
+            f"{fmt_minutos(min_parado)} parados en {n_paradas} parada(s).", style_kpi_label,
+        ))
+
+        def _sumar(clave):
+            acc = {}
+            for p in paradas:
+                k = (p.get(clave) or "Sin especificar") if clave != "dia" else fmt_fecha(p.get("hora_inicio"))
+                acc[k] = acc.get(k, 0.0) + float(p.get("minutos") or 0)
+            return sorted(acc.items(), key=lambda kv: kv[1], reverse=True)
+
+        def _barras(titulo, items, color, ancho_etq):
+            if not any(m > 0 for _, m in items):
+                return
+            story.append(Spacer(1, 5 * mm))
+            story.append(Paragraph(titulo, style_kpi_label))
+            story.append(Spacer(1, 2 * mm))
+            maximo = max((m for _, m in items), default=1) or 1
+            ancho_barra = PAGE_W - 2 * MARGIN - ancho_etq - 4 * mm
+            filas = [[
+                Paragraph(str(etq)[:34], style_kpi_label),
+                Banda(ancho_barra, m, maximo, color, fmt_minutos(m)),
+            ] for etq, m in items]
+            tt = Table(filas, colWidths=[ancho_etq, ancho_barra])
+            tt.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]))
+            story.append(tt)
+
+        _barras("Por área / proceso", _sumar("area_proceso"), FOREST_2, 40 * mm)
+        _barras("Por tipo de parada", _sumar("tipo_parada"), CITRUS, 40 * mm)
+        _barras("Por día", _sumar("dia"), FOREST_2, 30 * mm)
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(

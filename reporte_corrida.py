@@ -71,14 +71,16 @@ def _tabla_productos(productos):
 
 def _tabla_paradas(paradas):
     filas = [[
-        p.get("motivo") or "—",
         fmt_hora(p.get("hora_inicio")),
         fmt_hora(p.get("hora_fin")) if p.get("hora_fin") else "en curso",
         fmt_minutos(p.get("duracion_minutos")),
+        p.get("area_proceso") or "—",
+        p.get("tipo_parada") or "—",
+        (p.get("descripcion_falla") or p.get("equipo_afectado") or "—"),
     ] for p in paradas]
     return tabla(
-        ["Motivo", "Inicio", "Fin", "Duración"], filas,
-        [70 * mm, 35 * mm, 35 * mm, 20 * mm], align_derecha_desde=1,
+        ["Inicio", "Fin", "Duración", "Área", "Tipo", "Falla"], filas,
+        [30 * mm, 30 * mm, 18 * mm, 28 * mm, 26 * mm, 50 * mm], align_derecha_desde=2,
     )
 
 

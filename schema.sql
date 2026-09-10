@@ -200,18 +200,24 @@ COMMENT ON TABLE corrida_productos IS 'Productos de salida de una corrida (sopor
 -- una corrida se abre/cierra) o se puede cargar directo si ya se sabe.
 -- ----------------------------------------------------------------------------
 CREATE TABLE paradas (
-    id            SERIAL PRIMARY KEY,
-    corrida_id    INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
-    motivo        TEXT NOT NULL,
-    hora_inicio   TIMESTAMP NOT NULL,
-    hora_fin      TIMESTAMP,              -- null mientras la parada sigue en curso
-    observaciones TEXT,
-    creado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id                   SERIAL PRIMARY KEY,
+    corrida_id           INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
+    turno                TEXT,              -- DÍA / NOCHE
+    hora_inicio          TIMESTAMP NOT NULL,
+    hora_fin             TIMESTAMP,         -- null mientras la parada sigue en curso
+    area_proceso         TEXT,              -- Abastecimiento / Extracción / Estandarizado / Concentrador / Caldero
+    tipo_parada          TEXT,              -- Mecánico / Eléctrico / Operativo / Limpieza-CIP / Calidad / Espera producción / Falta material
+    equipo_afectado      TEXT,
+    descripcion_falla    TEXT,              -- antes se llamaba "motivo"
+    responsable_solucion TEXT,              -- Mantenimiento / Maquinista
+    solucion_obs         TEXT,              -- "solución y/o observaciones" de la hoja de paradas
+    recomendacion        TEXT,
+    creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CHECK (hora_fin IS NULL OR hora_fin >= hora_inicio)
 );
 
-COMMENT ON TABLE paradas IS 'Tiempos muertos registrados durante una corrida - motivo, hora de inicio y de fin.';
+COMMENT ON TABLE paradas IS 'Tiempos muertos registrados durante una corrida - turno, horas, área/proceso, tipo, equipo, falla y solución. Réplica de la hoja de paradas de planta.';
 
 CREATE INDEX idx_paradas_corrida ON paradas(corrida_id);
 

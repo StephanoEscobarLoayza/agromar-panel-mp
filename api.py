@@ -814,7 +814,8 @@ def reporte_corrida_pdf(corrida_id: int):
         paradas = rows(conn.execute(
             text(
                 """
-                SELECT motivo, hora_inicio, hora_fin,
+                SELECT hora_inicio, hora_fin, area_proceso, tipo_parada,
+                       equipo_afectado, descripcion_falla,
                        CASE WHEN hora_fin IS NULL THEN NULL
                             ELSE ROUND(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)
                        END AS duracion_minutos
@@ -890,14 +891,14 @@ def reporte_periodo_pdf(desde: str, hasta: str):
             GROUP BY l.proveedor ORDER BY kg DESC LIMIT 12
             """
         ), p))
-        paradas = list(conn.execute(text(
+        paradas = rows(conn.execute(text(
             """
-            SELECT p.motivo, COUNT(*) AS veces,
-                   COALESCE(SUM(CASE WHEN p.hora_fin IS NULL THEN 0
-                        ELSE EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60 END), 0) AS minutos
+            SELECT p.hora_inicio, p.area_proceso, p.tipo_parada,
+                   CASE WHEN p.hora_fin IS NULL THEN 0
+                        ELSE EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60 END AS minutos
             FROM paradas p JOIN corridas c ON c.id = p.corrida_id
             WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
-            GROUP BY p.motivo ORDER BY minutos DESC
+            ORDER BY p.hora_inicio
             """
         ), p))
 
@@ -1190,13 +1191,19 @@ def eliminar_asignacion(asignacion_id: int):
 # ---------------------------------------------------------------------------
 # paradas (tiempos muertos de una corrida)
 # ---------------------------------------------------------------------------
+_PARADA_COLS = (
+    "turno, area_proceso, tipo_parada, equipo_afectado, descripcion_falla, "
+    "responsable_solucion, solucion_obs, recomendacion"
+)
+
+
 @app.get("/api/corridas/{corrida_id}/paradas")
 def listar_paradas(corrida_id: int):
     with engine.connect() as conn:
         result = conn.execute(
             text(
-                """
-                SELECT id, corrida_id, motivo, hora_inicio, hora_fin, observaciones, creado_en,
+                f"""
+                SELECT id, corrida_id, hora_inicio, hora_fin, {_PARADA_COLS}, creado_en,
                        CASE WHEN hora_fin IS NULL THEN NULL
                             ELSE ROUND(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)
                        END AS duracion_minutos
@@ -1210,36 +1217,58 @@ def listar_paradas(corrida_id: int):
         return rows(result)
 
 
-class NuevaParada(BaseModel):
-    corrida_id: int
-    motivo: str
+class DatosParada(BaseModel):
+    turno: Optional[str] = None
     hora_inicio: str
     hora_fin: Optional[str] = None
-    observaciones: Optional[str] = ""
+    area_proceso: Optional[str] = None
+    tipo_parada: Optional[str] = None
+    equipo_afectado: Optional[str] = None
+    descripcion_falla: Optional[str] = None
+    responsable_solucion: Optional[str] = None
+    solucion_obs: Optional[str] = None
+    recomendacion: Optional[str] = None
+
+
+class NuevaParada(DatosParada):
+    corrida_id: int
+
+
+def _params_parada(p: DatosParada):
+    limpio = lambda s: (s.strip() or None) if isinstance(s, str) else s
+    return {
+        "turno": limpio(p.turno),
+        "hora_inicio": p.hora_inicio,
+        "hora_fin": p.hora_fin or None,
+        "area_proceso": limpio(p.area_proceso),
+        "tipo_parada": limpio(p.tipo_parada),
+        "equipo_afectado": limpio(p.equipo_afectado),
+        "descripcion_falla": limpio(p.descripcion_falla),
+        "responsable_solucion": limpio(p.responsable_solucion),
+        "solucion_obs": limpio(p.solucion_obs),
+        "recomendacion": limpio(p.recomendacion),
+    }
 
 
 @app.post("/api/paradas")
 def crear_parada(p: NuevaParada):
-    motivo = p.motivo.strip()
-    if not motivo:
-        raise HTTPException(status_code=400, detail="El motivo de la parada no puede estar vacío.")
+    if not p.hora_inicio:
+        raise HTTPException(status_code=400, detail="La hora de inicio es obligatoria.")
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text(
                     """
-                    INSERT INTO paradas (corrida_id, motivo, hora_inicio, hora_fin, observaciones)
-                    VALUES (:corrida_id, :motivo, :hora_inicio, :hora_fin, :obs)
+                    INSERT INTO paradas
+                        (corrida_id, turno, hora_inicio, hora_fin, area_proceso, tipo_parada,
+                         equipo_afectado, descripcion_falla, responsable_solucion, solucion_obs, recomendacion)
+                    VALUES
+                        (:corrida_id, :turno, :hora_inicio, :hora_fin, :area_proceso, :tipo_parada,
+                         :equipo_afectado, :descripcion_falla, :responsable_solucion, :solucion_obs, :recomendacion)
                     RETURNING id
                     """
                 ),
-                {
-                    "corrida_id": p.corrida_id,
-                    "motivo": motivo,
-                    "hora_inicio": p.hora_inicio,
-                    "hora_fin": p.hora_fin,
-                    "obs": p.observaciones,
-                },
+                {"corrida_id": p.corrida_id, **_params_parada(p)},
             )
             new_id = result.scalar()
         return {"id": new_id, "ok": True}
@@ -1278,35 +1307,25 @@ def cerrar_parada(parada_id: int, p: CerrarParada):
     return {"ok": True}
 
 
-class EditarParada(BaseModel):
-    motivo: str
-    hora_inicio: str
-    hora_fin: Optional[str] = None
-    observaciones: Optional[str] = ""
-
-
 @app.post("/api/paradas/{parada_id}")
-def editar_parada(parada_id: int, p: EditarParada):
-    motivo = p.motivo.strip()
-    if not motivo:
-        raise HTTPException(status_code=400, detail="El motivo de la parada no puede estar vacío.")
+def editar_parada(parada_id: int, p: DatosParada):
+    if not p.hora_inicio:
+        raise HTTPException(status_code=400, detail="La hora de inicio es obligatoria.")
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text(
                     """
-                    UPDATE paradas SET motivo = :motivo, hora_inicio = :hora_inicio,
-                                        hora_fin = :hora_fin, observaciones = :obs
+                    UPDATE paradas SET
+                        turno = :turno, hora_inicio = :hora_inicio, hora_fin = :hora_fin,
+                        area_proceso = :area_proceso, tipo_parada = :tipo_parada,
+                        equipo_afectado = :equipo_afectado, descripcion_falla = :descripcion_falla,
+                        responsable_solucion = :responsable_solucion, solucion_obs = :solucion_obs,
+                        recomendacion = :recomendacion
                     WHERE id = :id RETURNING id
                     """
                 ),
-                {
-                    "id": parada_id,
-                    "motivo": motivo,
-                    "hora_inicio": p.hora_inicio,
-                    "hora_fin": p.hora_fin,
-                    "obs": p.observaciones,
-                },
+                {"id": parada_id, **_params_parada(p)},
             )
             if result.scalar() is None:
                 raise HTTPException(status_code=404, detail="Parada no encontrada.")
@@ -1552,11 +1571,12 @@ def exportar_xlsx():
         )))
         _hoja_xlsx(wb, "Paradas", conn.execute(text(
             """
-            SELECT c.nombre AS corrida, p.motivo, p.hora_inicio, p.hora_fin,
+            SELECT c.nombre AS corrida, p.turno, p.hora_inicio, p.hora_fin,
                    CASE WHEN p.hora_fin IS NULL THEN NULL
                         ELSE ROUND(EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60)
-                   END AS duracion_min,
-                   p.observaciones
+                   END AS min_total,
+                   p.area_proceso, p.tipo_parada, p.equipo_afectado, p.descripcion_falla,
+                   p.responsable_solucion, p.solucion_obs, p.recomendacion
             FROM paradas p
             JOIN corridas c ON c.id = p.corrida_id
             ORDER BY c.fecha_inicio, p.hora_inicio

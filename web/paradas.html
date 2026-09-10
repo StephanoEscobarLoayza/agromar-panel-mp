@@ -39,7 +39,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Paradas</h1>
-    <p class="hero-sub">Motivo, hora de inicio y de fin de cada tiempo muerto — para saber cuánto se pierde y por qué.</p>
+    <p class="hero-sub">Turno, horas, área, tipo, equipo y solución de cada tiempo muerto — para saber cuánto se pierde y por qué.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -56,26 +56,25 @@
           <select id="corrida"></select>
         </div>
 
-        <div class="field">
-          <label for="motivo">Motivo</label>
-          <input type="text" id="motivo" placeholder="ej. falla mecánica, falta de MP, limpieza, cambio de producto">
+        <div class="two-col">
+          <div class="field"><label for="turno">Turno</label><select id="turno"></select></div>
+          <div class="field"><label for="area">Área / proceso</label><select id="area"></select></div>
         </div>
 
         <div class="two-col">
-          <div class="field">
-            <label for="horaInicio">Hora de inicio</label>
-            <input type="datetime-local" id="horaInicio">
-          </div>
-          <div class="field">
-            <label for="horaFin">Hora de fin (déjalo vacío si sigue en curso)</label>
-            <input type="datetime-local" id="horaFin">
-          </div>
+          <div class="field"><label for="horaInicio">Hora de inicio</label><input type="datetime-local" id="horaInicio"></div>
+          <div class="field"><label for="horaFin">Hora de fin <span style="font-weight:400;color:var(--text-muted)">(vacío = en curso)</span></label><input type="datetime-local" id="horaFin"></div>
         </div>
 
-        <div class="field">
-          <label for="obs">Observaciones</label>
-          <input type="text" id="obs" placeholder="opcional">
+        <div class="two-col">
+          <div class="field"><label for="tipo">Tipo de parada</label><select id="tipo"></select></div>
+          <div class="field"><label for="responsable">Responsable de solución</label><select id="responsable"></select></div>
         </div>
+
+        <div class="field"><label for="equipo">Equipo afectado</label><input type="text" id="equipo" placeholder="ej. Elevador transportadora inclinada"></div>
+        <div class="field"><label for="descFalla">Descripción de la falla</label><textarea id="descFalla" rows="2" placeholder="qué pasó"></textarea></div>
+        <div class="field"><label for="solucion">Solución y/o observaciones</label><textarea id="solucion" rows="2" placeholder="cómo se resolvió"></textarea></div>
+        <div class="field"><label for="recomendacion">Recomendación</label><textarea id="recomendacion" rows="2" placeholder="para evitar que se repita"></textarea></div>
 
         <div id="mensaje"></div>
         <button class="btn" id="btnGuardar">Registrar parada</button>
@@ -87,8 +86,8 @@
       <div class="running-total" id="totalParadas" style="padding:16px 20px 0"><span class="num">—</span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Motivo</th><th>Inicio</th><th>Fin</th><th class="right">Duración</th><th></th></tr></thead>
-          <tbody id="lista"><tr><td colspan="5" class="empty">Elige una corrida</td></tr></tbody>
+          <thead><tr><th>Inicio</th><th>Fin</th><th class="right">Duración</th><th>Área</th><th>Tipo</th><th>Falla</th><th></th></tr></thead>
+          <tbody id="lista"><tr><td colspan="7" class="empty">Elige una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -118,15 +117,37 @@
 
 <script src="app.js"></script>
 <script>
-const corridaSel = document.getElementById("corrida");
-const motivoInput = document.getElementById("motivo");
-const horaInicioInput = document.getElementById("horaInicio");
-const horaFinInput = document.getElementById("horaFin");
-const obsInput = document.getElementById("obs");
+const TURNOS = ["DÍA", "NOCHE"];
+const AREAS = ["Abastecimiento", "Extracción", "Estandarizado", "Concentrador", "Caldero"];
+const TIPOS = ["Mecánico", "Eléctrico", "Operativo", "Limpieza/CIP", "Calidad", "Espera producción", "Falta material"];
+const RESPONSABLES = ["Mantenimiento", "Maquinista"];
+
+const F = {
+  corrida: document.getElementById("corrida"),
+  turno: document.getElementById("turno"),
+  area: document.getElementById("area"),
+  tipo: document.getElementById("tipo"),
+  responsable: document.getElementById("responsable"),
+  inicio: document.getElementById("horaInicio"),
+  fin: document.getElementById("horaFin"),
+  equipo: document.getElementById("equipo"),
+  descFalla: document.getElementById("descFalla"),
+  solucion: document.getElementById("solucion"),
+  recomendacion: document.getElementById("recomendacion"),
+};
 const mensaje = document.getElementById("mensaje");
 const btnGuardar = document.getElementById("btnGuardar");
 const lista = document.getElementById("lista");
 const totalParadas = document.getElementById("totalParadas");
+
+function opciones(vals, vacio) {
+  return (vacio ? `<option value="">${vacio}</option>` : "") +
+    vals.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v === "DÍA" ? "Día" : v === "NOCHE" ? "Noche" : v)}</option>`).join("");
+}
+F.turno.innerHTML = opciones(TURNOS, "— elige —");
+F.area.innerHTML = opciones(AREAS, "— elige —");
+F.tipo.innerHTML = opciones(TIPOS, "— elige —");
+F.responsable.innerHTML = opciones(RESPONSABLES, "—");
 
 function fmtMinutos(min) {
   if (min === null || min === undefined) return "—";
@@ -134,31 +155,33 @@ function fmtMinutos(min) {
   const m = Math.round(min % 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
-
-function fmtHora(iso) {
-  if (!iso) return "—";
-  return fmtDate(iso);
+function fmtHora(iso) { return iso ? fmtDate(iso) : "—"; }
+function isoAInputLocal(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
 }
 
 async function cargarCorridas() {
   const corridas = await apiGet("/api/corridas?abiertas=true");
   if (corridas.length === 0) {
-    corridaSel.innerHTML = '<option value="">No hay corridas abiertas</option>';
-    lista.innerHTML = '<tr><td colspan="5" class="empty">No hay corridas abiertas</td></tr>';
+    F.corrida.innerHTML = '<option value="">No hay corridas abiertas</option>';
+    lista.innerHTML = '<tr><td colspan="7" class="empty">No hay corridas abiertas</td></tr>';
     totalParadas.innerHTML = "";
     return;
   }
-  corridaSel.innerHTML = corridas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("");
-  horaInicioInput.value = ahoraLocal();
+  F.corrida.innerHTML = corridas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("");
+  F.inicio.value = ahoraLocal();
   cargarParadas();
 }
 
 async function cargarParadas() {
-  const corridaId = corridaSel.value;
+  const corridaId = F.corrida.value;
   if (!corridaId) return;
   const paradas = await apiGet(`/api/corridas/${corridaId}/paradas`);
   if (paradas.length === 0) {
-    lista.innerHTML = '<tr><td colspan="5" class="empty">Sin paradas todavía</td></tr>';
+    lista.innerHTML = '<tr><td colspan="7" class="empty">Sin paradas todavía</td></tr>';
     totalParadas.innerHTML = '<span class="num">0m</span> paradas en esta corrida';
     return;
   }
@@ -167,25 +190,55 @@ async function cargarParadas() {
   totalParadas.innerHTML = `<span class="num">${fmtMinutos(totalMin)}</span> parados en ${paradas.length} parada(s)${enCurso ? " · hay una en curso" : ""}`;
 
   lista.innerHTML = paradas.map(p => `
-    <tr data-parada-id="${p.id}" data-motivo="${escapeHtml(p.motivo)}" data-inicio="${p.hora_inicio}" data-fin="${p.hora_fin || ""}">
-      <td data-celda="motivo">${escapeHtml(p.motivo)}</td>
-      <td data-celda="inicio">${fmtHora(p.hora_inicio)}</td>
-      <td data-celda="fin">${p.hora_fin ? fmtHora(p.hora_fin) : '<span class="tag">en curso</span>'}</td>
+    <tr data-parada-id="${p.id}">
+      <td>${fmtHora(p.hora_inicio)}</td>
+      <td>${p.hora_fin ? fmtHora(p.hora_fin) : '<span class="tag">en curso</span>'}</td>
       <td class="right num">${fmtMinutos(p.duracion_minutos)}</td>
-      <td class="right" data-celda="acciones" style="white-space:nowrap">
+      <td>${escapeHtml(p.area_proceso || "—")}</td>
+      <td>${escapeHtml(p.tipo_parada || "—")}</td>
+      <td>${escapeHtml(p.descripcion_falla || p.equipo_afectado || "—")}</td>
+      <td class="right" style="white-space:nowrap">
         ${p.hora_fin === null ? `<button class="btn-link strong" data-accion="cerrar" data-id="${p.id}">Cerrar</button>` : ""}
         <button class="btn-link" data-accion="editar" data-id="${p.id}" title="Editar">✎</button>
         <button class="btn-link btn-link-bad" data-accion="eliminar" data-id="${p.id}" title="Eliminar">✕</button>
       </td>
     </tr>
   `).join("");
+  lista._paradas = Object.fromEntries(paradas.map(p => [p.id, p]));
 }
 
-function isoAInputLocal(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
+function filaEdicion(p) {
+  const sel = (id, vals, val, vacio) =>
+    `<select class="ed-${id}" style="width:100%">` +
+    (vacio ? `<option value=""${val ? "" : " selected"}>${vacio}</option>` : "") +
+    vals.map(v => `<option value="${escapeHtml(v)}"${v === val ? " selected" : ""}>${escapeHtml(v === "DÍA" ? "Día" : v === "NOCHE" ? "Noche" : v)}</option>`).join("") +
+    `</select>`;
+  const inp = (id, val, tipo) => `<input type="${tipo || "text"}" class="ed-${id}" value="${escapeHtml(val || "")}" style="width:100%">`;
+  const ta = (id, val) => `<textarea class="ed-${id}" rows="2" style="width:100%">${escapeHtml(val || "")}</textarea>`;
+  return `<tr><td colspan="7" style="background:var(--surface-2)">
+    <div class="form-body" style="padding:14px 4px">
+      <div class="two-col">
+        <div class="field"><label>Turno</label>${sel("turno", TURNOS, p.turno, "— elige —")}</div>
+        <div class="field"><label>Área / proceso</label>${sel("area", AREAS, p.area_proceso, "— elige —")}</div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Hora de inicio</label>${inp("inicio", isoAInputLocal(p.hora_inicio), "datetime-local")}</div>
+        <div class="field"><label>Hora de fin</label>${inp("fin", isoAInputLocal(p.hora_fin), "datetime-local")}</div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Tipo de parada</label>${sel("tipo", TIPOS, p.tipo_parada, "— elige —")}</div>
+        <div class="field"><label>Responsable de solución</label>${sel("resp", RESPONSABLES, p.responsable_solucion, "—")}</div>
+      </div>
+      <div class="field"><label>Equipo afectado</label>${inp("equipo", p.equipo_afectado)}</div>
+      <div class="field"><label>Descripción de la falla</label>${ta("desc", p.descripcion_falla)}</div>
+      <div class="field"><label>Solución y/o observaciones</label>${ta("sol", p.solucion_obs)}</div>
+      <div class="field"><label>Recomendación</label>${ta("rec", p.recomendacion)}</div>
+      <div class="two-col">
+        <button class="btn" data-accion="guardar" data-id="${p.id}">Guardar cambios</button>
+        <button class="btn" data-accion="cancelar" style="background:var(--surface-2);color:var(--text)">Cancelar</button>
+      </div>
+    </div>
+  </td></tr>`;
 }
 
 lista.addEventListener("click", async (ev) => {
@@ -193,84 +246,67 @@ lista.addEventListener("click", async (ev) => {
   if (!btn) return;
   const id = btn.dataset.id;
   const fila = btn.closest("tr");
+  const accion = btn.dataset.accion;
 
-  if (btn.dataset.accion === "cerrar") {
-    try {
-      await apiPost(`/api/paradas/${id}/cerrar`, { hora_fin: ahoraLocal() });
-      cargarParadas();
-    } catch (e) {
-      alert(e.message);
-    }
-  } else if (btn.dataset.accion === "eliminar") {
+  if (accion === "cerrar") {
+    try { await apiPost(`/api/paradas/${id}/cerrar`, { hora_fin: ahoraLocal() }); cargarParadas(); }
+    catch (e) { alert(e.message); }
+  } else if (accion === "eliminar") {
     if (!confirm("¿Eliminar esta parada?")) return;
-    try {
-      await apiDelete(`/api/paradas/${id}`);
-      cargarParadas();
-    } catch (e) {
-      alert(e.message);
-    }
-  } else if (btn.dataset.accion === "editar") {
-    fila.querySelector('[data-celda="motivo"]').innerHTML =
-      `<input type="text" class="edit-motivo" value="${fila.dataset.motivo}" style="width:100%">`;
-    fila.querySelector('[data-celda="inicio"]').innerHTML =
-      `<input type="datetime-local" class="edit-inicio" value="${isoAInputLocal(fila.dataset.inicio)}">`;
-    fila.querySelector('[data-celda="fin"]').innerHTML =
-      `<input type="datetime-local" class="edit-fin" value="${isoAInputLocal(fila.dataset.fin)}">`;
-    fila.querySelector('[data-celda="acciones"]').innerHTML = `
-      <button class="btn-link strong" data-accion="guardar" data-id="${id}">Guardar</button>
-      <button class="btn-link" data-accion="cancelar" data-id="${id}">Cancelar</button>
-    `;
-  } else if (btn.dataset.accion === "cancelar") {
+    try { await apiDelete(`/api/paradas/${id}`); cargarParadas(); }
+    catch (e) { alert(e.message); }
+  } else if (accion === "editar") {
+    const p = lista._paradas[id];
+    fila.insertAdjacentHTML("afterend", filaEdicion(p));
+    fila.style.display = "none";
+  } else if (accion === "cancelar") {
     cargarParadas();
-  } else if (btn.dataset.accion === "guardar") {
-    const motivo = fila.querySelector(".edit-motivo").value.trim();
-    const inicio = fila.querySelector(".edit-inicio").value;
-    const fin = fila.querySelector(".edit-fin").value || null;
-    if (!motivo) { alert("El motivo no puede estar vacío."); return; }
+  } else if (accion === "guardar") {
+    const wrap = btn.closest("td");
+    const v = c => wrap.querySelector("." + c);
+    const inicio = v("ed-inicio").value;
     if (!inicio) { alert("La hora de inicio es obligatoria."); return; }
     try {
-      await apiPost(`/api/paradas/${id}`, { motivo, hora_inicio: inicio, hora_fin: fin, observaciones: "" });
+      await apiPost(`/api/paradas/${id}`, {
+        turno: v("ed-turno").value, hora_inicio: inicio, hora_fin: v("ed-fin").value || null,
+        area_proceso: v("ed-area").value, tipo_parada: v("ed-tipo").value,
+        equipo_afectado: v("ed-equipo").value, descripcion_falla: v("ed-desc").value,
+        responsable_solucion: v("ed-resp").value, solucion_obs: v("ed-sol").value,
+        recomendacion: v("ed-rec").value,
+      });
       cargarParadas();
-    } catch (e) {
-      alert(e.message);
-    }
+    } catch (e) { alert(e.message); }
   }
 });
 
-corridaSel.addEventListener("change", cargarParadas);
+F.corrida.addEventListener("change", cargarParadas);
 
 btnGuardar.addEventListener("click", async () => {
-  const motivo = motivoInput.value.trim();
-  const horaInicio = horaInicioInput.value;
-  const horaFin = horaFinInput.value || null;
-
-  if (!corridaSel.value) {
-    mensaje.innerHTML = '<div class="msg bad">Elige una corrida.</div>';
-    return;
-  }
-  if (!motivo) {
-    mensaje.innerHTML = '<div class="msg bad">Escribe el motivo de la parada.</div>';
-    return;
-  }
-  if (!horaInicio) {
-    mensaje.innerHTML = '<div class="msg bad">Ingresa la hora de inicio.</div>';
-    return;
-  }
+  if (!F.corrida.value) { mensaje.innerHTML = '<div class="msg bad">Elige una corrida.</div>'; return; }
+  if (!F.turno.value) { mensaje.innerHTML = '<div class="msg bad">Elige el turno.</div>'; return; }
+  if (!F.inicio.value) { mensaje.innerHTML = '<div class="msg bad">Ingresa la hora de inicio.</div>'; return; }
+  if (!F.area.value) { mensaje.innerHTML = '<div class="msg bad">Elige el área / proceso.</div>'; return; }
+  if (!F.tipo.value) { mensaje.innerHTML = '<div class="msg bad">Elige el tipo de parada.</div>'; return; }
 
   btnGuardar.disabled = true;
   try {
     await apiPost("/api/paradas", {
-      corrida_id: Number(corridaSel.value),
-      motivo,
-      hora_inicio: horaInicio,
-      hora_fin: horaFin,
-      observaciones: obsInput.value || "",
+      corrida_id: Number(F.corrida.value),
+      turno: F.turno.value,
+      hora_inicio: F.inicio.value,
+      hora_fin: F.fin.value || null,
+      area_proceso: F.area.value,
+      tipo_parada: F.tipo.value,
+      equipo_afectado: F.equipo.value,
+      descripcion_falla: F.descFalla.value,
+      responsable_solucion: F.responsable.value,
+      solucion_obs: F.solucion.value,
+      recomendacion: F.recomendacion.value,
     });
     mensaje.innerHTML = '<div class="msg ok">Parada registrada.</div>';
-    motivoInput.value = "";
-    obsInput.value = "";
-    horaFinInput.value = "";
-    horaInicioInput.value = ahoraLocal();
+    ["equipo", "descFalla", "solucion", "recomendacion"].forEach(k => F[k].value = "");
+    F.fin.value = "";
+    F.inicio.value = ahoraLocal();
     cargarParadas();
   } catch (e) {
     mensaje.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
