@@ -13,25 +13,34 @@
   body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
   .login-bg{position:fixed;inset:0;z-index:0;
     background:var(--forest) url("/login-bg.jpg") center/cover no-repeat;
-    filter:blur(6px) saturate(1.05);transform:scale(1.09)}
+    filter:blur(3px) saturate(1.12) brightness(1.02);transform:scale(1.06)}
+  /* dos capas: un tinte forest suave parejo + un viñeteado que oscurece solo
+     los bordes, así la foto se ve pero el marco queda contenido */
   .login-bg::after{content:"";position:absolute;inset:0;
-    background:linear-gradient(155deg,rgba(18,53,36,.55),rgba(18,53,36,.84))}
+    background:
+      radial-gradient(135% 130% at 50% 32%, rgba(18,53,36,.10) 0%, rgba(18,53,36,.44) 52%, rgba(12,36,25,.80) 100%),
+      linear-gradient(180deg, rgba(18,53,36,.28), rgba(18,53,36,.20))}
   .login-dots{position:fixed;inset:0;z-index:1;pointer-events:none;
-    background-image:radial-gradient(rgba(244,239,224,.09) 1px,transparent 1.4px);background-size:16px 16px;opacity:.5;
-    mask-image:linear-gradient(120deg,#000 0%,#000 38%,transparent 72%)}
-  .login-card{position:relative;z-index:2;width:100%;max-width:380px;
-    background:var(--surface);border:1px solid var(--border);border-radius:18px;
-    box-shadow:0 24px 60px rgba(0,0,0,.35);padding:32px 30px 28px}
-  .login-mark{display:flex;align-items:baseline;gap:2px;font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:28px}
+    background-image:radial-gradient(rgba(244,239,224,.07) 1px,transparent 1.4px);background-size:18px 18px;opacity:.45;
+    mask-image:linear-gradient(120deg,#000 0%,#000 34%,transparent 66%)}
+  .login-card{position:relative;z-index:2;width:100%;max-width:404px;overflow:hidden;
+    background:var(--surface);border-radius:20px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 30px 70px rgba(8,24,16,.45), 0 6px 18px rgba(8,24,16,.25);
+    padding:38px 36px 30px}
+  .login-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;
+    background:linear-gradient(90deg,var(--citrus),var(--forest-2))}
+  .login-mark{display:flex;align-items:baseline;gap:2px;font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:29px}
   .login-mark .agro{color:var(--citrus)}
   .login-mark .mar{color:var(--text)}
   .login-mark .dot{width:8px;height:8px;border-radius:50%;background:var(--citrus);display:inline-block;margin:0 3px 5px}
-  .login-sub{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
-  .login-title{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;margin:22px 0 4px}
-  .login-hint{font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+  .login-sub{font-size:11px;letter-spacing:.17em;text-transform:uppercase;color:var(--text-muted);margin-top:3px}
+  .login-title{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:600;margin:24px 0 5px;line-height:1.15}
+  .login-hint{font-size:13px;color:var(--text-2);margin-bottom:20px;line-height:1.55}
   .login-card label{font-size:12px;color:var(--text-2);font-weight:600;display:block;margin-bottom:6px}
+  .login-card input{padding:12px 13px}
   #msg .msg{margin-top:14px}
-  .login-foot{margin-top:20px;font-size:11px;color:var(--text-muted);text-align:center;letter-spacing:.06em;text-transform:uppercase}
+  .login-foot{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);
+    font-family:'Fraunces',Georgia,serif;font-style:italic;font-size:13px;color:var(--foot-accent);text-align:center;letter-spacing:.01em;text-transform:none}
 </style>
 </head>
 <body>
