@@ -138,7 +138,8 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
-        "Esto es lo que el sistema calcula en vivo (peso neto menos lo ya asignado a corridas) - no reemplaza un conteo físico real. "
+        "Cálculo en vivo del sistema (peso neto menos lo ya asignado a corridas), para ir siguiendo el stock mientras dura la "
+        "campaña. El conteo físico real de la MP se hace al cierre y ese es el número que manda. "
         "Solo se cuentan lotes \"En proceso\" o \"En espera\" - un lote \"Procesado\" con algo de saldo casi siempre es ruido de "
         "medición de Trazabilidad, no materia prima real disponible para usar.",
         style_footnote,
