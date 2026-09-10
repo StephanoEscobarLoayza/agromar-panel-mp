@@ -165,10 +165,10 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     if stock_cierre is not None:
         kpis.append(("Stock de MP en piso al cierre", f"{fmt_kg(float(stock_cierre))} kg", TEXT))
     if brix_medido is not None:
-        kpis.append(("Brix real (medido)", fmt_num(brix_medido, 2), OK))
+        kpis.append(("Brix final (medido)", fmt_num(brix_medido, 2), OK))
         if brix_inicial_medido is not None:
             kpis.append(("Brix inicial (medido)", fmt_num(brix_inicial_medido, 2), TEXT))
-        kpis.append(("Ratio real (medido)", fmt_num(ratio_medido, 2), OK))
+        kpis.append(("Ratio", fmt_num(ratio_medido, 2), OK))
     elif brix_prom is not None:
         kpis.append(("Brix ponderado (estimado)", fmt_num(brix_prom, 2), TEXT))
         if ratio_prom is not None:
