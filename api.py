@@ -28,6 +28,7 @@ from sqlalchemy import create_engine, text
 from sync_lotes import sincronizar_lotes
 from reporte_base import ahora_peru
 from reporte_corrida import generar_reporte_pdf
+from reporte_periodo import generar_reporte_periodo_pdf
 from reporte_stock import generar_reporte_stock_pdf
 
 BASE_DIR = Path(__file__).parent
@@ -844,6 +845,69 @@ def reporte_corrida_pdf(corrida_id: int):
             # para esta misma URL (mismo link "Reporte PDF" siempre) y mostrar
             # datos desactualizados aunque la corrida ya tenga registros nuevos
             # (ej. tanques medidos agregados después de la ultima vez que se abrio).
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.get("/api/reporte-periodo.pdf")
+def reporte_periodo_pdf(desde: str, hasta: str):
+    """Resumen de producción de un rango de fechas: MP procesada, corridas,
+    tipos de proceso, producto terminado, proveedores y paradas. Las corridas
+    se agrupan por su fecha de inicio; `hasta` cuenta el día completo."""
+    try:
+        d_desde = datetime.strptime(desde, "%Y-%m-%d").date()
+        d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fechas inválidas (usa AAAA-MM-DD).")
+    if d_desde > d_hasta:
+        raise HTTPException(status_code=400, detail="La fecha 'desde' no puede ser posterior a 'hasta'.")
+    p = {"d": d_desde, "h": d_hasta + timedelta(days=1)}
+
+    with engine.connect() as conn:
+        corridas = rows(conn.execute(text(
+            """
+            SELECT v.*, c.rendimiento
+            FROM v_cuadre_corridas v JOIN corridas c ON c.id = v.id
+            WHERE v.fecha_inicio >= :d AND v.fecha_inicio < :h
+            ORDER BY v.fecha_inicio
+            """
+        ), p))
+        productos = rows(conn.execute(text(
+            """
+            SELECT c.nombre AS corrida, p.producto, p.pt_kg, p.volumen_litros
+            FROM corrida_productos p JOIN corridas c ON c.id = p.corrida_id
+            WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
+            """
+        ), p))
+        proveedores = list(conn.execute(text(
+            """
+            SELECT l.proveedor, SUM(a.kg_asignados) AS kg
+            FROM asignaciones a
+            JOIN corridas c ON c.id = a.corrida_id
+            JOIN lotes l ON l.numero = a.lote_numero
+            WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h AND a.kg_asignados IS NOT NULL
+            GROUP BY l.proveedor ORDER BY kg DESC LIMIT 12
+            """
+        ), p))
+        paradas = list(conn.execute(text(
+            """
+            SELECT p.motivo, COUNT(*) AS veces,
+                   COALESCE(SUM(CASE WHEN p.hora_fin IS NULL THEN 0
+                        ELSE EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60 END), 0) AS minutos
+            FROM paradas p JOIN corridas c ON c.id = p.corrida_id
+            WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
+            GROUP BY p.motivo ORDER BY minutos DESC
+            """
+        ), p))
+
+    pdf_bytes = generar_reporte_periodo_pdf(d_desde, d_hasta, corridas, productos, proveedores, paradas)
+    nombre = f"resumen-{d_desde.strftime('%Y%m%d')}-a-{d_hasta.strftime('%Y%m%d')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{nombre}"',
             "Cache-Control": "no-store",
         },
     )

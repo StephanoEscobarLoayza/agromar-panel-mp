@@ -50,6 +50,31 @@
   <div class="kpis" id="kpis"></div>
 
   <section>
+    <div class="section-head"><h2>Reporte por período</h2></div>
+    <div class="panel">
+      <div class="form-body">
+        <p class="hint-line">
+          Resumen de toda la producción entre dos fechas — MP procesada, corridas,
+          tipos de proceso, producto terminado, proveedores y paradas. Las corridas
+          se agrupan por su fecha de inicio.
+        </p>
+        <div class="chips" style="margin-bottom:2px">
+          <button type="button" class="chip-filter" data-preset="semana">Esta semana</button>
+          <button type="button" class="chip-filter" data-preset="mes">Este mes</button>
+          <button type="button" class="chip-filter" data-preset="mespasado">Mes pasado</button>
+          <button type="button" class="chip-filter" data-preset="campana">Toda la campaña</button>
+        </div>
+        <div class="two-col">
+          <div class="field"><label for="repDesde">Desde</label><input type="date" id="repDesde"></div>
+          <div class="field"><label for="repHasta">Hasta</label><input type="date" id="repHasta"></div>
+        </div>
+        <div id="repMsg"></div>
+        <button class="btn" id="btnReportePeriodo">Generar PDF</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <div class="section-head">
       <h2>Corridas</h2>
       <button class="btn" id="btnMostrarForm" style="width:auto;padding:8px 16px">+ Nueva corrida</button>
@@ -394,6 +419,63 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       alert(e.message);
     }
   }
+});
+
+// ---------- reporte por período ----------
+const repDesde = document.getElementById("repDesde");
+const repHasta = document.getElementById("repHasta");
+const repMsg = document.getElementById("repMsg");
+
+function isoFecha(d) {
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function aplicarPreset(preset) {
+  const hoy = new Date();
+  let desde, hasta = hoy;
+  if (preset === "semana") {
+    desde = new Date(hoy);
+    const dow = (hoy.getDay() + 6) % 7;            // 0 = lunes
+    desde.setDate(hoy.getDate() - dow);
+  } else if (preset === "mes") {
+    desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  } else if (preset === "mespasado") {
+    desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);  // último día del mes pasado
+  } else {                                          // campaña
+    desde = new Date(2026, 6, 1);                   // 1 de julio 2026
+  }
+  repDesde.value = isoFecha(desde);
+  repHasta.value = isoFecha(hasta);
+}
+aplicarPreset("mes");
+document.querySelector('.chip-filter[data-preset="mes"]').classList.add("active");
+
+document.querySelectorAll(".chip-filter[data-preset]").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".chip-filter[data-preset]").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    aplicarPreset(b.dataset.preset);
+    repMsg.innerHTML = "";
+  });
+});
+[repDesde, repHasta].forEach(inp => inp.addEventListener("input", () => {
+  document.querySelectorAll(".chip-filter[data-preset]").forEach(x => x.classList.remove("active"));
+  repMsg.innerHTML = "";
+}));
+
+document.getElementById("btnReportePeriodo").addEventListener("click", () => {
+  if (!repDesde.value || !repHasta.value) {
+    repMsg.innerHTML = '<div class="msg bad">Elige la fecha "desde" y "hasta".</div>';
+    return;
+  }
+  if (repDesde.value > repHasta.value) {
+    repMsg.innerHTML = '<div class="msg bad">La fecha "desde" no puede ser posterior a "hasta".</div>';
+    return;
+  }
+  repMsg.innerHTML = "";
+  const url = `/api/reporte-periodo.pdf?desde=${repDesde.value}&hasta=${repHasta.value}&t=${Date.now()}`;
+  window.open(url, "_blank", "noopener");
 });
 
 // PT kg en vivo mientras se llena tambores/peso en cualquier panel de productos
