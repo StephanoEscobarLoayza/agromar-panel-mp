@@ -81,9 +81,18 @@
     </div>
     <div class="panel" style="margin-top:0">
       <div class="form-body">
-        <div class="field">
-          <label for="corridaSelect">Corrida en curso</label>
-          <select id="corridaSelect"><option value="">Cargando…</option></select>
+        <div class="two-col">
+          <div class="field">
+            <label for="corridaSelect">Corrida en curso</label>
+            <select id="corridaSelect"><option value="">Cargando…</option></select>
+          </div>
+          <div class="field">
+            <label for="modoSiguienteBin">Elegir el siguiente bin por</label>
+            <select id="modoSiguienteBin">
+              <option value="fecha">Fecha (el que sigue en la cola)</option>
+              <option value="calidad">Calidad (el que más ayuda al Brix/Ratio)</option>
+            </select>
+          </div>
         </div>
         <button class="btn" id="btnSiguienteBin" style="width:auto;padding:11px 22px">Calcular siguiente bin</button>
       </div>
@@ -282,16 +291,20 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
     </div>
   `;
 
+  const porCalidad = r.modo === "calidad";
+  const refSingular = porCalidad ? "el bin que más ayuda al Brix/Ratio" : "el siguiente en tu cola";
+  const refPlural = porCalidad ? "los bines que más ayudan al Brix/Ratio" : "los siguientes en tu cola";
+
   let mensajeSiguiente;
   const filasBines = r.pasos_bines.map((p, i) => filaHtml(p, i === r.pasos_bines.length - 1 && r.cumplido)).join("");
   if (r.cumplido_ya) {
     if (r.pasos_bines.length === 0) {
       mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas — y no hay más bines en espera para seguir la cola.</div>`;
     } else if (r.cumplido) {
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. En planta siempre corren 2 bines a la vez, así que ${r.pasos_bines.length > 1 ? "estos son los siguientes en tu cola" : "este es el siguiente en tu cola"} para cuando se acabe el que está activo — la mezcla se mantiene sobre el mínimo.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. En planta siempre corren 2 bines a la vez, así que ${r.pasos_bines.length > 1 ? refPlural : refSingular} para cuando se acabe el que está activo — la mezcla se mantiene sobre el mínimo.</div>`;
     } else {
       const ultimo = r.pasos_bines[r.pasos_bines.length - 1];
-      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: en planta siempre corren 2 bines a la vez, y metiendo ${r.pasos_bines.length > 1 ? "estos 2 lotes de tu cola" : "el siguiente lote de tu cola"} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, por debajo del mínimo.</div>`;
+      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: en planta siempre corren 2 bines a la vez, y metiendo ${r.pasos_bines.length > 1 ? refPlural : refSingular} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, por debajo del mínimo${porCalidad ? " — ni eligiendo el mejor de los disponibles alcanza" : ""}.</div>`;
     }
   } else if (r.cumplido) {
     mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${r.pasos_bines.length} lote(s) de bines más se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin}.</div>`;
@@ -309,7 +322,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
       ${tablaHtml(r.ya_alimentado.map((p) => filaHtml(p, false)).join(""))}
     </div>
     <div class="panel" style="margin-top:16px">
-      <div class="panel-head"><h3>El siguiente bin</h3></div>
+      <div class="panel-head"><h3>El siguiente bin — ${porCalidad ? "por calidad" : "por fecha"}</h3></div>
       ${mensajeSiguiente}
       ${filasBines ? tablaHtml(filasBines) : ""}
     </div>
@@ -329,10 +342,12 @@ async function calcularSiguienteBin() {
     return;
   }
 
+  const modo = document.getElementById("modoSiguienteBin").value;
+
   btnSiguienteBin.disabled = true;
   resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Calculando…</div></div>';
   try {
-    const r = await apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=${brixMin}&ratio_min=${ratioMin}`);
+    const r = await apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=${brixMin}&ratio_min=${ratioMin}&modo=${modo}`);
     resultadoSiguienteBin.innerHTML = bloqueSiguienteBin(r, brixMin, ratioMin);
   } catch (e) {
     resultadoSiguienteBin.innerHTML = `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">${escapeHtml(e.message)}</div></div>`;
