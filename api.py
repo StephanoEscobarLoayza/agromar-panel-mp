@@ -1213,7 +1213,7 @@ class NuevaMedicionTanque(BaseModel):
     corrida_id: int
     tanque: str
     litros: Optional[float] = None
-    brix_inicial: Optional[float] = None
+    brix_inicial: float  # obligatorio - el equipo usa el promedio del inicial como referencia
     brix_final: float
     acidez: float
     ph: Optional[float] = None
@@ -1225,6 +1225,8 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
     tanque = m.tanque.strip()
     if not tanque:
         raise HTTPException(status_code=400, detail="Escribe qué tanque es (ej. TK1).")
+    if m.brix_inicial <= 0:
+        raise HTTPException(status_code=400, detail="El Brix inicial debe ser mayor a 0.")
     if m.brix_final <= 0:
         raise HTTPException(status_code=400, detail="El Brix final debe ser mayor a 0.")
     if m.acidez <= 0:
@@ -1263,7 +1265,7 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
 class EditarMedicionTanque(BaseModel):
     tanque: str
     litros: Optional[float] = None
-    brix_inicial: Optional[float] = None
+    brix_inicial: float
     brix_final: float
     acidez: float
     ph: Optional[float] = None
@@ -1275,6 +1277,8 @@ def editar_medicion_tanque(medicion_id: int, m: EditarMedicionTanque):
     tanque = m.tanque.strip()
     if not tanque:
         raise HTTPException(status_code=400, detail="Escribe qué tanque es (ej. TK1).")
+    if m.brix_inicial <= 0:
+        raise HTTPException(status_code=400, detail="El Brix inicial debe ser mayor a 0.")
     if m.brix_final <= 0:
         raise HTTPException(status_code=400, detail="El Brix final debe ser mayor a 0.")
     if m.acidez <= 0:

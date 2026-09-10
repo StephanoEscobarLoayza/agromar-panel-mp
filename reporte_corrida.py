@@ -114,7 +114,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # estandarización, así que en cuanto hay UNA medición real, esa es la
     # que se muestra (ver comentario en schema.sql, tabla mediciones_tanque).
     mediciones = mediciones or []
-    brix_medido = ratio_medido = None
+    brix_medido = ratio_medido = brix_inicial_medido = None
     if mediciones:
         litros_pond = sum(float(m.get("litros") or 1) for m in mediciones)
         brix_pond_med = sum(float(m.get("litros") or 1) * float(m["brix_final"]) for m in mediciones)
@@ -122,6 +122,14 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         brix_medido = brix_pond_med / litros_pond
         acidez_medido = acidez_pond_med / litros_pond
         ratio_medido = brix_medido / acidez_medido if acidez_medido > 0 else None
+        # Brix inicial promedio (ponderado por litros) - solo informativo, el
+        # número principal sigue siendo el final. Cuenta solo los tanques que
+        # tienen inicial cargado (los históricos podrían no tenerlo).
+        med_con_ini = [m for m in mediciones if m.get("brix_inicial") is not None]
+        if med_con_ini:
+            litros_ini = sum(float(m.get("litros") or 1) for m in med_con_ini)
+            brix_ini_pond = sum(float(m.get("litros") or 1) * float(m["brix_inicial"]) for m in med_con_ini)
+            brix_inicial_medido = brix_ini_pond / litros_ini
 
     pt_total = sum(float(p["pt_kg"]) for p in productos if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in productos if p.get("volumen_litros") is not None)
@@ -158,6 +166,8 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         kpis.append(("Stock de MP en piso al cierre", f"{fmt_kg(float(stock_cierre))} kg", TEXT))
     if brix_medido is not None:
         kpis.append(("Brix real (medido)", fmt_num(brix_medido, 2), OK))
+        if brix_inicial_medido is not None:
+            kpis.append(("Brix inicial (medido)", fmt_num(brix_inicial_medido, 2), TEXT))
         kpis.append(("Ratio real (medido)", fmt_num(ratio_medido, 2), OK))
     elif brix_prom is not None:
         kpis.append(("Brix ponderado (estimado)", fmt_num(brix_prom, 2), TEXT))

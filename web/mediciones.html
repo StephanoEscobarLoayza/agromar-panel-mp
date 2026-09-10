@@ -70,7 +70,7 @@
         </div>
 
         <div class="two-col">
-          <div class="field"><label for="brixInicial">Brix inicial</label><input type="number" id="brixInicial" step="0.01" placeholder="opcional"></div>
+          <div class="field"><label for="brixInicial">Brix inicial</label><input type="number" id="brixInicial" step="0.01" placeholder="ej. 11.20"></div>
           <div class="field"><label for="brixFinal">Brix final</label><input type="number" id="brixFinal" step="0.01" placeholder="ej. 12.01"></div>
         </div>
 
@@ -173,13 +173,19 @@ function renderComparacion(estimado, medidas) {
   }
 
   let litrosTotal = 0, brixPond = 0, acidezPond = 0;
+  let litrosConInicial = 0, brixInicialPond = 0;
   medidas.forEach(m => {
     const w = Number(m.litros) || 1;
     litrosTotal += w;
     brixPond += w * Number(m.brix_final);
     acidezPond += w * Number(m.acidez);
+    if (m.brix_inicial !== null && m.brix_inicial !== undefined && m.brix_inicial !== "") {
+      litrosConInicial += w;
+      brixInicialPond += w * Number(m.brix_inicial);
+    }
   });
   const brixMed = brixPond / litrosTotal;
+  const brixInicialMed = litrosConInicial > 0 ? brixInicialPond / litrosConInicial : null;
   const acidezMed = acidezPond / litrosTotal;
   const ratioMed = acidezMed > 0 ? brixMed / acidezMed : null;
   const deltaBrix = brixMed - estimado.brix_actual;
@@ -200,6 +206,7 @@ function renderComparacion(estimado, medidas) {
         <div>
           <div class="hint-line" style="font-weight:600;color:var(--ok);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Medido (${medidas.length} tanque${medidas.length > 1 ? "s" : ""}${todosConLitros ? ", " + fmtKg(litrosTotal) + " L" : ""})</div>
           <div class="lookup">
+            <div class="lookup-row saldo"><span>Brix inicial promedio</span><span class="num">${brixInicialMed !== null ? brixInicialMed.toFixed(2) : "—"}</span></div>
             <div class="lookup-row saldo"><span>Brix final promedio</span><span class="num">${brixMed.toFixed(2)}</span></div>
             <div class="lookup-row saldo"><span>Acidez promedio</span><span class="num">${acidezMed.toFixed(3)}</span></div>
             <div class="lookup-row saldo"><span>Ratio promedio</span><span class="num">${ratioMed !== null ? ratioMed.toFixed(2) : "—"}</span></div>
@@ -277,17 +284,18 @@ lista.addEventListener("click", async (ev) => {
   } else if (btn.dataset.accion === "guardar") {
     const tanque = fila.querySelector(".edit-tanque").value.trim();
     const litros = fila.querySelector(".edit-litros").value;
-    const brixInicial = fila.querySelector(".edit-brix-inicial").value;
+    const brixInicial = Number(fila.querySelector(".edit-brix-inicial").value);
     const brixFinal = Number(fila.querySelector(".edit-brix-final").value);
     const acidez = Number(fila.querySelector(".edit-acidez").value);
     const ph = fila.querySelector(".edit-ph").value;
     if (!tanque) { alert("Escribe qué tanque es."); return; }
+    if (!brixInicial || brixInicial <= 0) { alert("El Brix inicial debe ser mayor a 0."); return; }
     if (!brixFinal || brixFinal <= 0) { alert("El Brix final debe ser mayor a 0."); return; }
     if (!acidez || acidez <= 0) { alert("La acidez debe ser mayor a 0."); return; }
     try {
       await apiPost(`/api/mediciones-tanque/${id}`, {
         tanque, litros: litros === "" ? null : Number(litros),
-        brix_inicial: brixInicial === "" ? null : Number(brixInicial),
+        brix_inicial: brixInicial,
         brix_final: brixFinal, acidez, ph: ph === "" ? null : Number(ph),
       });
       cargarTodo();
@@ -301,6 +309,7 @@ corridaSel.addEventListener("change", cargarTodo);
 
 btnGuardar.addEventListener("click", async () => {
   const tanque = tanqueInput.value.trim();
+  const brixInicial = Number(brixInicialInput.value);
   const brixFinal = Number(brixFinalInput.value);
   const acidez = Number(acidezInput.value);
 
@@ -310,6 +319,10 @@ btnGuardar.addEventListener("click", async () => {
   }
   if (!tanque) {
     mensaje.innerHTML = '<div class="msg bad">Escribe qué tanque es (ej. TK1).</div>';
+    return;
+  }
+  if (!brixInicial || brixInicial <= 0) {
+    mensaje.innerHTML = '<div class="msg bad">Ingresa el Brix inicial medido.</div>';
     return;
   }
   if (!brixFinal || brixFinal <= 0) {
@@ -327,7 +340,7 @@ btnGuardar.addEventListener("click", async () => {
       corrida_id: Number(corridaSel.value),
       tanque,
       litros: litrosInput.value ? Number(litrosInput.value) : null,
-      brix_inicial: brixInicialInput.value ? Number(brixInicialInput.value) : null,
+      brix_inicial: brixInicial,
       brix_final: brixFinal,
       acidez,
       ph: phInput.value ? Number(phInput.value) : null,
