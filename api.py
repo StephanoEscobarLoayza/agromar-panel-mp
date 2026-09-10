@@ -863,7 +863,7 @@ def bines_disponibles(conn, lote_numero: int, excluir_asignacion_id: Optional[in
 
 
 def _marcar_estado_por_consumo(conn, lote_numero: int):
-    """Se llama SIEMPRE que se registra o corrige un consumo. Antes esto
+    """Se llama SIEMPRE que se crea, corrige o BORRA un consumo. Antes esto
     ponía "EN PROCESO" a ciegas, sin importar si esa misma asignación dejaba
     el lote en 0 kg de saldo - un lote que se termina de golpe se quedaba
     pegado en "En proceso" para siempre, porque nada más volvía a tocar
@@ -872,7 +872,20 @@ def _marcar_estado_por_consumo(conn, lote_numero: int):
     lo arreglaba sola aunque el Sheet sí dijera "Procesado" del otro lado -
     Stephano lo notó ("el sincronizador jala de Drive y lo pone en proceso
     de nuevo"). Ahora se recalcula el saldo real después del cambio y se
-    guarda el estado que corresponde de verdad."""
+    guarda el estado que corresponde de verdad.
+
+    Si al lote ya no le queda NINGUNA asignación (se borró la única que
+    tenía), no tiene sentido dejarlo con un override "EN PROCESO" ni
+    "PROCESADO" a la fuerza - se le quita el override (estado_manual=NULL)
+    para que vuelva a mandar estado_fuente, el de la hoja de Trazabilidad
+    (normalmente "En espera" si nunca se había tocado). Encontrado por
+    Stephano: anotó un lote, lo borró, y se quedó pegado en "En proceso"."""
+    tiene_asignaciones = conn.execute(
+        text("SELECT 1 FROM asignaciones WHERE lote_numero = :n LIMIT 1"), {"n": lote_numero}
+    ).scalar()
+    if not tiene_asignaciones:
+        conn.execute(text("UPDATE lotes SET estado_manual = NULL WHERE numero = :n"), {"n": lote_numero})
+        return
     saldo = conn.execute(
         text("SELECT kg_saldo FROM v_saldo_lotes WHERE numero = :n"), {"n": lote_numero}
     ).scalar()
@@ -1024,11 +1037,13 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
 @app.delete("/api/asignaciones/{asignacion_id}")
 def eliminar_asignacion(asignacion_id: int):
     with engine.begin() as conn:
-        result = conn.execute(
-            text("DELETE FROM asignaciones WHERE id = :id RETURNING id"), {"id": asignacion_id}
-        )
-        if result.scalar() is None:
+        lote_numero = conn.execute(
+            text("SELECT lote_numero FROM asignaciones WHERE id = :id"), {"id": asignacion_id}
+        ).scalar()
+        if lote_numero is None:
             raise HTTPException(status_code=404, detail="Asignación no encontrada.")
+        conn.execute(text("DELETE FROM asignaciones WHERE id = :id"), {"id": asignacion_id})
+        _marcar_estado_por_consumo(conn, lote_numero)
     return {"ok": True}
 
 
