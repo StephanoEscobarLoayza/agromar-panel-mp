@@ -267,8 +267,10 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones) -> bytes:
         _set(ws, ws.cell(row=m0 + 1, column=sc), "Sin saldo pendiente.")
 
     # ---------- anchos de columna ----------
-    anchos = {1: 12, 2: 30, 3: 7, 4: 12, 5: 12, 6: 12, 7: 26, 8: 40, 9: 13, 10: 12,
-              11: 15, 12: 12, 13: 12, 14: 13, 15: 11, 16: 12}
+    # D y E cargan las fechas INICIO/FINAL con hora ("DD/MM/YYYY HH:MM" ~16
+    # caracteres) - si van angostas Excel muestra "#######".
+    anchos = {1: 12, 2: 30, 3: 8, 4: 18, 5: 18, 6: 13, 7: 26, 8: 40, 9: 14, 10: 12,
+              11: 16, 12: 13, 13: 13, 14: 14, 15: 11, 16: 13}
     for i, w in anchos.items():
         ws.column_dimensions[get_column_letter(i)].width = w
 
