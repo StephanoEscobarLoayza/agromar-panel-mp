@@ -1,5 +1,6 @@
 """Genera el PDF de cuadre de una corrida (botón "Reporte PDF" en Corridas).
 Piezas compartidas (paleta, tarjetas KPI, etc.) viven en reporte_base.py."""
+import unicodedata
 from datetime import datetime
 from io import BytesIO
 
@@ -41,14 +42,33 @@ def _tabla_lotes_simple(lotes, con_saldo=False):
     return tabla(["Lote", "Proveedor"], filas, [22 * mm, 151 * mm])
 
 
+def _cuenta_como_pt(producto: dict) -> bool:
+    """El enjuague sale de la línea pero no es producto terminado - no suma al
+    PT kg, ni al rendimiento, ni al volumen de la corrida. Cualquier fila cuyo
+    nombre mencione "enjuague" (con o sin tildes, mayúsculas, etc.) se deja
+    fuera de esos totales - igual se muestra en la tabla de productos, marcada.
+    Todo lo demás (Jugo Simple Aséptico, Jugo Concentrado Congelado, etc.) sí
+    cuenta."""
+    nombre = "".join(
+        c for c in unicodedata.normalize("NFD", (producto.get("producto") or "").lower())
+        if unicodedata.category(c) != "Mn"
+    )
+    return "enjuague" not in nombre
+
+
 def _tabla_productos(productos):
-    filas = [[
-        p.get("producto") or "—",
-        fmt_num(p.get("tambores"), 0),
-        fmt_kg(p.get("peso_neto_tambor_kg")),
-        fmt_kg(p.get("pt_kg")),
-        fmt_kg(p.get("volumen_litros")),
-    ] for p in productos]
+    filas = []
+    for p in productos:
+        nombre = p.get("producto") or "—"
+        if not _cuenta_como_pt(p):
+            nombre += " (no cuenta como PT)"
+        filas.append([
+            nombre,
+            fmt_num(p.get("tambores"), 0),
+            fmt_kg(p.get("peso_neto_tambor_kg")),
+            fmt_kg(p.get("pt_kg")),
+            fmt_kg(p.get("volumen_litros")),
+        ])
     return tabla(
         ["Producto", "Tambores", "Peso/tambor", "PT kg", "Litros"], filas,
         [45 * mm, 25 * mm, 30 * mm, 30 * mm, 30 * mm], align_derecha_desde=1,
@@ -131,8 +151,12 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
             brix_ini_pond = sum(float(m.get("litros") or 1) * float(m["brix_inicial"]) for m in med_con_ini)
             brix_inicial_medido = brix_ini_pond / litros_ini
 
-    pt_total = sum(float(p["pt_kg"]) for p in productos if p.get("pt_kg") is not None)
-    litros_total = sum(float(p["volumen_litros"]) for p in productos if p.get("volumen_litros") is not None)
+    # el enjuague sale de la línea pero no es producto terminado - se deja fuera
+    # del PT kg, del rendimiento y del volumen (ver _cuenta_como_pt).
+    productos_pt = [p for p in productos if _cuenta_como_pt(p)]
+    hay_no_pt = len(productos_pt) < len(productos)
+    pt_total = sum(float(p["pt_kg"]) for p in productos_pt if p.get("pt_kg") is not None)
+    litros_total = sum(float(p["volumen_litros"]) for p in productos_pt if p.get("volumen_litros") is not None)
     rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
 
     paradas_cerradas = [p for p in paradas if p.get("duracion_minutos") is not None]
@@ -263,6 +287,13 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Productos de salida ({len(productos)})"))
         story.append(_tabla_productos(productos))
+        if hay_no_pt:
+            story.append(Spacer(1, 3 * mm))
+            story.append(Paragraph(
+                "El enjuague sale de la línea pero no es producto terminado - no suma "
+                "al PT kg, ni al rendimiento, ni al volumen de arriba.",
+                style_footnote,
+            ))
 
     if paradas:
         story.append(Spacer(1, 8 * mm))
