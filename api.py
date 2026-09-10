@@ -538,19 +538,9 @@ def listar_corridas(abiertas: bool = False):
                 )
             )
         else:
-            # rendimiento no vive en la vista v_cuadre_corridas (es de la
-            # tabla corridas directo) - se agrega acá para "Producto
-            # terminado" en Dashboards, que lo usa para estimar el PT kg de
-            # las corridas que nunca tuvieron tambores cargados a mano (casi
-            # todas, las importadas de Trazabilidad).
-            result = conn.execute(text(
-                """
-                SELECT v.*, c.rendimiento
-                FROM v_cuadre_corridas v
-                JOIN corridas c ON c.id = v.id
-                ORDER BY v.fecha_inicio DESC
-                """
-            ))
+            result = conn.execute(
+                text("SELECT * FROM v_cuadre_corridas ORDER BY fecha_inicio DESC")
+            )
         return rows(result)
 
 
