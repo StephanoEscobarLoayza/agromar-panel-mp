@@ -90,7 +90,10 @@ def reporte_stock_pdf():
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'inline; filename="stock-materia-prima.pdf"'},
+        headers={
+            "Content-Disposition": 'inline; filename="stock-materia-prima.pdf"',
+            "Cache-Control": "no-store",
+        },
     )
 
 
@@ -759,7 +762,14 @@ def reporte_corrida_pdf(corrida_id: int):
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{nombre_archivo}"'},
+        headers={
+            "Content-Disposition": f'inline; filename="{nombre_archivo}"',
+            # Sin esto, el navegador puede quedarse con una copia vieja del PDF
+            # para esta misma URL (mismo link "Reporte PDF" siempre) y mostrar
+            # datos desactualizados aunque la corrida ya tenga registros nuevos
+            # (ej. tanques medidos agregados después de la ultima vez que se abrio).
+            "Cache-Control": "no-store",
+        },
     )
 
 
