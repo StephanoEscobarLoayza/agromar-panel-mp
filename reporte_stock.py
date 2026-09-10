@@ -2,7 +2,6 @@
 sistema calcula en vivo para cada lote (Silo + Bines), en un momento dado.
 No agrega ningún conteo físico manual - es exactamente lo que ya muestra
 v_saldo_lotes, solo que ordenado y presentado para imprimir o compartir."""
-from datetime import datetime
 from io import BytesIO
 
 from reportlab.lib.units import mm
@@ -12,6 +11,7 @@ from reporte_base import (
     FOREST_2, CITRUS, TEXT_2,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_fecha, Banda, header_footer, kpi_card, encabezado, seccion, tabla, nuevo_doc,
+    ahora_peru,
 )
 
 
@@ -74,7 +74,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     lotes_completos = [l for l in lotes if abs(float(l["kg_saldo"]) - float(l["peso_neto_kg"])) < 0.01]
     lotes_parciales = [l for l in lotes if abs(float(l["kg_saldo"]) - float(l["peso_neto_kg"])) >= 0.01]
 
-    ahora = datetime.now()
+    ahora = ahora_peru()
 
     story = [
         encabezado(

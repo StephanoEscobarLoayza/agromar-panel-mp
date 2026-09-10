@@ -3,7 +3,7 @@ reporte_stock.py, y los que se agreguen después) - paleta, estilos de texto,
 tarjetas KPI, badges y el mini-gráfico de barras. Todo con reportlab (puro
 Python, sin dependencias de sistema como WeasyPrint - instala y corre sin
 problema en Render)."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -101,6 +101,14 @@ def fmt_minutos(m):
         return "—"
     h, mi = divmod(int(round(m)), 60)
     return f"{h}h {mi}m" if h else f"{mi}m"
+
+
+def ahora_peru():
+    """Hora local de la planta (Perú, UTC-5, sin horario de verano) para los
+    sellos "Generado el ..." de los reportes. En Render el servidor corre en
+    UTC, así que datetime.now() a secas quedaba ~5 horas adelantado frente al
+    reloj de Stephano - mismo gotcha ya corregido en paradas y en el front."""
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-5)))
 
 
 class Banda(Flowable):

@@ -1,7 +1,6 @@
 """Genera el PDF de cuadre de una corrida (botón "Reporte PDF" en Corridas).
 Piezas compartidas (paleta, tarjetas KPI, etc.) viven en reporte_base.py."""
 import unicodedata
-from datetime import datetime
 from io import BytesIO
 
 from reportlab.lib.units import mm
@@ -11,7 +10,7 @@ from reporte_base import (
     FOREST_2, CITRUS, OK, BAD, TEXT,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
-    encabezado, seccion, tabla, nuevo_doc,
+    encabezado, seccion, tabla, nuevo_doc, ahora_peru,
 )
 
 
@@ -288,7 +287,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(_tabla_paradas(paradas))
 
     story.append(Spacer(1, 10 * mm))
-    story.append(Paragraph(f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M')} desde el Panel de cuadre de producción.", style_footnote))
+    story.append(Paragraph(f"Generado el {ahora_peru().strftime('%d/%m/%Y %H:%M')} desde el Panel de cuadre de producción.", style_footnote))
 
     doc.build(
         story,
