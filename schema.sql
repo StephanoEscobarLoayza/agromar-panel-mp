@@ -53,13 +53,13 @@ CREATE TABLE corridas (
     rendimiento         NUMERIC(6,4),
     estado              TEXT NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta', 'cerrada')),
     creado_en           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    stock_inicio_kg     NUMERIC(14,2),                 -- suma de kg_saldo de TODOS los lotes al crear esta corrida
+    stock_inicio_kg     NUMERIC(14,2),                 -- suma de kg_saldo de los lotes EN PROCESO/EN ESPERA al crear esta corrida
     stock_cierre_kg     NUMERIC(14,2)                  -- lo mismo al finalizar - NULL de nuevo si se reabre
 );
 
 COMMENT ON TABLE corridas IS 'Cada corrida de producción. Es la unidad de cuadre real, no la fecha calendario.';
 COMMENT ON COLUMN corridas.mp_kg_objetivo IS 'Total "MP kg" reportado por Trazabilidad para esta corrida - el número contra el que se cuadra.';
-COMMENT ON COLUMN corridas.stock_inicio_kg IS 'Foto del stock total en piso (Silo+Bines) al momento de crear la corrida. NULL en corridas creadas antes de este campo existir - no hay como reconstruir el pasado.';
+COMMENT ON COLUMN corridas.stock_inicio_kg IS 'Foto del stock en piso (Silo+Bines) al crear la corrida - mismo criterio que el reporte de stock: solo lotes EN PROCESO/EN ESPERA, un lote PROCESADO con saldo residual es ruido de Trazabilidad, no MP disponible. NULL en corridas creadas antes de este campo existir.';
 COMMENT ON COLUMN corridas.stock_cierre_kg IS 'Lo mismo al finalizar. Se limpia a NULL si se reabre, hasta que se vuelva a finalizar.';
 
 -- ----------------------------------------------------------------------------

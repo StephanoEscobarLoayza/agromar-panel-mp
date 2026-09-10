@@ -565,7 +565,8 @@ def crear_corrida(c: NuevaCorrida):
                     """
                     INSERT INTO corridas (nombre, tipo_proceso, fecha_inicio, estado, stock_inicio_kg)
                     VALUES (:nombre, :tipo_proceso, :fecha_inicio, 'abierta',
-                            (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes))
+                            (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes
+                             WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')))
                     RETURNING id
                     """
                 ),
@@ -595,7 +596,8 @@ def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
             text(
                 """
                 UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada',
-                       stock_cierre_kg = (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes)
+                       stock_cierre_kg = (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes
+                                          WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA'))
                 WHERE id = :id AND estado = 'abierta'
                 RETURNING id
                 """
