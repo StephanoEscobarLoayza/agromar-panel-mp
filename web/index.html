@@ -155,10 +155,13 @@ const ICON_CORRIDAS = '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" wi
 const ICON_PROMEDIO = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 14 L8 8 L11.5 11 L17 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 5H17V9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // ---------- barras horizontales (categoria + valor), etiqueta y numero siempre visibles ----------
-function statBarRow(label, valorTexto, pct, colorStyle, labelWidth) {
+// La etiqueta nunca envuelve a 2 lineas (se veia mal, cada fila quedaba de
+// alto distinto) - se recorta con "..." si no entra, y el nombre completo
+// queda en el title (tooltip al pasar el mouse / mantener tocado).
+function statBarRow(label, valorTexto, pct, colorStyle, labelWidth, tituloCompleto) {
   return `
     <div class="stat-bar-row">
-      <div class="stat-bar-label" style="${labelWidth ? `width:${labelWidth}` : ""}">${label}</div>
+      <div class="stat-bar-label" style="${labelWidth ? `width:${labelWidth}` : ""}" title="${escapeHtml(tituloCompleto || "")}">${label}</div>
       <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
       <div class="stat-bar-value num">${valorTexto}</div>
     </div>
@@ -186,7 +189,8 @@ function renderListaCorridas(corridas) {
       `${fmtKg(d.valor)} kg`,
       Math.max(2, (d.valor / max) * 100),
       `background:${color}`,
-      "190px"
+      "190px",
+      d.nombre
     );
   }).join("");
 }
@@ -214,7 +218,8 @@ function renderPorTipo(corridas) {
       `${fmtKg(promedios[t.key])} kg`,
       Math.max(2, (promedios[t.key] / max) * 100),
       `background:var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`,
-      "150px"
+      "150px",
+      `${t.label} (${stats[t.key].cuenta})`
     ));
   cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
 }
@@ -249,7 +254,8 @@ function renderListaSaldo(lotes) {
     `${fmtKg(l.kg_saldo)} kg`,
     Math.max(2, (Number(l.kg_saldo) / max) * 100),
     "background:var(--forest-2)",
-    "120px"
+    "120px",
+    `#${l.numero} ${l.ubicacion_actual || "—"}`
   )).join("");
 }
 
@@ -272,7 +278,8 @@ function renderPorProveedor(lotes) {
     `${fmtKg(valor)} kg`,
     Math.max(2, (valor / max) * 100),
     "background:var(--citrus)",
-    "170px"
+    "170px",
+    prov
   )).join("");
 }
 
