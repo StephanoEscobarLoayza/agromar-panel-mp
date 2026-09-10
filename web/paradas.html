@@ -63,7 +63,7 @@
 
         <div class="two-col">
           <div class="field"><label for="horaInicio">Hora de inicio</label><input type="datetime-local" id="horaInicio"></div>
-          <div class="field"><label for="horaFin">Hora de fin <span style="font-weight:400;color:var(--text-muted)">(vacío = en curso)</span></label><input type="datetime-local" id="horaFin"></div>
+          <div class="field"><label for="horaFin">Hora de fin <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label><input type="datetime-local" id="horaFin"></div>
         </div>
 
         <div class="two-col">
@@ -71,10 +71,10 @@
           <div class="field"><label for="responsable">Responsable de solución</label><select id="responsable"></select></div>
         </div>
 
-        <div class="field"><label for="equipo">Equipo afectado</label><input type="text" id="equipo" placeholder="ej. Elevador transportadora inclinada"></div>
-        <div class="field"><label for="descFalla">Descripción de la falla</label><textarea id="descFalla" rows="2" placeholder="qué pasó"></textarea></div>
-        <div class="field"><label for="solucion">Solución y/o observaciones</label><textarea id="solucion" rows="2" placeholder="cómo se resolvió"></textarea></div>
-        <div class="field"><label for="recomendacion">Recomendación</label><textarea id="recomendacion" rows="2" placeholder="para evitar que se repita"></textarea></div>
+        <div class="field"><label for="equipo">Equipo afectado</label><input type="text" id="equipo" placeholder="Equipo o componente afectado"></div>
+        <div class="field"><label for="descFalla">Descripción de la falla</label><textarea id="descFalla" rows="2" placeholder="Descripción de la falla ocurrida"></textarea></div>
+        <div class="field"><label for="solucion">Solución y/o observaciones</label><textarea id="solucion" rows="2" placeholder="Acción realizada para resolver la parada"></textarea></div>
+        <div class="field"><label for="recomendacion">Recomendación</label><textarea id="recomendacion" rows="2" placeholder="Acción preventiva sugerida"></textarea></div>
 
         <div id="mensaje"></div>
         <button class="btn" id="btnGuardar">Registrar parada</button>
@@ -87,7 +87,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr><th>Inicio</th><th>Fin</th><th class="right">Duración</th><th>Área</th><th>Tipo</th><th>Falla</th><th></th></tr></thead>
-          <tbody id="lista"><tr><td colspan="7" class="empty">Elige una corrida</td></tr></tbody>
+          <tbody id="lista"><tr><td colspan="7" class="empty">Seleccione una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -144,10 +144,10 @@ function opciones(vals, vacio) {
   return (vacio ? `<option value="">${vacio}</option>` : "") +
     vals.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v === "DÍA" ? "Día" : v === "NOCHE" ? "Noche" : v)}</option>`).join("");
 }
-F.turno.innerHTML = opciones(TURNOS, "— elige —");
-F.area.innerHTML = opciones(AREAS, "— elige —");
-F.tipo.innerHTML = opciones(TIPOS, "— elige —");
-F.responsable.innerHTML = opciones(RESPONSABLES, "—");
+F.turno.innerHTML = opciones(TURNOS, "Seleccionar");
+F.area.innerHTML = opciones(AREAS, "Seleccionar");
+F.tipo.innerHTML = opciones(TIPOS, "Seleccionar");
+F.responsable.innerHTML = opciones(RESPONSABLES, "Seleccionar");
 
 function fmtMinutos(min) {
   if (min === null || min === undefined) return "—";
@@ -181,7 +181,7 @@ async function cargarParadas() {
   if (!corridaId) return;
   const paradas = await apiGet(`/api/corridas/${corridaId}/paradas`);
   if (paradas.length === 0) {
-    lista.innerHTML = '<tr><td colspan="7" class="empty">Sin paradas todavía</td></tr>';
+    lista.innerHTML = '<tr><td colspan="7" class="empty">Sin paradas registradas</td></tr>';
     totalParadas.innerHTML = '<span class="num">0m</span> paradas en esta corrida';
     return;
   }
@@ -218,16 +218,16 @@ function filaEdicion(p) {
   return `<tr><td colspan="7" style="background:var(--surface-2)">
     <div class="form-body" style="padding:14px 4px">
       <div class="two-col">
-        <div class="field"><label>Turno</label>${sel("turno", TURNOS, p.turno, "— elige —")}</div>
-        <div class="field"><label>Área / proceso</label>${sel("area", AREAS, p.area_proceso, "— elige —")}</div>
+        <div class="field"><label>Turno</label>${sel("turno", TURNOS, p.turno, "Seleccionar")}</div>
+        <div class="field"><label>Área / proceso</label>${sel("area", AREAS, p.area_proceso, "Seleccionar")}</div>
       </div>
       <div class="two-col">
         <div class="field"><label>Hora de inicio</label>${inp("inicio", isoAInputLocal(p.hora_inicio), "datetime-local")}</div>
         <div class="field"><label>Hora de fin</label>${inp("fin", isoAInputLocal(p.hora_fin), "datetime-local")}</div>
       </div>
       <div class="two-col">
-        <div class="field"><label>Tipo de parada</label>${sel("tipo", TIPOS, p.tipo_parada, "— elige —")}</div>
-        <div class="field"><label>Responsable de solución</label>${sel("resp", RESPONSABLES, p.responsable_solucion, "—")}</div>
+        <div class="field"><label>Tipo de parada</label>${sel("tipo", TIPOS, p.tipo_parada, "Seleccionar")}</div>
+        <div class="field"><label>Responsable de solución</label>${sel("resp", RESPONSABLES, p.responsable_solucion, "Seleccionar")}</div>
       </div>
       <div class="field"><label>Equipo afectado</label>${inp("equipo", p.equipo_afectado)}</div>
       <div class="field"><label>Descripción de la falla</label>${ta("desc", p.descripcion_falla)}</div>
