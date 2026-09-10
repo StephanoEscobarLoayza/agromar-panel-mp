@@ -71,6 +71,21 @@ function fmtDate(iso) {
          d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
 }
 
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+
+function fmtFechaSola(iso) {
+  // Para columnas DATE puras (fecha_ingreso de un lote, sin hora) - nunca
+  // pasarlas por fmtDate()/new Date() a secas: un string "2026-09-08" sin
+  // hora se interpreta como medianoche UTC, y en Perú (UTC-5) se muestra
+  // como el día ANTERIOR a las 7pm (mismo problema ya documentado con
+  // TIMESTAMP vs hora local, pero al revés: acá no hay hora que mezclar,
+  // el bug es que JS igual le inventa una). Se parsean los números
+  // directo, sin darle a JS la oportunidad de reinterpretar la zona horaria.
+  if (!iso) return "—";
+  const [anio, mes, dia] = iso.split("-").map(Number);
+  return `${String(dia).padStart(2, "0")}-${MESES_CORTOS[mes - 1]}`;
+}
+
 function escapeHtml(s) {
   const div = document.createElement("div");
   div.textContent = s ?? "";

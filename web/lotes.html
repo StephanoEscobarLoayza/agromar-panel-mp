@@ -63,12 +63,12 @@
       <table>
         <thead>
           <tr>
-            <th>Lote</th><th>Proveedor</th><th>Procedencia</th><th>Almacén</th><th>Ubicación</th><th>Estado</th>
+            <th>Lote</th><th>Proveedor</th><th>Procedencia</th><th>Almacén</th><th>Fecha</th><th>Ubicación</th><th>Estado</th>
             <th class="right">Peso neto</th><th class="right">Saldo</th>
             <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
           </tr>
         </thead>
-        <tbody id="filas"><tr><td colspan="11" class="empty">Cargando…</td></tr></tbody>
+        <tbody id="filas"><tr><td colspan="12" class="empty">Cargando…</td></tr></tbody>
       </table>
     </div>
     <div class="viz-legend bordered">
@@ -175,6 +175,7 @@ function fila(l) {
       <td>${escapeHtml(l.proveedor)}</td>
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
+      <td>${fmtFechaSola(l.fecha_ingreso)}</td>
       <td>${ubicacionBoton(l)}</td>
       <td>${estadoBoton(l)}</td>
       <td class="right num">${fmtKg(l.peso_neto_kg)}</td>
@@ -190,7 +191,7 @@ function render(lista) {
   const cont = document.getElementById("filas");
   cont.innerHTML = lista.length
     ? lista.map(fila).join("")
-    : '<tr><td colspan="11" class="empty">Sin resultados</td></tr>';
+    : '<tr><td colspan="12" class="empty">Sin resultados</td></tr>';
 }
 
 let filtroActual = "todos";
@@ -216,7 +217,7 @@ async function cargar() {
     todos = await apiGet("/api/lotes");
     aplicarFiltros();
   } catch (e) {
-    document.getElementById("filas").innerHTML = `<tr><td colspan="11"><div class="msg bad">${escapeHtml(e.message)}</div></td></tr>`;
+    document.getElementById("filas").innerHTML = `<tr><td colspan="12"><div class="msg bad">${escapeHtml(e.message)}</div></td></tr>`;
   }
 }
 

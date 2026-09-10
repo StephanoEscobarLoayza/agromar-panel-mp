@@ -145,7 +145,7 @@ function filaHtml(p, resaltada) {
       <td class="strong num">#${p.numero}</td>
       <td>${escapeHtml(p.proveedor)}</td>
       <td><span class="tag">${tagAlmacen(p.tipo_almacen)}</span></td>
-      <td>${fmtDate(p.fecha_ingreso)}</td>
+      <td>${fmtFechaSola(p.fecha_ingreso)}</td>
       <td class="right num">${kgTexto}</td>
       <td class="right num">${p.brix_lote.toFixed(2)}</td>
       <td class="right num">${p.acidez_lote.toFixed(2)}</td>
