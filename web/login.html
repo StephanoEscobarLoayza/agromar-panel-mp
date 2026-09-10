@@ -41,6 +41,14 @@
   #msg .msg{margin-top:14px}
   .login-foot{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);
     font-family:'Fraunces',Georgia,serif;font-style:italic;font-size:13px;color:var(--foot-accent);text-align:center;letter-spacing:.01em;text-transform:none}
+  /* en pantalla vertical (celular y tablet en vertical) la foto horizontal se
+     recorta a puro verde - se usa un recorte vertical (silos + naranjas) */
+  @media (max-width:820px){
+    .login-bg{background-image:url("/login-bg-mobile.jpg");filter:blur(3px) saturate(1.1) brightness(1)}
+  }
+  @media (max-width:560px){
+    .login-card{max-width:none}
+  }
 </style>
 </head>
 <body>

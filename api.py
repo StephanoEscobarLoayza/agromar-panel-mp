@@ -55,7 +55,7 @@ _COOKIE_NAME = "agromar_auth"
 _COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días sin volver a entrar
 _COOKIE_SECURE = os.environ.get("APP_INSECURE_COOKIE") != "1"  # =1 solo para probar en http local
 # rutas visibles sin login (para que la pantalla de login cargue y pueda enviar)
-_RUTAS_LIBRES = {"/login.html", "/login-bg.jpg", "/api/login", "/api/sesion", "/style.css", "/app.js", "/favicon.svg"}
+_RUTAS_LIBRES = {"/login.html", "/login-bg.jpg", "/login-bg-mobile.jpg", "/api/login", "/api/sesion", "/style.css", "/app.js", "/favicon.svg"}
 
 
 def _token_sesion():
