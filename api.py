@@ -781,6 +781,47 @@ def listar_productos_corrida(corrida_id: int):
         return rows(result)
 
 
+# El saldo de un lote (v_saldo_lotes.kg_saldo / bines_saldo) es UN SOLO número
+# global - si una corrida POSTERIOR sigue consumiendo un lote que esta corrida
+# también usó, ese saldo baja para todos, incluido el reporte de una corrida
+# ya cerrada (Stephano lo notó con el lote 2393/2402: el reporte del 9 de
+# setiembre mostraba 0 de saldo porque la corrida del 10 ya se lo había
+# terminado, cuando lo que quería ver era la foto de CUANDO CERRÓ esa corrida).
+# Para una corrida ya cerrada (fecha_final IS NOT NULL), estas expresiones
+# recalculan el saldo usando solo las asignaciones creadas hasta esa fecha de
+# cierre (+5h para pasar de hora Perú a UTC, igual criterio que ahora_peru) -
+# una foto fija que ya no se mueve aunque después otra corrida use el resto.
+# Para una corrida todavía abierta (fecha_final NULL) se usa el saldo en vivo,
+# igual que siempre - ahí sí interesa ver el número más fresco.
+_SQL_KG_SALDO_AL_CIERRE = """
+    CASE WHEN :fecha_final IS NULL THEN v.kg_saldo ELSE
+        l.peso_neto_kg - COALESCE((
+            SELECT SUM(a2.kg_asignados) FROM asignaciones a2
+            WHERE a2.lote_numero = a.lote_numero
+              AND a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours')
+        ), 0)
+    END
+"""
+_SQL_BINES_SALDO_AL_CIERRE = """
+    CASE WHEN :fecha_final IS NULL THEN v.bines_saldo ELSE
+        l.bines_totales - COALESCE((
+            SELECT SUM(a2.bines_consumidos) FROM asignaciones a2
+            WHERE a2.lote_numero = a.lote_numero
+              AND a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours')
+        ), 0)
+    END
+"""
+_SQL_KG_CONSUMIDO_AL_CIERRE = """
+    CASE WHEN :fecha_final IS NULL THEN v.kg_consumidos ELSE
+        COALESCE((
+            SELECT SUM(a2.kg_asignados) FROM asignaciones a2
+            WHERE a2.lote_numero = a.lote_numero
+              AND a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours')
+        ), 0)
+    END
+"""
+
+
 @app.get("/api/corridas/{corrida_id}/reporte.pdf")
 def reporte_corrida_pdf(corrida_id: int):
     """Genera el PDF de cuadre de una corrida: KPIs, lotes de MP consumidos,
@@ -793,9 +834,9 @@ def reporte_corrida_pdf(corrida_id: int):
 
         lotes = rows(conn.execute(
             text(
-                """
+                f"""
                 SELECT a.lote_numero, l.proveedor, a.tipo_almacen_origen, a.kg_asignados,
-                       l.brix_recepcion, l.acidez, l.ratio, v.kg_saldo
+                       l.brix_recepcion, l.acidez, l.ratio, ({_SQL_KG_SALDO_AL_CIERRE}) AS kg_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
                 JOIN v_saldo_lotes v ON v.numero = a.lote_numero
@@ -803,7 +844,7 @@ def reporte_corrida_pdf(corrida_id: int):
                 ORDER BY a.creado_en ASC
                 """
             ),
-            {"c": corrida_id},
+            {"c": corrida_id, "fecha_final": corrida.get("fecha_final")},
         ))
         productos = rows(conn.execute(
             text(
@@ -933,20 +974,27 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
         if corrida is None:
             raise HTTPException(status_code=404, detail="Corrida no encontrada.")
 
+        # mismo criterio que el reporte PDF: si esta corrida ya está cerrada,
+        # el saldo de sus lotes queda congelado a la fecha de cierre - no
+        # sigue bajando cuando una corrida posterior consume el resto del
+        # mismo lote (ver _SQL_..._AL_CIERRE más arriba).
         lotes = rows(conn.execute(text(
-            """
+            f"""
             SELECT a.lote_numero, a.kg_asignados, a.bines_consumidos, a.brix_produccion,
                    a.tipo_almacen_origen, a.fecha_proceso,
                    l.proveedor, l.procedencia, l.guia, l.fecha_ingreso, l.brix_recepcion,
                    l.peso_neto_kg, l.bines_totales,
-                   s.kg_saldo, s.bines_saldo, s.kg_consumidos, s.estado_actual
+                   ({_SQL_KG_SALDO_AL_CIERRE}) AS kg_saldo,
+                   ({_SQL_BINES_SALDO_AL_CIERRE}) AS bines_saldo,
+                   ({_SQL_KG_CONSUMIDO_AL_CIERRE}) AS kg_consumidos,
+                   v.estado_actual
             FROM asignaciones a
             JOIN lotes l ON l.numero = a.lote_numero
-            LEFT JOIN v_saldo_lotes s ON s.numero = a.lote_numero
+            LEFT JOIN v_saldo_lotes v ON v.numero = a.lote_numero
             WHERE a.corrida_id = :c
             ORDER BY a.fecha_proceso, a.lote_numero
             """
-        ), {"c": corrida_id}))
+        ), {"c": corrida_id, "fecha_final": corrida.get("fecha_final")}))
         productos = rows(conn.execute(text(
             "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros "
             "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
