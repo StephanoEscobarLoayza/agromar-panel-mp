@@ -171,6 +171,12 @@ function colorSaldo(pct) {
 function fila(l) {
   const pct = l.peso_neto_kg > 0 ? Math.min(100, (l.kg_saldo / l.peso_neto_kg) * 100) : 0;
   const tagLabel = l.tipo_almacen === "BINES" ? "Bines" : l.tipo_almacen === "SILO" ? "Silo" : "Mixto";
+  // en Silo el kg ya dice todo; en Bines/Mixto interesa además el conteo de
+  // bines (cuántos entraron, cuántos quedan) - eso es lo que se cuenta en
+  // el patio, el kg es un estimado que sale de ahí.
+  const esBines = l.tipo_almacen !== "SILO" && l.bines_totales != null;
+  const binesTotalesSub = esBines ? `<div class="num-sub">${fmtInt(l.bines_totales)} bines</div>` : "";
+  const binesSaldoSub = esBines ? `<div class="num-sub">${fmtInt(l.bines_saldo ?? 0)} bines</div>` : "";
   return `
     <tr>
       <td class="strong num">${l.numero}</td>
@@ -180,8 +186,8 @@ function fila(l) {
       <td>${fmtFechaSola(l.fecha_ingreso)}</td>
       <td>${ubicacionBoton(l)}</td>
       <td>${estadoBoton(l)}</td>
-      <td class="right num">${fmtKg(l.peso_neto_kg)}</td>
-      <td class="right num"><span class="saldo-bar"><i style="width:${pct}%;background:${colorSaldo(pct)}"></i></span>${fmtKg(l.kg_saldo)}</td>
+      <td class="right num">${fmtKg(l.peso_neto_kg)}${binesTotalesSub}</td>
+      <td class="right num"><span class="saldo-bar"><i style="width:${pct}%;background:${colorSaldo(pct)}"></i></span>${fmtKg(l.kg_saldo)}${binesSaldoSub}</td>
       <td class="right num">${l.brix_recepcion ?? "—"}</td>
       <td class="right num">${l.acidez ?? "—"}</td>
       <td class="right num">${l.ratio ?? "—"}</td>
