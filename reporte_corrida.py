@@ -15,18 +15,26 @@ from reporte_base import (
 
 
 def _tabla_lotes(lotes):
-    filas = [[
-        f"#{l['lote_numero']}",
-        l.get("proveedor") or "—",
-        "Bines" if l.get("tipo_almacen_origen") == "BINES" else "Silo" if l.get("tipo_almacen_origen") == "SILO" else "—",
-        fmt_kg(l["kg_asignados"]) if l.get("kg_asignados") is not None else "pendiente",
-        fmt_num(l.get("brix_recepcion"), 2),
-        fmt_num(l.get("acidez"), 2),
-        fmt_num(l.get("ratio"), 2),
-    ] for l in lotes]
+    filas = []
+    for l in lotes:
+        es_bines = l.get("tipo_almacen_origen") == "BINES"
+        kg_txt = fmt_kg(l["kg_asignados"]) if l.get("kg_asignados") is not None else "pendiente"
+        # en bines el conteo de patio manda más que el kg (que es un
+        # estimado) - se muestra al lado, no reemplazando el kg.
+        if es_bines and l.get("bines_consumidos") is not None:
+            kg_txt += f" ({fmt_num(l['bines_consumidos'], 0)} bines)"
+        filas.append([
+            f"#{l['lote_numero']}",
+            l.get("proveedor") or "—",
+            "Bines" if es_bines else "Silo" if l.get("tipo_almacen_origen") == "SILO" else "—",
+            kg_txt,
+            fmt_num(l.get("brix_recepcion"), 2),
+            fmt_num(l.get("acidez"), 2),
+            fmt_num(l.get("ratio"), 2),
+        ])
     return tabla(
         ["Lote", "Proveedor", "Almacén", "Kg usado", "Brix", "Acidez", "Ratio"], filas,
-        [22 * mm, 55 * mm, 20 * mm, 26 * mm, 16 * mm, 18 * mm, 16 * mm], align_derecha_desde=3,
+        [22 * mm, 50 * mm, 20 * mm, 31 * mm, 16 * mm, 18 * mm, 16 * mm], align_derecha_desde=3,
     )
 
 
@@ -35,8 +43,15 @@ def _tabla_lotes_simple(lotes, con_saldo=False):
     para las dos sub-listas de "Estado de estos lotes hoy" (terminados / con
     saldo para la siguiente corrida)."""
     if con_saldo:
-        filas = [[f"#{l['lote_numero']}", l.get("proveedor") or "—", f"{fmt_kg(float(l['kg_saldo']))} kg"] for l in lotes]
-        return tabla(["Lote", "Proveedor", "Saldo hoy"], filas, [22 * mm, 91 * mm, 60 * mm], align_derecha_desde=2)
+        filas = []
+        for l in lotes:
+            saldo_txt = f"{fmt_kg(float(l['kg_saldo']))} kg"
+            # si el lote es de bines, el saldo en bines dice más que el kg -
+            # es lo que de verdad se cuenta en el patio.
+            if l.get("tipo_almacen_origen") == "BINES" and l.get("bines_saldo") is not None:
+                saldo_txt += f" · {fmt_num(l['bines_saldo'], 0)} bines"
+            filas.append([f"#{l['lote_numero']}", l.get("proveedor") or "—", saldo_txt])
+        return tabla(["Lote", "Proveedor", "Saldo hoy"], filas, [22 * mm, 79 * mm, 72 * mm], align_derecha_desde=2)
     filas = [[f"#{l['lote_numero']}", l.get("proveedor") or "—"] for l in lotes]
     return tabla(["Lote", "Proveedor"], filas, [22 * mm, 151 * mm])
 

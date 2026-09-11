@@ -836,7 +836,9 @@ def reporte_corrida_pdf(corrida_id: int):
             text(
                 f"""
                 SELECT a.lote_numero, l.proveedor, a.tipo_almacen_origen, a.kg_asignados,
-                       l.brix_recepcion, l.acidez, l.ratio, ({_SQL_KG_SALDO_AL_CIERRE}) AS kg_saldo
+                       a.bines_consumidos, l.brix_recepcion, l.acidez, l.ratio,
+                       ({_SQL_KG_SALDO_AL_CIERRE}) AS kg_saldo,
+                       ({_SQL_BINES_SALDO_AL_CIERRE}) AS bines_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
                 JOIN v_saldo_lotes v ON v.numero = a.lote_numero
