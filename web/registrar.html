@@ -174,16 +174,20 @@ recientesBody.addEventListener("click", async (ev) => {
     if (esBines) {
       const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
       const binesActual = Number(fila.dataset.bines) || 0;
-      const quedanActual = Number(fila.dataset.binesSaldo) || 0; // lo que hay ahora, contando ya esta fila
-      const maxBines = quedanActual + binesActual; // lo que habría si esta fila no hubiera consumido nada
+      const quedanActual = Number(fila.dataset.binesSaldo) || 0; // saldo del lote ahora, ya descontando esta fila
+      const maxBines = quedanActual + binesActual; // lo máximo que esta fila podría tener (si nadie más lo hubiera tocado)
+      // Pide directo "cuántos bines consumió ESTA fila" (no "cuántos quedan") - pedir el
+      // saldo restante confundía cuando el lote se reparte entre varias corridas: Stephano
+      // terminaba escribiendo ahí el total del lote o el saldo de otra corrida, y el consumo
+      // de esta fila quedaba mal sin que se notara hasta que el saldo global se descuadraba.
       fila.querySelector('[data-celda="kg"]').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
-          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" style="width:64px;text-align:right" title="Bines que quedan ahora">
-          <span style="font-size:11px;color:var(--text-muted)">bines</span>
+          <input type="number" min="1" max="${maxBines}" step="1" value="${binesActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" style="width:64px;text-align:right" title="Bines que consumió esta corrida de este lote">
+          <span style="font-size:11px;color:var(--text-muted)">bines aquí</span>
         </div>`;
       fila.querySelector('[data-celda="acciones"]').innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">consumo: ${binesActual} bines · ${fmtKg(binesActual * kgPorBin)} kg</span>
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">${fmtKg(binesActual * kgPorBin)} kg · quedan ${maxBines - binesActual} en el lote (de ${maxBines} disponibles)</span>
           <div style="white-space:nowrap">
             <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
             <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -191,9 +195,10 @@ recientesBody.addEventListener("click", async (ev) => {
         </div>
       `;
       fila.querySelector(".edit-bines-input").addEventListener("input", (ev) => {
-        const quedan = ev.target.value === "" ? NaN : Number(ev.target.value);
-        const consumidos = isNaN(quedan) ? 0 : Math.max(0, maxBines - quedan);
-        document.getElementById(`edit-kg-hint-${id}`).textContent = `consumo: ${consumidos} bines · ${fmtKg(consumidos * kgPorBin)} kg`;
+        const bines = ev.target.value === "" ? NaN : Number(ev.target.value);
+        const consumidos = isNaN(bines) ? 0 : Math.max(0, Math.min(maxBines, bines));
+        document.getElementById(`edit-kg-hint-${id}`).textContent =
+          `${fmtKg(consumidos * kgPorBin)} kg · quedan ${maxBines - consumidos} en el lote (de ${maxBines} disponibles)`;
       });
       return;
     }
@@ -210,17 +215,12 @@ recientesBody.addEventListener("click", async (ev) => {
     let kg, bines = null;
     if (binesInput) {
       const maxBines = Number(binesInput.dataset.maxBines);
-      const quedan = binesInput.value === "" ? NaN : Number(binesInput.value);
-      if (isNaN(quedan) || quedan < 0 || quedan > maxBines) {
-        alert(`Ingresa cuántos bines quedan ahora (entre 0 y ${maxBines}).`);
+      bines = binesInput.value === "" ? NaN : Number(binesInput.value);
+      if (isNaN(bines) || bines <= 0 || bines > maxBines) {
+        alert(`Ingresa cuántos bines consumió esta corrida de este lote (entre 1 y ${maxBines}).`);
         return;
       }
-      bines = maxBines - quedan;
-      if (bines <= 0) {
-        alert("Con esos bines que quedan, esta fila no registraría ningún consumo.");
-        return;
-      }
-      const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
+      const kgPorBin = Number(binesInput.dataset.kgPorBin);
       kg = bines * kgPorBin;
     } else {
       kg = Number(fila.querySelector(".edit-kg-input").value);
