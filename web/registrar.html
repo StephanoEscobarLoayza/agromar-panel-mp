@@ -186,7 +186,7 @@ recientesBody.addEventListener("click", async (ev) => {
       // lo que la otra corrida ya tenía, y esa fila quedaba mal.
       fila.querySelector('[data-celda="kg"]').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
-          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" title="Bines que quedan de este lote (contando todas las corridas)">
+          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" style="width:64px;text-align:right;flex-shrink:0" title="Bines que quedan de este lote (contando todas las corridas)">
           <span style="font-size:11px;color:var(--text-muted)">bines quedan</span>
         </div>`;
       const hint = (quedan) => {
