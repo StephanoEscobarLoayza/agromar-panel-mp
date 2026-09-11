@@ -173,21 +173,31 @@ recientesBody.addEventListener("click", async (ev) => {
     const esBines = fila.dataset.tipoOrigen === "BINES" && Number(fila.dataset.binesTotales) > 0;
     if (esBines) {
       const kgPorBin = Number(fila.dataset.pesoNeto) / Number(fila.dataset.binesTotales);
+      const binesTotales = Number(fila.dataset.binesTotales);
       const binesActual = Number(fila.dataset.bines) || 0;
       const quedanActual = Number(fila.dataset.binesSaldo) || 0; // saldo del lote ahora, ya descontando esta fila
       const maxBines = quedanActual + binesActual; // lo máximo que esta fila podría tener (si nadie más lo hubiera tocado)
-      // Pide directo "cuántos bines consumió ESTA fila" (no "cuántos quedan") - pedir el
-      // saldo restante confundía cuando el lote se reparte entre varias corridas: Stephano
-      // terminaba escribiendo ahí el total del lote o el saldo de otra corrida, y el consumo
-      // de esta fila quedaba mal sin que se notara hasta que el saldo global se descuadraba.
+      const otrasCorridas = binesTotales - maxBines; // lo que YA se fue en otras corridas - no se toca desde aquí
+      // Pide "cuántos bines quedan" (Stephano cuenta el patio y quiere poner
+      // eso directo, no calcular una resta) - pero mostrando bien claro que
+      // es el saldo TOTAL del lote, y cuánto de eso ya se fue en otras
+      // corridas, porque ahí fue donde se confundió antes con un lote
+      // repartido en dos corridas (el 2393): escribía el número sin contar
+      // lo que la otra corrida ya tenía, y esa fila quedaba mal.
       fila.querySelector('[data-celda="kg"]').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
-          <input type="number" min="1" max="${maxBines}" step="1" value="${binesActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" style="width:64px;text-align:right" title="Bines que consumió esta corrida de este lote">
-          <span style="font-size:11px;color:var(--text-muted)">bines aquí</span>
+          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" title="Bines que quedan de este lote (contando todas las corridas)">
+          <span style="font-size:11px;color:var(--text-muted)">bines quedan</span>
         </div>`;
+      const hint = (quedan) => {
+        const consumidos = maxBines - quedan;
+        let txt = `esta corrida: ${consumidos} bines · ${fmtKg(consumidos * kgPorBin)} kg`;
+        if (otrasCorridas > 0) txt += ` · otras corridas ya usaron ${otrasCorridas} bines de este lote`;
+        return txt;
+      };
       fila.querySelector('[data-celda="acciones"]').innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">${fmtKg(binesActual * kgPorBin)} kg · quedan ${maxBines - binesActual} en el lote (de ${maxBines} disponibles)</span>
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">${hint(quedanActual)}</span>
           <div style="white-space:nowrap">
             <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
             <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -195,10 +205,9 @@ recientesBody.addEventListener("click", async (ev) => {
         </div>
       `;
       fila.querySelector(".edit-bines-input").addEventListener("input", (ev) => {
-        const bines = ev.target.value === "" ? NaN : Number(ev.target.value);
-        const consumidos = isNaN(bines) ? 0 : Math.max(0, Math.min(maxBines, bines));
+        const quedan = ev.target.value === "" ? NaN : Number(ev.target.value);
         document.getElementById(`edit-kg-hint-${id}`).textContent =
-          `${fmtKg(consumidos * kgPorBin)} kg · quedan ${maxBines - consumidos} en el lote (de ${maxBines} disponibles)`;
+          hint(isNaN(quedan) ? maxBines : Math.max(0, Math.min(maxBines, quedan)));
       });
       return;
     }
@@ -215,9 +224,14 @@ recientesBody.addEventListener("click", async (ev) => {
     let kg, bines = null;
     if (binesInput) {
       const maxBines = Number(binesInput.dataset.maxBines);
-      bines = binesInput.value === "" ? NaN : Number(binesInput.value);
-      if (isNaN(bines) || bines <= 0 || bines > maxBines) {
-        alert(`Ingresa cuántos bines consumió esta corrida de este lote (entre 1 y ${maxBines}).`);
+      const quedan = binesInput.value === "" ? NaN : Number(binesInput.value);
+      if (isNaN(quedan) || quedan < 0 || quedan > maxBines) {
+        alert(`Ingresa cuántos bines quedan de este lote ahora (entre 0 y ${maxBines}).`);
+        return;
+      }
+      bines = maxBines - quedan;
+      if (bines <= 0) {
+        alert("Con esos bines que quedan, esta corrida no tendría ningún consumo registrado.");
         return;
       }
       const kgPorBin = Number(binesInput.dataset.kgPorBin);
