@@ -20,7 +20,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
@@ -1714,4 +1714,21 @@ def exportar_xlsx():
 # ---------------------------------------------------------------------------
 # front-end estático (todo en el mismo servicio - un solo link para compartir)
 # ---------------------------------------------------------------------------
+# style.css y app.js se referencian sin "?v=" desde las 8 páginas - cualquier
+# cambio de diseño (como el de aquí, los bines en Lotes) puede quedarse
+# invisible en un navegador que ya los tenía en caché, igual que pasó antes
+# con los PDF de reporte. "no-cache" (no "no-store") obliga al navegador a
+# preguntarle siempre al servidor si cambió (una vuelta rápida, 304 si no
+# cambió) en vez de usar la copia guardada a ciegas por un rato. Declaradas
+# ANTES del mount de StaticFiles para que Starlette las resuelva primero.
+@app.get("/style.css")
+def _css_sin_cache():
+    return FileResponse(BASE_DIR / "web" / "style.css", media_type="text/css", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/app.js")
+def _js_sin_cache():
+    return FileResponse(BASE_DIR / "web" / "app.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
 app.mount("/", StaticFiles(directory=BASE_DIR / "web", html=True), name="web")
