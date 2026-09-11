@@ -96,23 +96,37 @@ CREATE INDEX idx_asignaciones_corrida ON asignaciones(corrida_id);
 
 -- ----------------------------------------------------------------------------
 -- VALIDACIÓN AUTOMÁTICA: bloquea a nivel de base de datos si se intenta
--- asignar más kg de los que el lote tiene disponibles. Esto es justamente lo
--- que falló con el lote 2333 (se asignó parcial en una corrida y luego total
--- en otra, sumando más de lo que el lote realmente pesaba) - con este trigger
--- ya no puede volver a pasar, sin importar quién cargue el dato ni desde dónde.
+-- asignar más kg (o más bines) de los que el lote tiene disponibles. Esto es
+-- justamente lo que falló con el lote 2333 (se asignó parcial en una corrida
+-- y luego total en otra, sumando más de lo que el lote realmente pesaba) -
+-- con este trigger ya no puede volver a pasar, sin importar quién cargue el
+-- dato ni desde dónde.
+--
+-- La validación de bines se agregó después (2026-09-11): antes solo se
+-- chequeaba en el código de Python (`bines_disponibles()` en api.py) antes
+-- del INSERT/UPDATE - una consulta aparte, sin ninguna protección real si dos
+-- corridas registran consumo del MISMO lote casi al mismo instante (dos
+-- personas trabajando corridas en paralelo, por ejemplo). El chequeo de
+-- Python se mantiene (da un mensaje de error más amable, sin llegar a
+-- tocar la base), pero ahora este trigger es el que de verdad no deja pasar
+-- el exceso, pase lo que pase del lado de la aplicación.
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_validar_saldo_lote()
 RETURNS TRIGGER AS $$
 DECLARE
-    peso_total       NUMERIC;
-    ya_asignado       NUMERIC;
-    saldo_disponible  NUMERIC;
+    peso_total          NUMERIC;
+    ya_asignado         NUMERIC;
+    saldo_disponible    NUMERIC;
+    bines_total         INTEGER;
+    bines_ya_asignados  INTEGER;
+    bines_disponibles   INTEGER;
 BEGIN
     IF NEW.kg_asignados IS NULL THEN
         RETURN NEW;  -- "kg pendiente" - nada que validar todavía
     END IF;
 
-    SELECT peso_neto_kg INTO peso_total FROM lotes WHERE numero = NEW.lote_numero;
+    SELECT peso_neto_kg, bines_totales INTO peso_total, bines_total
+    FROM lotes WHERE numero = NEW.lote_numero;
 
     SELECT COALESCE(SUM(kg_asignados), 0) INTO ya_asignado
     FROM asignaciones
@@ -124,6 +138,22 @@ BEGIN
     IF NEW.kg_asignados > saldo_disponible THEN
         RAISE EXCEPTION 'El lote % solo tiene % kg de saldo disponible (se intentó asignar % kg)',
             NEW.lote_numero, saldo_disponible, NEW.kg_asignados;
+    END IF;
+
+    -- mismo criterio para bines - solo aplica si el lote se maneja por bines
+    -- (bines_totales no es null) y esta fila trae un conteo de bines.
+    IF NEW.bines_consumidos IS NOT NULL AND bines_total IS NOT NULL THEN
+        SELECT COALESCE(SUM(bines_consumidos), 0) INTO bines_ya_asignados
+        FROM asignaciones
+        WHERE lote_numero = NEW.lote_numero
+          AND id <> COALESCE(NEW.id, -1);
+
+        bines_disponibles := bines_total - bines_ya_asignados;
+
+        IF NEW.bines_consumidos > bines_disponibles THEN
+            RAISE EXCEPTION 'El lote % solo tiene % bin(es) de saldo disponible (se intentó asignar % bines)',
+                NEW.lote_numero, bines_disponibles, NEW.bines_consumidos;
+        END IF;
     END IF;
 
     RETURN NEW;
