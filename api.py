@@ -31,6 +31,7 @@ from reporte_corrida import generar_reporte_pdf
 from reporte_periodo import generar_reporte_periodo_pdf
 from reporte_stock import generar_reporte_stock_pdf
 from reporte_trazabilidad import generar_trazabilidad_xlsx
+from reporte_paradas import generar_paradas_periodo_xlsx
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
@@ -1727,12 +1728,8 @@ def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
         raise HTTPException(status_code=400, detail="La fecha 'desde' no puede ser posterior a 'hasta'.")
     p = {"d": d_desde, "h": d_hasta + timedelta(days=1)}
 
-    from openpyxl import Workbook
-
-    wb = Workbook()
-    wb.remove(wb.active)
     with engine.connect() as conn:
-        _hoja_xlsx(wb, "Paradas", conn.execute(text(
+        paradas = rows(conn.execute(text(
             """
             SELECT c.nombre AS corrida, p.turno, p.hora_inicio, p.hora_fin,
                    CASE WHEN p.hora_fin IS NULL THEN NULL
@@ -1747,11 +1744,10 @@ def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
             """
         ), p))
 
-    buf = BytesIO()
-    wb.save(buf)
+    xlsx_bytes = generar_paradas_periodo_xlsx(d_desde, d_hasta, paradas)
     nombre = f"paradas-{d_desde:%Y%m%d}-a-{d_hasta:%Y%m%d}.xlsx"
     return Response(
-        content=buf.getvalue(),
+        content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{nombre}"',
