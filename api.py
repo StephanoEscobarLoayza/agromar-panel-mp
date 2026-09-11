@@ -1713,6 +1713,53 @@ def exportar_xlsx():
     )
 
 
+@app.get("/api/paradas/export.xlsx")
+def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
+    """Excel de las paradas registradas en un rango de fechas (por defecto la
+    semana, desde el botón de Paradas), con los mismos campos del formulario -
+    para llevarlo o analizarlo aparte de la app. `hasta` cuenta el día completo."""
+    try:
+        d_desde = datetime.strptime(desde, "%Y-%m-%d").date()
+        d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fechas inválidas (usa AAAA-MM-DD).")
+    if d_desde > d_hasta:
+        raise HTTPException(status_code=400, detail="La fecha 'desde' no puede ser posterior a 'hasta'.")
+    p = {"d": d_desde, "h": d_hasta + timedelta(days=1)}
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    with engine.connect() as conn:
+        _hoja_xlsx(wb, "Paradas", conn.execute(text(
+            """
+            SELECT c.nombre AS corrida, p.turno, p.hora_inicio, p.hora_fin,
+                   CASE WHEN p.hora_fin IS NULL THEN NULL
+                        ELSE ROUND(EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60)
+                   END AS min_total,
+                   p.area_proceso, p.tipo_parada, p.equipo_afectado, p.descripcion_falla,
+                   p.responsable_solucion, p.solucion_obs, p.recomendacion
+            FROM paradas p
+            JOIN corridas c ON c.id = p.corrida_id
+            WHERE p.hora_inicio >= :d AND p.hora_inicio < :h
+            ORDER BY p.hora_inicio
+            """
+        ), p))
+
+    buf = BytesIO()
+    wb.save(buf)
+    nombre = f"paradas-{d_desde:%Y%m%d}-a-{d_hasta:%Y%m%d}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # front-end estático (todo en el mismo servicio - un solo link para compartir)
 # ---------------------------------------------------------------------------
