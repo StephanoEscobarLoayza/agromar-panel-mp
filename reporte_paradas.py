@@ -14,8 +14,10 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 _TITULO_FILL = PatternFill("solid", fgColor="1F4E37")   # verde bosque de la marca
+_ACENTO_FILL = PatternFill("solid", fgColor="E8890C")   # cítrico de la marca - acento bajo el título, mismo criterio que las secciones de los PDF
 _HEAD_FILL = PatternFill("solid", fgColor="CFE2C1")
-_TOTAL_FILL = PatternFill("solid", fgColor="F2F2F2")
+_FILA_ALT_FILL = PatternFill("solid", fgColor="F3F8EF")  # cebreado sutil de filas, para que no se vea una pared plana en períodos largos
+_EN_CURSO_FILL = PatternFill("solid", fgColor="FBEBD6")  # ámbar - misma paleta "warn" que ya usa la app, para no perder de vista una parada sin cerrar
 _BOLD = Font(bold=True)
 _HEAD_FONT = Font(bold=True, size=10, color="1F4E37")
 _TITULO_FONT = Font(bold=True, size=13, color="FFFFFF")
@@ -78,6 +80,13 @@ def generar_paradas_periodo_xlsx(desde, hasta, paradas) -> bytes:
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[1].height = 26
 
+    # acento cítrico bajo el título - mismo lenguaje visual que la doble
+    # regla forest+citrus de los encabezados de sección en los PDF
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
+    for i in range(1, ncols + 1):
+        ws.cell(row=2, column=i).fill = _ACENTO_FILL
+    ws.row_dimensions[2].height = 4
+
     # ---------- resumen ----------
     total_min = sum(float(p.get("min_total") or 0) for p in paradas)
     n = len(paradas)
@@ -85,14 +94,14 @@ def generar_paradas_periodo_xlsx(desde, hasta, paradas) -> bytes:
     resumen = f"{n} parada{'s' if n != 1 else ''} · {_fmt_minutos(total_min)} parados en total"
     if en_curso:
         resumen += f" · {en_curso} en curso"
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
-    c = ws.cell(row=2, column=1, value=resumen)
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=ncols)
+    c = ws.cell(row=3, column=1, value=resumen)
     c.font = Font(italic=True, size=10, color="5B6459")
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[2].height = 20
+    ws.row_dimensions[3].height = 20
 
     # ---------- encabezados ----------
-    hfila = 4
+    hfila = 5
     for i, (nombre, ancho) in enumerate(COLS, start=1):
         cc = ws.cell(row=hfila, column=i, value=nombre)
         cc.font = _HEAD_FONT
@@ -109,8 +118,13 @@ def generar_paradas_periodo_xlsx(desde, hasta, paradas) -> bytes:
         cc = ws.cell(row=r, column=1, value="Sin paradas registradas en este período.")
         cc.font = Font(italic=True, color="8B9186")
         cc.alignment = Alignment(horizontal="center")
-    for p in paradas:
+    for idx, p in enumerate(paradas):
         fin = p.get("hora_fin")
+        # una parada sin cerrar se resalta entera en ámbar (misma paleta
+        # "warn" que ya usa el resto de la app) - no hay que leer cada
+        # fila para notar que todavía sigue abierta. Si no, cebreado
+        # sutil cada 2 filas para que un período largo no se vea plano.
+        fila_fill = _EN_CURSO_FILL if fin is None else (_FILA_ALT_FILL if idx % 2 == 1 else None)
         fila = [
             p.get("corrida") or "—",
             "Día" if p.get("turno") == "DÍA" else "Noche" if p.get("turno") == "NOCHE" else (p.get("turno") or "—"),
@@ -128,6 +142,8 @@ def generar_paradas_periodo_xlsx(desde, hasta, paradas) -> bytes:
         for i, v in enumerate(fila, start=1):
             cc = ws.cell(row=r, column=i, value=v)
             cc.border = _BORDE
+            if fila_fill:
+                cc.fill = fila_fill
             if i in (3, 4):
                 cc.number_format = _FMT_FECHAHORA
                 cc.alignment = Alignment(vertical="top")
@@ -135,6 +151,7 @@ def generar_paradas_periodo_xlsx(desde, hasta, paradas) -> bytes:
                 cc.alignment = Alignment(horizontal="right", vertical="top")
                 if v is None:
                     cc.value = "en curso"
+                    cc.font = _BOLD
                     cc.alignment = Alignment(horizontal="center", vertical="top")
             elif i in (9, 11, 12):
                 cc.alignment = _WRAP
@@ -143,6 +160,14 @@ def generar_paradas_periodo_xlsx(desde, hasta, paradas) -> bytes:
         r += 1
 
     ws.freeze_panes = f"A{hfila + 1}"
+    ws.print_title_rows = f"{hfila}:{hfila}"  # repite el encabezado en cada página al imprimir
+
+    # ---------- pie ----------
+    r += 1
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=ncols)
+    cc = ws.cell(row=r, column=1, value=f"Generado el {_ahora_peru().strftime('%d/%m/%Y %H:%M')} desde el Panel de cuadre de producción.")
+    cc.font = Font(italic=True, size=9, color="8B9186")
+    cc.alignment = Alignment(horizontal="left", indent=1)
 
     buf = BytesIO()
     wb.save(buf)
