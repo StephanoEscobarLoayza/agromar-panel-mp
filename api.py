@@ -206,16 +206,20 @@ def _paso_mezcla(l, kg_usado, es_parcial, kg_acum, brix_pond, acidez_pond):
     return paso
 
 
-def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min):
-    """Agrega hasta MAX_BINES_AJUSTE lotes de bines COMPLETOS (nunca corta a
-    una fracción) - en planta siempre entran 2 lotes de bines a la vez, sin
+def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=MAX_BINES_AJUSTE):
+    """Agrega hasta max_bines lotes de bines COMPLETOS (nunca corta a una
+    fracción) - por defecto 2, porque en planta siempre entran 2 lotes de
+    bines a la vez sobre el silo al arrancar una corrida desde cero, sin
     importar si con uno solo ya alcanzaría el mínimo: la prioridad es
     procesar más materia prima, no la mínima posible para llegar al
     Brix/Ratio (Stephano lo aclaró explícitamente: quedarse corto con un
-    bin parcial cuando podría meter más es ineficiente para la producción)."""
+    bin parcial cuando podría meter más es ineficiente para la producción).
+    Pero a media corrida (ver sugerir_siguiente_bin), el caller puede pasar
+    max_bines=1 si solo se le acabó UN bin de los dos que tenía corriendo -
+    no hace falta reponer los dos si el otro sigue con saldo."""
     pasos_bines = []
     for l in bines:
-        if len(pasos_bines) >= MAX_BINES_AJUSTE:
+        if len(pasos_bines) >= max_bines:
             break
         kg_disponible = float(l["kg_saldo"])
         brix_lote = float(l["brix_recepcion"])
@@ -228,10 +232,10 @@ def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_m
     return pasos_bines, cumplido
 
 
-def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min):
-    """Igual que _ajustar_con_bines (hasta MAX_BINES_AJUSTE lotes COMPLETOS,
-    nunca a fracción) pero en vez de ir por orden de llegada, en cada uno de
-    los cupos elige - de lo que queda disponible - el bin que deja la MEJOR
+def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=MAX_BINES_AJUSTE):
+    """Igual que _ajustar_con_bines (hasta max_bines lotes COMPLETOS, nunca a
+    fracción) pero en vez de ir por orden de llegada, en cada uno de los
+    cupos elige - de lo que queda disponible - el bin que deja la MEJOR
     mezcla resultante, probando de verdad cada candidato contra lo que ya se
     lleva acumulado (no solo comparando el brix/ratio propio de cada lote
     suelto). Stephano pidió esto como alternativa a "el que sigue por
@@ -242,7 +246,7 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
     así no gana un bin que dispara el ratio pero hunde el brix, ni al revés."""
     disponibles = list(bines)
     pasos_bines = []
-    while disponibles and len(pasos_bines) < MAX_BINES_AJUSTE:
+    while disponibles and len(pasos_bines) < max_bines:
         mejor = mejor_score = None
         for l in disponibles:
             kg_l = float(l["kg_saldo"])
@@ -364,7 +368,7 @@ def sugerir_mezcla(brix_min: float, ratio_min: float):
     return {"modo": "opciones", "origen_base": "en_espera_multiple", "escenarios": escenarios}
 
 
-def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=False):
+def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
     brix_mezcla = brix_pond / kg_acum
     acidez_mezcla = acidez_pond / kg_acum
     ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
@@ -377,7 +381,6 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=F
         "acidez_lote": float(r["acidez"]),
         "ratio_lote": float(r["ratio"]) if r["ratio"] is not None else None,
         "kg_usado": round(kg_usado, 2),
-        "estimado": estimado,
         "kg_acumulado": round(kg_acum, 2),
         "brix_mezcla": round(brix_mezcla, 2),
         "acidez_mezcla": round(acidez_mezcla, 3),
@@ -386,14 +389,18 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=F
 
 
 @app.get("/api/corridas/{corrida_id}/sugerir-siguiente-bin")
-def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, modo: str = "fecha"):
+def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, modo: str = "fecha", n_bines: int = 1):
     """Para cuando ya estás a mitad de una corrida y un lote de bines se te
     acaba: a diferencia del sugeridor general (que arranca de cero asumiendo
     que vas a usar el lote de Silo completo), este parte de lo que YA
     registraste de verdad en 'Registrar consumo' para esta corrida (Silo +
     bines ya usados) - ese es el Brix/Ratio acumulado real que ya está
     mezclado en la máquina - y sugiere el/los siguiente(s) bin(es) que hacen
-    falta para llegar al mínimo, de a uno, máximo 2, igual que en planta.
+    falta para llegar al mínimo.
+
+    n_bines: cuántos bines se te acabaron de verdad (1 o 2) - eso es lo que
+    se repone, no siempre 2 (si solo se te acabó uno de los dos que tenías
+    corriendo, el otro sigue con saldo y no hace falta tocarlo).
 
     modo="fecha" (por defecto): el siguiente en la cola por orden de
     llegada - fácil de calcular a mano con solo mirar la fecha, se usa para
@@ -401,6 +408,8 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
     modo="calidad": en vez de por fecha, elige el/los bin(es) que más
     ayudan a mantener o subir el Brix/Ratio de la mezcla resultante - esto
     sí hace falta calcularlo, no es solo mirar una fecha."""
+    if n_bines not in (1, 2):
+        raise HTTPException(status_code=400, detail="n_bines debe ser 1 o 2.")
     with engine.connect() as conn:
         corrida = one(conn.execute(text("SELECT id, nombre FROM corridas WHERE id = :id"), {"id": corrida_id}))
         if corrida is None:
@@ -410,11 +419,9 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
             text(
                 """
                 SELECT a.lote_numero, a.kg_asignados, a.tipo_almacen_origen, a.creado_en,
-                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio,
-                       v.kg_saldo
+                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
-                LEFT JOIN v_saldo_lotes v ON v.numero = a.lote_numero
                 WHERE a.corrida_id = :c
                 ORDER BY a.creado_en ASC
                 """
@@ -432,55 +439,71 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
             """
         )))
 
+    if not registrado:
+        return {
+            "corrida_nombre": corrida["nombre"],
+            "tiene_registros": False,
+            "lotes_sin_calidad": [],
+        }
+
     kg_acum = brix_pond = acidez_pond = 0.0
     ya_alimentado = []
+    en_proceso = []
     lotes_sin_calidad = []
     for r in registrado:
-        estimado = r["kg_asignados"] is None
-        if estimado:
-            # "kg pendiente": el lote ya empezó a alimentar la corrida (típico
-            # Silo) pero todavía no se sabe el total exacto - se estima con el
-            # saldo que le queda al lote (mismo criterio que /api/lotes/sugerir-mezcla
-            # usa para un Silo "EN PROCESO"), en vez de tratarlo como si no
-            # se hubiera registrado nada.
-            kg = float(r["kg_saldo"] or 0)
-        else:
-            kg = float(r["kg_asignados"])
-        if kg <= 0:
-            continue
         if r["brix_recepcion"] is None or r["acidez"] is None or float(r["acidez"]) <= 0:
             lotes_sin_calidad.append(r["lote_numero"])
+            continue
+        if r["kg_asignados"] is None:
+            # "kg pendiente": el lote ya empezó a alimentar la corrida pero
+            # todavía no se sabe cuánto lleva metido hasta ahora - se muestra
+            # como referencia (Brix/Acidez de recepción) pero SIN inventar un
+            # kg, porque asumir que ya entró completo (o cualquier otro
+            # número) puede estar muy lejos de lo que en realidad lleva.
+            en_proceso.append({
+                "numero": r["lote_numero"],
+                "proveedor": r["proveedor"],
+                "fecha_ingreso": r["fecha_ingreso"],
+                "tipo_almacen": r["tipo_almacen_origen"],
+                "brix_lote": float(r["brix_recepcion"]),
+                "acidez_lote": float(r["acidez"]),
+                "ratio_lote": float(r["ratio"]) if r["ratio"] is not None else None,
+            })
+            continue
+        kg = float(r["kg_asignados"])
+        if kg <= 0:
             continue
         kg_acum += kg
         brix_pond += float(r["brix_recepcion"]) * kg
         acidez_pond += float(r["acidez"]) * kg
-        ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado))
+        ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond))
 
     if kg_acum == 0:
+        # sí hay lotes alimentando la corrida (por eso no es "sin registros"),
+        # pero ninguno con kg confirmado todavía - no se puede calcular un
+        # Brix/Ratio real de la mezcla hasta que se registre al menos uno
+        # (se completa el "kg pendiente" desde "Registrar consumo").
         return {
             "corrida_nombre": corrida["nombre"],
-            "tiene_registros": False,
+            "tiene_registros": True,
+            "sin_kg_confirmado": True,
+            "en_proceso": en_proceso,
             "lotes_sin_calidad": lotes_sin_calidad,
         }
 
     ya_cumple = (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
 
-    # en planta SIEMPRE corren 2 lotes de bines a la vez, sin importar si la
-    # mezcla ya llegó al mínimo o no (regla operativa, no de calidad) - por
-    # eso siempre se muestra el siguiente bin (o los 2 siguientes), completos,
-    # aunque ya no "haga falta" para la calidad. Por fecha (de a uno, el que
-    # sigue en la cola) o por calidad (el que más ayuda al Brix/Ratio),
-    # según lo que haya pedido el front en `modo`.
     if modo == "calidad":
-        pasos_bines, cumplido = _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min)
+        pasos_bines, cumplido = _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=n_bines)
     else:
-        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min)
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=n_bines)
 
     return {
         "corrida_nombre": corrida["nombre"],
         "modo": modo,
         "tiene_registros": True,
         "ya_alimentado": ya_alimentado,
+        "en_proceso": en_proceso,
         "lotes_sin_calidad": lotes_sin_calidad,
         "brix_actual": round(brix_pond / kg_acum, 2),
         "ratio_actual": round(brix_pond / acidez_pond, 2) if acidez_pond > 0 else None,
