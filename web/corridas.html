@@ -230,14 +230,10 @@ function corridaCard(c) {
 }
 
 function productoFila(p, corridaId) {
-  const esEntrada = p.tipo === "entrada";
   const litros = p.volumen_litros != null && p.volumen_litros !== "" ? ` · ${fmtKg(p.volumen_litros)} L` : "";
-  const noPt = (!esEntrada && p.cuenta_como_pt === false)
-    ? ` <span class="tag" style="background:var(--surface-2);color:var(--text-muted)">no cuenta como PT</span>`
-    : "";
   return `
     <div class="prod-fila" data-producto-id="${p.id}">
-      <div><b>${escapeHtml(p.producto)}</b>${noPt}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}${p.observaciones ? ` · ${escapeHtml(p.observaciones)}` : ""}</span></div>
+      <div><b>${escapeHtml(p.producto)}</b><span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}${p.observaciones ? ` · ${escapeHtml(p.observaciones)}` : ""}</span></div>
       <div class="prod-pt num">${fmtKg(p.pt_kg)} kg
         <button class="btn-link" data-accion="editar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Editar">✎</button>
         <button class="btn-link" data-accion="eliminar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Eliminar">✕</button>
@@ -288,7 +284,7 @@ async function cargarProductosPanel(corridaId) {
     let html = `<div class="prod-grupo-titulo">Productos de salida</div>`;
     html += salida.length ? salida.map(p => productoFila(p, corridaId)).join("") : '<div class="empty">Sin productos registrados todavía.</div>';
     if (entrada.length) {
-      html += `<div class="prod-grupo-titulo" style="margin-top:12px">Insumos de entrada <span style="font-weight:400;color:var(--text-muted)">— se metieron a la corrida desde afuera, nunca cuentan como PT</span></div>`;
+      html += `<div class="prod-grupo-titulo" style="margin-top:12px">Insumos de entrada <span style="font-weight:400;color:var(--text-muted)">— material ingresado a la corrida desde una fuente externa</span></div>`;
       html += entrada.map(p => productoFila(p, corridaId)).join("");
     }
     cont.innerHTML = html;

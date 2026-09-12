@@ -1007,7 +1007,7 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
             JOIN lotes l ON l.numero = a.lote_numero
             LEFT JOIN v_saldo_lotes v ON v.numero = a.lote_numero
             WHERE a.corrida_id = :c
-            ORDER BY a.fecha_proceso, a.lote_numero
+            ORDER BY a.lote_numero
             """
         ), {"c": corrida_id, "fecha_final": corrida.get("fecha_final")}))
         productos = rows(conn.execute(text(

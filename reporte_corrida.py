@@ -274,10 +274,9 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     if entrada_kg_total > 0:
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
-            f"El producto terminado de arriba ya descuenta {fmt_kg(entrada_kg_total)} kg de insumos que "
-            f"entraron a la corrida desde afuera (reposición para subir Brix, ver \"Insumos de entrada\" "
-            f"más abajo) - Calidad reporta {fmt_kg(pt_bruto_total)} kg en total al pesar los tambores, "
-            f"sin hacer esa resta.",
+            f"El producto terminado ya descuenta {fmt_kg(entrada_kg_total)} kg correspondientes a insumos "
+            f"de entrada (ver \"Insumos de entrada\" más abajo). Calidad reporta {fmt_kg(pt_bruto_total)} kg "
+            f"brutos al pesar los tambores, antes de este descuento.",
             style_footnote,
         ))
     story.append(Spacer(1, 6 * mm))
@@ -352,7 +351,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Insumos de entrada ({len(productos_entrada)})"))
         story.append(Paragraph(
-            "Producto que se metió a la corrida desde afuera (no lo produjo ella) - nunca cuenta como PT ni suma al rendimiento.",
+            "Material ingresado a la corrida desde una fuente externa; no forma parte del producto terminado ni del rendimiento.",
             style_footnote,
         ))
         story.append(Spacer(1, 2 * mm))
