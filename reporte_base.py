@@ -140,6 +140,11 @@ class Banda(Flowable):
 
 
 def header_footer(canvas_obj, doc, texto_pie):
+    """El "Generado el ..." vive AQUÍ (se dibuja en el margen de cada página,
+    fuera del frame de contenido) y no como Paragraph al final del story -
+    antes, si la última tabla llegaba casi hasta el borde inferior, ese
+    Paragraph solo no encontraba espacio y se empujaba solo a una página
+    nueva, casi en blanco. Al vivir en el pie fijo nunca puede desbordar."""
     canvas_obj.saveState()
     canvas_obj.setStrokeColor(BORDER)
     canvas_obj.setLineWidth(0.5)
@@ -147,7 +152,7 @@ def header_footer(canvas_obj, doc, texto_pie):
     canvas_obj.setFont("Helvetica", 8)
     canvas_obj.setFillColor(TEXT_MUTED)
     canvas_obj.drawString(MARGIN, 10 * mm, "Del campo a planta, cuadrado al kilo. · Agromar Industrial")
-    canvas_obj.drawRightString(PAGE_W - MARGIN, 10 * mm, f"Página {doc.page}")
+    canvas_obj.drawRightString(PAGE_W - MARGIN, 10 * mm, f"Generado {ahora_peru().strftime('%d/%m/%Y %H:%M')} · Página {doc.page}")
     canvas_obj.drawCentredString(PAGE_W / 2, 10 * mm, texto_pie)
     canvas_obj.restoreState()
 

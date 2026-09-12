@@ -9,7 +9,7 @@ from reporte_base import (
     FOREST_2, CITRUS, OK, BAD, TEXT,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
-    encabezado, seccion, tabla, nuevo_doc, ahora_peru,
+    encabezado, seccion, tabla, nuevo_doc,
 )
 
 
@@ -361,9 +361,6 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Paradas registradas ({len(paradas)})"))
         story.append(_tabla_paradas(paradas))
-
-    story.append(Spacer(1, 10 * mm))
-    story.append(Paragraph(f"Generado el {ahora_peru().strftime('%d/%m/%Y %H:%M')} desde el Panel de cuadre de producción.", style_footnote))
 
     doc.build(
         story,
