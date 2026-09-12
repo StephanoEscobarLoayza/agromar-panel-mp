@@ -364,7 +364,7 @@ def sugerir_mezcla(brix_min: float, ratio_min: float):
     return {"modo": "opciones", "origen_base": "en_espera_multiple", "escenarios": escenarios}
 
 
-def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
+def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=False):
     brix_mezcla = brix_pond / kg_acum
     acidez_mezcla = acidez_pond / kg_acum
     ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
@@ -377,6 +377,7 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
         "acidez_lote": float(r["acidez"]),
         "ratio_lote": float(r["ratio"]) if r["ratio"] is not None else None,
         "kg_usado": round(kg_usado, 2),
+        "estimado": estimado,
         "kg_acumulado": round(kg_acum, 2),
         "brix_mezcla": round(brix_mezcla, 2),
         "acidez_mezcla": round(acidez_mezcla, 3),
@@ -409,9 +410,11 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
             text(
                 """
                 SELECT a.lote_numero, a.kg_asignados, a.tipo_almacen_origen, a.creado_en,
-                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio
+                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio,
+                       v.kg_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
+                LEFT JOIN v_saldo_lotes v ON v.numero = a.lote_numero
                 WHERE a.corrida_id = :c
                 ORDER BY a.creado_en ASC
                 """
@@ -433,7 +436,16 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
     ya_alimentado = []
     lotes_sin_calidad = []
     for r in registrado:
-        kg = float(r["kg_asignados"] or 0)
+        estimado = r["kg_asignados"] is None
+        if estimado:
+            # "kg pendiente": el lote ya empezó a alimentar la corrida (típico
+            # Silo) pero todavía no se sabe el total exacto - se estima con el
+            # saldo que le queda al lote (mismo criterio que /api/lotes/sugerir-mezcla
+            # usa para un Silo "EN PROCESO"), en vez de tratarlo como si no
+            # se hubiera registrado nada.
+            kg = float(r["kg_saldo"] or 0)
+        else:
+            kg = float(r["kg_asignados"])
         if kg <= 0:
             continue
         if r["brix_recepcion"] is None or r["acidez"] is None or float(r["acidez"]) <= 0:
@@ -442,7 +454,7 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
         kg_acum += kg
         brix_pond += float(r["brix_recepcion"]) * kg
         acidez_pond += float(r["acidez"]) * kg
-        ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond))
+        ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado))
 
     if kg_acum == 0:
         return {

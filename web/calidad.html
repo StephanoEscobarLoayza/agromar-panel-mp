@@ -139,13 +139,18 @@ function tagAlmacen(t) {
 function filaHtml(p, resaltada) {
   // los bines siempre se meten completos (nunca a fracción - en planta
   // siempre entran 2 lotes de bines a la vez), así que kg_usado ya es el
-  // total del lote.
-  const kgTexto = fmtKg(p.kg_usado);
+  // total del lote. `estimado` (solo en "ya_alimentado") = el lote sigue
+  // como "kg pendiente" en Registrar consumo - se estima con su saldo
+  // porque todavía no se sabe el kg final.
+  const kgTexto = p.estimado ? `~${fmtKg(p.kg_usado)}` : fmtKg(p.kg_usado);
+  const tagEstimado = p.estimado
+    ? ` <span class="tag" style="background:var(--warn-bg);color:var(--warn)">estimado, en proceso</span>`
+    : "";
   return `
     <tr${resaltada ? ' style="background:var(--ok-bg)"' : ""}>
       <td class="strong num">#${p.numero}</td>
       <td>${escapeHtml(p.proveedor)}</td>
-      <td><span class="tag">${tagAlmacen(p.tipo_almacen)}</span></td>
+      <td><span class="tag">${tagAlmacen(p.tipo_almacen)}</span>${tagEstimado}</td>
       <td>${fmtFechaSola(p.fecha_ingreso)}</td>
       <td class="right num">${kgTexto}</td>
       <td class="right num">${p.brix_lote.toFixed(2)}</td>
