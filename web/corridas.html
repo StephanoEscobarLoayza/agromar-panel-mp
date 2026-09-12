@@ -202,28 +202,31 @@ function corridaCard(c) {
       </div>
       <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
         <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
-        <div class="two-col" style="margin-top:10px">
-          <select id="prod-tipo-${c.id}">
-            <option value="salida" selected>Producto de salida (lo produjo esta corrida)</option>
-            <option value="entrada">Insumo de entrada (se metió desde afuera, ej. para subir Brix)</option>
-          </select>
-          <input type="text" id="prod-nombre-${c.id}" placeholder="Nombre (ej. Concentrado, o Reposición 2026)">
+        <button class="btn-link" id="prod-form-toggle-${c.id}" data-accion="toggle-form-producto" data-id="${c.id}" style="margin-top:10px">+ Agregar producto</button>
+        <div class="prod-form" id="prod-form-${c.id}" style="display:none;margin-top:10px">
+          <div class="two-col">
+            <select id="prod-tipo-${c.id}">
+              <option value="salida" selected>Producto de salida (lo produjo esta corrida)</option>
+              <option value="entrada">Insumo de entrada (ingresó a la corrida desde una fuente externa, ej. para subir Brix)</option>
+            </select>
+            <input type="text" id="prod-nombre-${c.id}" placeholder="Nombre (ej. Concentrado, o Reposición 2026)">
+          </div>
+          <div class="two-col" style="margin-top:8px">
+            <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
+            <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
+          </div>
+          <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
+          <div class="two-col" style="margin-top:8px">
+            <input type="number" id="prod-litros-${c.id}" min="0" step="0.01" placeholder="Volumen (litros)">
+            <input type="text" id="prod-obs-${c.id}" placeholder="Observaciones (opcional)">
+          </div>
+          <label id="prod-cuentapt-label-${c.id}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:8px 0 4px">
+            <input type="checkbox" id="prod-cuentapt-${c.id}" style="width:auto" checked>
+            Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.
+          </label>
+          <div id="prod-msg-${c.id}"></div>
+          <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar</button>
         </div>
-        <div class="two-col" style="margin-top:8px">
-          <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
-          <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
-        </div>
-        <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
-        <div class="two-col" style="margin-top:8px">
-          <input type="number" id="prod-litros-${c.id}" min="0" step="0.01" placeholder="Volumen (litros)">
-          <input type="text" id="prod-obs-${c.id}" placeholder="Observaciones (opcional)">
-        </div>
-        <label id="prod-cuentapt-label-${c.id}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:8px 0 4px">
-          <input type="checkbox" id="prod-cuentapt-${c.id}" style="width:auto" checked>
-          Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.
-        </label>
-        <div id="prod-msg-${c.id}"></div>
-        <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar</button>
       </div>
     </div>
   `;
@@ -249,7 +252,7 @@ function productoFilaEdicion(p, corridaId) {
       <div class="two-col">
         <select class="ed-prod-tipo">
           <option value="salida" ${esEntrada ? "" : "selected"}>Producto de salida</option>
-          <option value="entrada" ${esEntrada ? "selected" : ""}>Insumo de entrada (no es PT)</option>
+          <option value="entrada" ${esEntrada ? "selected" : ""}>Insumo de entrada</option>
         </select>
         <input type="text" class="ed-prod-nombre" value="${escapeHtml(p.producto)}" placeholder="Nombre">
       </div>
@@ -436,7 +439,17 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const panel = document.getElementById(`prod-panel-${id}`);
     const abrir = panel.style.display === "none";
     panel.style.display = abrir ? "block" : "none";
-    if (abrir) cargarProductosPanel(id);
+    if (abrir) {
+      cargarProductosPanel(id);
+      document.getElementById(`prod-form-${id}`).style.display = "none";
+      document.getElementById(`prod-form-toggle-${id}`).textContent = "+ Agregar producto";
+    }
+  } else if (accion === "toggle-form-producto") {
+    const form = document.getElementById(`prod-form-${id}`);
+    const toggle = document.getElementById(`prod-form-toggle-${id}`);
+    const abrir = form.style.display === "none";
+    form.style.display = abrir ? "block" : "none";
+    toggle.textContent = abrir ? "Cancelar" : "+ Agregar producto";
   } else if (accion === "guardar-producto") {
     const tipo = document.getElementById(`prod-tipo-${id}`).value;
     const nombre = document.getElementById(`prod-nombre-${id}`).value.trim();
