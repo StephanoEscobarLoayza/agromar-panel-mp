@@ -68,7 +68,7 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         kpis.append(("Volumen", f"{fmt_kg(litros_total)} L", TEXT))
     kpis.append((
         "Tiempo parado",
-        fmt_minutos(min_parado) if paradas else "sin paradas",
+        fmt_minutos(min_parado) if paradas else "Sin paradas",
         BAD if min_parado > 60 else TEXT,
     ))
     filas_kpi = []

@@ -794,12 +794,22 @@ def listar_productos_corrida(corrida_id: int):
 # una foto fija que ya no se mueve aunque después otra corrida use el resto.
 # Para una corrida todavía abierta (fecha_final NULL) se usa el saldo en vivo,
 # igual que siempre - ahí sí interesa ver el número más fresco.
+#
+# IMPORTANTE: el corte por fecha (creado_en <= cierre) SOLO debe aplicarse a
+# asignaciones de OTRAS corridas - las de la corrida :c misma cuentan SIEMPRE,
+# sin importar cuándo se registraron. Sin esto, un lote que esta corrida
+# consumió pero cuya asignación se guardó/editó DESPUÉS de darle "Finalizar"
+# (flujo normal: cerrar y después terminar de cargar el detalle) se excluía a
+# sí mismo del cálculo, y el reporte mostraba el lote como si nunca lo hubiera
+# tocado (Stephano lo notó con los lotes 2449/2450 de la corrida 94 - salía
+# el saldo completo del lote en vez del que de verdad quedaba).
 _SQL_KG_SALDO_AL_CIERRE = """
     CASE WHEN :fecha_final IS NULL THEN v.kg_saldo ELSE
         l.peso_neto_kg - COALESCE((
             SELECT SUM(a2.kg_asignados) FROM asignaciones a2
             WHERE a2.lote_numero = a.lote_numero
-              AND a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours')
+              AND (a2.corrida_id = :c
+                   OR a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours'))
         ), 0)
     END
 """
@@ -808,7 +818,8 @@ _SQL_BINES_SALDO_AL_CIERRE = """
         l.bines_totales - COALESCE((
             SELECT SUM(a2.bines_consumidos) FROM asignaciones a2
             WHERE a2.lote_numero = a.lote_numero
-              AND a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours')
+              AND (a2.corrida_id = :c
+                   OR a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours'))
         ), 0)
     END
 """
@@ -817,7 +828,8 @@ _SQL_KG_CONSUMIDO_AL_CIERRE = """
         COALESCE((
             SELECT SUM(a2.kg_asignados) FROM asignaciones a2
             WHERE a2.lote_numero = a.lote_numero
-              AND a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours')
+              AND (a2.corrida_id = :c
+                   OR a2.creado_en <= (CAST(:fecha_final AS timestamp) + interval '5 hours'))
         ), 0)
     END
 """

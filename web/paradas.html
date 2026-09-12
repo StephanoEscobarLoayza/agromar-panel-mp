@@ -209,7 +209,7 @@ async function cargarParadas() {
   const paradas = await apiGet(`/api/corridas/${corridaId}/paradas`);
   if (paradas.length === 0) {
     lista.innerHTML = '<tr><td colspan="9" class="empty">Sin paradas registradas</td></tr>';
-    totalParadas.textContent = "sin paradas registradas";
+    totalParadas.textContent = "Sin paradas registradas";
     return;
   }
   const totalMin = paradas.reduce((acc, p) => acc + (p.duracion_minutos || 0), 0);

@@ -211,7 +211,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         kpis.append(("Volumen", f"{fmt_kg(litros_total)} L", TEXT))
     kpis.append((
         "Tiempo parado",
-        (fmt_minutos(min_parado) + (" · hay una en curso" if hay_en_curso else "")) if paradas else "sin paradas",
+        (fmt_minutos(min_parado) + (" · hay una en curso" if hay_en_curso else "")) if paradas else "Sin paradas",
         BAD if min_parado > 60 else TEXT,
     ))
 
