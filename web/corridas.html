@@ -213,6 +213,7 @@ function corridaCard(c) {
           <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
           <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
         </div>
+        <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
         <div class="two-col" style="margin-top:8px">
           <input type="number" id="prod-litros-${c.id}" min="0" step="0.01" placeholder="Volumen (litros)">
           <input type="text" id="prod-obs-${c.id}" placeholder="Observaciones (opcional)">
@@ -221,7 +222,6 @@ function corridaCard(c) {
           <input type="checkbox" id="prod-cuentapt-${c.id}" style="width:auto" checked>
           Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.
         </label>
-        <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
         <div id="prod-msg-${c.id}"></div>
         <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar</button>
       </div>
