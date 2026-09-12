@@ -202,7 +202,7 @@ recientesBody.addEventListener("click", async (ev) => {
           <div style="white-space:nowrap">
             <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
             <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
-            <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)">Volver a pendiente</button>
+            <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)" title="Volver a pendiente">↺</button>
           </div>
         </div>
       `;
@@ -218,7 +218,7 @@ recientesBody.addEventListener("click", async (ev) => {
     fila.querySelector('[data-celda="acciones"]').innerHTML = `
       <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
       <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
-      <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)">Volver a pendiente</button>
+      <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)" title="Volver a pendiente">↺</button>
     `;
   } else if (btn.dataset.accion === "cancelar-asig") {
     cargarRecientes();

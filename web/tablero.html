@@ -10,32 +10,47 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root{
-    --bg:#0E1F16; --surface:#15301F; --surface-2:#1B3B26; --border:#2B4B36;
-    --text:#F4EFE0; --text-2:#BFD3C4; --text-muted:#7FA084;
+    --forest:#123524;
+    --text:#F4EFE0; --text-2:#CBDCD1; --text-muted:#93AD9A;
     --citrus:#F2A93C; --citrus-2:#F6C177;
     --ok:#4CC787;
-    --bad:#F0776C; --bad-bg:#3B1D1B; --bad-line:#7A362E;
-    --shadow:0 20px 60px rgba(0,0,0,.35);
+    --bad:#F0776C; --bad-bg:rgba(59,29,27,.72); --bad-line:#B5544A;
+    --glass-bg:rgba(13,32,21,.58); --glass-border:rgba(244,239,224,.12);
+    --glass-row:rgba(9,24,16,.4);
+    --shadow:0 24px 60px rgba(5,15,10,.5);
   }
   *{box-sizing:border-box}
+  html,body{height:100%}
   body{
-    margin:0; background:var(--bg); color:var(--text);
+    margin:0; color:var(--text);
     font-family:'Public Sans',system-ui,sans-serif;
     min-height:100vh;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     padding:40px 20px;
-    background-image:
-      radial-gradient(1100px circle at 82% -14%, color-mix(in srgb, var(--citrus) 16%, transparent), transparent 60%),
-      radial-gradient(rgba(244,239,224,.05) 1px, transparent 1.4px);
-    background-size:auto, 18px 18px;
   }
   h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;text-wrap:balance}
   .num{font-family:'IBM Plex Mono','SFMono-Regular',monospace;font-variant-numeric:tabular-nums}
   a{color:inherit}
 
-  .board{width:100%;max-width:1180px;margin:0 auto;padding:34px 40px 44px}
+  /* ---------- fondo con foto (misma foto/tratamiento que login.html) + motas ---------- */
+  .board-bg{position:fixed;inset:0;z-index:0;
+    background:var(--forest) url("/login-bg.jpg") center/cover no-repeat;
+    filter:blur(3px) saturate(1.12) brightness(.85);transform:scale(1.06)}
+  .board-bg::after{content:"";position:absolute;inset:0;
+    background:
+      radial-gradient(135% 130% at 50% 30%, rgba(18,53,36,.30) 0%, rgba(14,40,27,.58) 55%, rgba(8,22,15,.82) 100%),
+      linear-gradient(180deg, rgba(10,28,19,.35), rgba(10,28,19,.30))}
+  .board-motes{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+  @media (max-width:820px){
+    .board-bg{background-image:url("/login-bg-mobile.jpg")}
+  }
 
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:22px;border-bottom:1px solid var(--border)}
+  .board{position:relative;z-index:2;width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+  .glass{background:var(--glass-bg);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);
+    border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--shadow)}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 28px}
   .mark{display:flex;align-items:baseline;gap:2px;font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:22px;text-decoration:none}
   .mark .agro{color:var(--citrus-2)}
   .mark .dot{width:6px;height:6px;border-radius:50%;background:var(--citrus);display:inline-block;margin:0 2px 3px}
@@ -44,20 +59,20 @@
   .clock .hora{font-size:22px;font-weight:600}
   .clock .fecha{font-size:12px;color:var(--text-muted);margin-top:2px}
 
-  .hero-corrida{padding:32px 0 26px;display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap}
+  .hero-corrida{padding:30px 32px;display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap}
   .hc-label{display:flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
   .live-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0;animation:pulse 2s ease-in-out infinite}
-  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent)}50%{box-shadow:0 0 0 7px transparent}}
-  .hc-nombre{font-size:50px;font-weight:700;letter-spacing:-.01em;line-height:1.04}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(76,199,135,.55)}50%{box-shadow:0 0 0 7px rgba(76,199,135,0)}}
+  .hc-nombre{font-size:48px;font-weight:700;letter-spacing:-.01em;line-height:1.04}
   .hc-desde{font-size:15px;color:var(--text-2);margin-top:10px}
   .hc-kg{text-align:right}
-  .hc-kg .valor{font-size:50px;font-weight:600;color:var(--citrus-2)}
+  .hc-kg .valor{font-size:48px;font-weight:600;color:var(--citrus-2)}
   .hc-kg .etiqueta{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
 
   .alerta-parada{
-    display:none; align-items:center; gap:18px; margin:0 0 26px;
-    background:var(--bad-bg); border:1px solid var(--bad-line); border-radius:14px;
-    padding:20px 26px; box-shadow:var(--shadow);
+    display:none; align-items:center; gap:18px;
+    background:var(--bad-bg); border:1px solid var(--bad-line); border-radius:20px;
+    padding:22px 28px; box-shadow:var(--shadow); backdrop-filter:blur(16px);
   }
   .alerta-parada.activa{display:flex}
   .alerta-icono{width:46px;height:46px;flex-shrink:0;border-radius:50%;background:var(--bad);display:flex;align-items:center;justify-content:center;
@@ -70,25 +85,30 @@
   .alerta-tiempo .valor{font-size:30px;font-weight:600;color:var(--bad)}
   .alerta-tiempo .etiqueta{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
 
-  .seccion-titulo{font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin:30px 0 12px}
-  .registros{display:flex;flex-direction:column;gap:1px;background:var(--border);border-radius:12px;overflow:hidden;border:1px solid var(--border)}
-  .registro{display:flex;align-items:center;gap:16px;background:var(--surface);padding:16px 20px}
+  .panel-lotes{padding:8px 0 12px}
+  .seccion-titulo{font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin:14px 28px 12px}
+  .registros{display:flex;flex-direction:column}
+  .registro{display:flex;align-items:center;gap:16px;padding:14px 28px;border-top:1px solid var(--glass-border)}
+  .registro:nth-child(even){background:var(--glass-row)}
   .registro .lote{font-size:17px;font-weight:600;min-width:80px}
-  .registro .tag{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--text-2);letter-spacing:.03em;white-space:nowrap}
-  .registro .proveedor{color:var(--text-2);font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .registro .tag{font-size:11.5px;padding:3px 9px;border-radius:999px;background:rgba(244,239,224,.10);color:var(--text-2);letter-spacing:.03em;white-space:nowrap}
+  .registro .proveedor{color:var(--text-2);font-size:14px;flex:1;min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .registro .kg{font-size:17px;font-weight:600;color:var(--citrus-2);min-width:110px;text-align:right;white-space:nowrap}
   .registro .hace{color:var(--text-muted);font-size:13px;min-width:80px;text-align:right;white-space:nowrap}
-  .vacio{padding:22px 20px;color:var(--text-muted);font-size:14.5px;background:var(--surface);border-radius:12px;border:1px solid var(--border)}
+  .vacio{padding:22px 28px;color:var(--text-muted);font-size:14.5px}
 
-  .pie{display:flex;align-items:center;justify-content:space-between;margin-top:26px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)}
+  .pie{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;font-size:12px;color:var(--text-muted)}
   .pie a{text-decoration:none;color:var(--text-muted)}
   .pie a:hover{color:var(--text-2)}
 </style>
 </head>
 <body>
 
+<div class="board-bg"></div>
+<canvas class="board-motes" id="motes" aria-hidden="true"></canvas>
+
 <div class="board">
-  <div class="topbar">
+  <div class="topbar glass">
     <a href="index.html" class="mark" title="Ir a Dashboards">
       <div>
         <div><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
@@ -115,12 +135,14 @@
     </div>
   </div>
 
-  <div id="contenidoCorrida"><div class="vacio">Cargando…</div></div>
+  <div id="contenidoCorrida" class="glass"><div class="vacio">Cargando…</div></div>
 
-  <div class="seccion-titulo">Últimos lotes registrados</div>
-  <div id="listaRegistros"><div class="vacio">Cargando…</div></div>
+  <div class="glass panel-lotes">
+    <div class="seccion-titulo">Últimos lotes registrados</div>
+    <div id="listaRegistros"><div class="vacio">Cargando…</div></div>
+  </div>
 
-  <div class="pie">
+  <div class="pie glass">
     <span>Se actualiza solo — no hace falta tocar nada.</span>
     <a href="corridas.html">Ir a Corridas →</a>
   </div>
@@ -128,6 +150,68 @@
 
 <script src="app.js"></script>
 <script>
+// motas de luz flotando - mismo dibujo que login.html, para que el tablero
+// se sienta parte de la misma identidad (foto de planta + partículas), no
+// una pantalla técnica aparte.
+(function motas() {
+  const cv = document.getElementById("motes");
+  if (!cv || !cv.getContext) return;
+  const ctx = cv.getContext("2d");
+  const factorMov = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0.4 : 1;
+  let w = 0, h = 0, dpr = 1, parts = [], raf = null, t = null;
+
+  function nueva() {
+    return {
+      x: Math.random() * w, y: Math.random() * h,
+      r: 0.8 + Math.random() * 2.4,
+      vy: -(0.22 + Math.random() * 0.55) * factorMov,
+      sway: Math.random() * Math.PI * 2,
+      swaySpeed: (0.008 + Math.random() * 0.016) * factorMov,
+      swayAmp: (0.35 + Math.random() * 0.75) * factorMov,
+      a: 0.16 + Math.random() * 0.38,
+      citrus: Math.random() < 0.22,
+    };
+  }
+  function medir() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = cv.clientWidth; h = cv.clientHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round((w * h) / 20000);
+    parts = Array.from({ length: Math.max(20, Math.min(72, n)) }, nueva);
+    dibujar();
+  }
+  function dibujar() {
+    ctx.clearRect(0, 0, w, h);
+    for (const p of parts) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(" + (p.citrus ? "242,169,60," : "244,239,224,") + p.a + ")";
+      ctx.fill();
+    }
+  }
+  function paso() {
+    for (const p of parts) {
+      p.y += p.vy;
+      p.sway += p.swaySpeed;
+      p.x += Math.sin(p.sway) * p.swayAmp;
+      if (p.y < -6) { p.y = h + 6; p.x = Math.random() * w; }
+      if (p.x < -6) p.x = w + 6;
+      else if (p.x > w + 6) p.x = -6;
+    }
+    dibujar();
+    if (document.hidden) { raf = null; return; }
+    raf = requestAnimationFrame(paso);
+  }
+
+  medir();
+  raf = requestAnimationFrame(paso);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !raf) raf = requestAnimationFrame(paso);
+  });
+  window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(medir, 200); });
+})();
+
 const REFRESCO_DATOS_MS = 45000;
 
 let estado = { corrida: null, registros: [], paradaActiva: null };
