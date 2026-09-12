@@ -1256,7 +1256,7 @@ def crear_asignacion(a: NuevaAsignacion):
 
 
 class EditarAsignacion(BaseModel):
-    kg_asignados: float
+    kg_asignados: Optional[float] = None  # None = volver a dejarla en "kg pendiente"
     bines_consumidos: Optional[int] = None  # solo aplica si el lote es de bines - el front recalcula el kg a partir de esto
 
 
@@ -1266,8 +1266,9 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
     manda la cantidad de bines corregida junto con el kg ya recalculado
     (bines x kg-por-bin) - no le pide a producción que calcule el kg a mano.
     Si es SILO, bines_consumidos llega en null y se guarda así (nunca tuvo
-    bines)."""
-    if a.kg_asignados <= 0:
+    bines). kg_asignados=None vuelve a dejar la fila en "kg pendiente" (por
+    si se confirmó un kg por error y hay que deshacerlo)."""
+    if a.kg_asignados is not None and a.kg_asignados <= 0:
         raise HTTPException(status_code=400, detail="El peso a asignar debe ser mayor a 0.")
     try:
         with engine.begin() as conn:

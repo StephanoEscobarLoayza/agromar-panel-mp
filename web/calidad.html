@@ -255,13 +255,15 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
     if (n === 0) {
       mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas confirmado — y no hay bines en espera disponibles para reponer.</div>`;
     } else if (r.cumplido) {
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. Repón ${refBin} — la mezcla se mantiene sobre el mínimo.</div>`;
+      const ultimo = r.pasos_bines[n - 1];
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. Repón ${refBin} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, sobre el mínimo.</div>`;
     } else {
       const ultimo = r.pasos_bines[n - 1];
       mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: al reponer con ${refBin} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, por debajo del mínimo${porCalidad ? " — ni eligiendo el mejor de los disponibles alcanza" : ""}.</div>`;
     }
   } else if (r.cumplido) {
-    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${refBin} se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin}.</div>`;
+    const ultimo = r.pasos_bines[n - 1];
+    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${refBin} se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}.</div>`;
   } else if (n === 0) {
     mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px 0">No hay lotes de bines en espera disponibles para reponer.</div>';
   } else {
