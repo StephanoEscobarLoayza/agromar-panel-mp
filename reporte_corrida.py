@@ -1,6 +1,5 @@
 """Genera el PDF de cuadre de una corrida (botón "Reporte PDF" en Corridas).
 Piezas compartidas (paleta, tarjetas KPI, etc.) viven en reporte_base.py."""
-import unicodedata
 from io import BytesIO
 
 from reportlab.lib.units import mm
@@ -58,17 +57,13 @@ def _tabla_lotes_simple(lotes, con_saldo=False, cerrada=False):
 
 
 def _cuenta_como_pt(producto: dict) -> bool:
-    """El enjuague sale de la línea pero no es producto terminado - no suma al
-    PT kg, ni al rendimiento, ni al volumen de la corrida. Cualquier fila cuyo
-    nombre mencione "enjuague" (con o sin tildes, mayúsculas, etc.) se deja
-    fuera de esos totales. Igual se muestra normal en la tabla de productos.
-    Todo lo demás (Jugo Simple Aséptico, Jugo Concentrado Congelado, etc.) sí
-    cuenta."""
-    nombre = "".join(
-        c for c in unicodedata.normalize("NFD", (producto.get("producto") or "").lower())
-        if unicodedata.category(c) != "Mn"
-    )
-    return "enjuague" not in nombre
+    """Si esta fila suma al PT kg, al rendimiento y al volumen de la corrida.
+    Es una marca a mano por fila (`corrida_productos.cuenta_como_pt`), NO se
+    adivina por el nombre - antes se descartaba cualquier fila que dijera
+    "enjuague", pero eso no cubría casos reales como un saldo de tambor sin
+    completar (Stephano: "quisiera que cuente solo el pt principal"). Igual se
+    muestra normal en la tabla de productos, solo no suma a esos 3 totales."""
+    return producto.get("cuenta_como_pt", True) is not False
 
 
 def _tabla_productos(productos):

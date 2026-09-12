@@ -214,6 +214,7 @@ CREATE TABLE corrida_productos (
     peso_neto_tambor_kg  NUMERIC(8,2),
     pt_kg                NUMERIC(12,2),              -- producto terminado en kg (tambores × peso, o cargado directo)
     volumen_litros       NUMERIC(12,2),              -- litros de producto terminado, cargados directo (no se calcula con un factor aproximado)
+    cuenta_como_pt       BOOLEAN NOT NULL DEFAULT TRUE, -- si suma al PT kg/rendimiento/volumen de los reportes - se desmarca a mano (enjuague, saldo de tambor sin completar, etc.), no se adivina por el nombre
     observaciones        TEXT,
     creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -221,6 +222,7 @@ CREATE TABLE corrida_productos (
 );
 
 COMMENT ON TABLE corrida_productos IS 'Productos de salida de una corrida (soporta producción en paralelo de más de un producto desde el mismo MP).';
+COMMENT ON COLUMN corrida_productos.cuenta_como_pt IS 'Si esta fila cuenta como producto terminado real en los reportes (PT kg, rendimiento, volumen). Se marca/desmarca a mano por fila - antes se adivinaba si el nombre decía "enjuague", pero eso no cubría casos como un saldo de tambor sin completar.';
 
 -- ----------------------------------------------------------------------------
 -- PARADAS: tiempos muertos durante una corrida (falla mecánica, falta de MP,

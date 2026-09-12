@@ -2,7 +2,6 @@
 Junta lo que pasó en un rango de fechas: MP procesada, corridas, tipos de
 proceso, producto terminado, proveedores y paradas. Piezas compartidas
 (paleta, KPIs, tablas) viven en reporte_base.py."""
-import unicodedata
 from io import BytesIO
 
 from reportlab.lib.units import mm
@@ -22,12 +21,10 @@ def _mp_de_corrida(c):
     return float(c.get("mp_kg_objetivo") or c.get("kg_asignados_total") or 0)
 
 
-def _es_pt(nombre):
-    n = "".join(
-        ch for ch in unicodedata.normalize("NFD", (nombre or "").lower())
-        if unicodedata.category(ch) != "Mn"
-    )
-    return "enjuague" not in n
+def _es_pt(producto: dict) -> bool:
+    """Si esta fila cuenta como PT real - marca a mano por fila
+    (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre."""
+    return producto.get("cuenta_como_pt", True) is not False
 
 
 def _rend_txt(r):
@@ -48,7 +45,7 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
     doc = nuevo_doc(buf, f"Resumen de producción {desde} a {hasta}")
 
     mp_total = sum(_mp_de_corrida(c) for c in corridas)
-    prod_pt = [p for p in productos if _es_pt(p.get("producto"))]
+    prod_pt = [p for p in productos if _es_pt(p)]
     pt_total = sum(float(p["pt_kg"]) for p in prod_pt if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in prod_pt if p.get("volumen_litros") is not None)
     min_parado = sum(float(p.get("minutos") or 0) for p in paradas)

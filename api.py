@@ -759,7 +759,7 @@ def listar_todos_productos():
                 """
                 SELECT cp.id, cp.corrida_id, c.nombre AS corrida_nombre, c.fecha_inicio,
                        c.tipo_proceso, c.mp_kg_objetivo, cp.producto, cp.tambores,
-                       cp.peso_neto_tambor_kg, cp.pt_kg, cp.volumen_litros
+                       cp.peso_neto_tambor_kg, cp.pt_kg, cp.volumen_litros, cp.cuenta_como_pt
                 FROM corrida_productos cp
                 JOIN corridas c ON c.id = cp.corrida_id
                 ORDER BY c.fecha_inicio DESC
@@ -774,7 +774,7 @@ def listar_productos_corrida(corrida_id: int):
     with engine.connect() as conn:
         result = conn.execute(
             text(
-                "SELECT id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, observaciones "
+                "SELECT id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt, observaciones "
                 "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
             ),
             {"c": corrida_id},
@@ -851,7 +851,7 @@ def reporte_corrida_pdf(corrida_id: int):
         ))
         productos = rows(conn.execute(
             text(
-                "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros "
+                "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
                 "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
             ),
             {"c": corrida_id},
@@ -921,7 +921,7 @@ def reporte_periodo_pdf(desde: str, hasta: str):
         ), p))
         productos = rows(conn.execute(text(
             """
-            SELECT c.nombre AS corrida, p.producto, p.pt_kg, p.volumen_litros
+            SELECT c.nombre AS corrida, p.producto, p.pt_kg, p.volumen_litros, p.cuenta_como_pt
             FROM corrida_productos p JOIN corridas c ON c.id = p.corrida_id
             WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
             """
@@ -999,7 +999,7 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
             """
         ), {"c": corrida_id, "fecha_final": corrida.get("fecha_final")}))
         productos = rows(conn.execute(text(
-            "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros "
+            "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
             "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
         ), {"c": corrida_id}))
         mediciones = rows(conn.execute(text(
@@ -1038,6 +1038,7 @@ class NuevoProductoCorrida(BaseModel):
     peso_neto_tambor_kg: Optional[float] = None
     pt_kg: Optional[float] = None
     volumen_litros: Optional[float] = None  # se carga directo (medido/conocido), no se calcula con un factor
+    cuenta_como_pt: bool = True  # se desmarca a mano para enjuague, saldo de tambor sin completar, etc.
     observaciones: Optional[str] = ""
 
 
@@ -1055,14 +1056,15 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
                 text(
                     """
                     INSERT INTO corrida_productos
-                        (corrida_id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, observaciones)
+                        (corrida_id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt, observaciones)
                     VALUES
-                        (:corrida_id, :producto, :tambores, :peso_tambor, :pt_kg, :volumen, :obs)
+                        (:corrida_id, :producto, :tambores, :peso_tambor, :pt_kg, :volumen, :cuenta_pt, :obs)
                     ON CONFLICT (corrida_id, producto) DO UPDATE SET
                         tambores = EXCLUDED.tambores,
                         peso_neto_tambor_kg = EXCLUDED.peso_neto_tambor_kg,
                         pt_kg = EXCLUDED.pt_kg,
                         volumen_litros = EXCLUDED.volumen_litros,
+                        cuenta_como_pt = EXCLUDED.cuenta_como_pt,
                         observaciones = EXCLUDED.observaciones
                     RETURNING id
                     """
@@ -1074,6 +1076,7 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
                     "peso_tambor": p.peso_neto_tambor_kg,
                     "pt_kg": pt_kg,
                     "volumen": p.volumen_litros,
+                    "cuenta_pt": p.cuenta_como_pt,
                     "obs": p.observaciones,
                 },
             )
@@ -1081,6 +1084,52 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
         return {"id": new_id, "ok": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+
+
+@app.post("/api/corridas/{corrida_id}/productos/{producto_id}")
+def editar_producto_corrida(corrida_id: int, producto_id: int, p: NuevoProductoCorrida):
+    """Corrige un producto de salida ya registrado (nombre, tambores, peso,
+    volumen o si cuenta como PT) - antes la única forma de "editar" era
+    borrarlo y volver a crearlo, o adivinar que reescribir el mismo nombre
+    lo actualizaba (upsert por nombre, fácil de fallar con un typo)."""
+    producto = p.producto.strip()
+    if not producto:
+        raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
+    pt_kg = p.pt_kg
+    if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
+        pt_kg = p.tambores * p.peso_neto_tambor_kg
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    UPDATE corrida_productos
+                    SET producto = :producto, tambores = :tambores, peso_neto_tambor_kg = :peso_tambor,
+                        pt_kg = :pt_kg, volumen_litros = :volumen, cuenta_como_pt = :cuenta_pt,
+                        observaciones = :obs
+                    WHERE id = :id AND corrida_id = :corrida_id
+                    RETURNING id
+                    """
+                ),
+                {
+                    "id": producto_id,
+                    "corrida_id": corrida_id,
+                    "producto": producto,
+                    "tambores": p.tambores,
+                    "peso_tambor": p.peso_neto_tambor_kg,
+                    "pt_kg": pt_kg,
+                    "volumen": p.volumen_litros,
+                    "cuenta_pt": p.cuenta_como_pt,
+                    "obs": p.observaciones,
+                },
+            )
+            if result.scalar() is None:
+                raise HTTPException(status_code=404, detail="Producto no encontrado.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+    return {"ok": True}
 
 
 @app.delete("/api/corridas/{corrida_id}/productos/{producto_id}")
@@ -1681,7 +1730,7 @@ def exportar_xlsx():
         _hoja_xlsx(wb, "Productos de salida", conn.execute(text(
             """
             SELECT c.nombre AS corrida, p.producto, p.tambores, p.peso_neto_tambor_kg,
-                   p.pt_kg, p.volumen_litros, p.observaciones
+                   p.pt_kg, p.volumen_litros, p.cuenta_como_pt, p.observaciones
             FROM corrida_productos p
             JOIN corridas c ON c.id = p.corrida_id
             ORDER BY c.fecha_inicio, p.producto

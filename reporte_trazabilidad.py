@@ -10,7 +10,6 @@ dato de entrada -por ejemplo el % de descuento a brix que le pasa su jefe- o
 llena a mano un campo que la app no guarda, la hoja recalcule sola, igual que
 la de planta. Lo que no está en la app (GRP, N° Guía, % descuento a brix,
 cáscara / semilla, GNC) sale en blanco para llenarlo a mano al cierre."""
-import unicodedata
 from datetime import date, datetime
 from io import BytesIO
 
@@ -61,12 +60,10 @@ def _f(v):
         return v
 
 
-def _es_pt(nombre):
-    n = "".join(
-        ch for ch in unicodedata.normalize("NFD", (nombre or "").lower())
-        if unicodedata.category(ch) != "Mn"
-    )
-    return "enjuague" not in n
+def _es_pt(producto: dict) -> bool:
+    """Si esta fila cuenta como PT real - marca a mano por fila
+    (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre."""
+    return producto.get("cuenta_como_pt", True) is not False
 
 
 def _set(ws, celda, valor, *, fmt=None, bold=False, fill=None, borde=False, centro=False):
@@ -238,7 +235,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
              fmt=_FMT_BRIX, bold=True)
 
     # ---------- datos de entrada del bloque de resumen ----------
-    prod_pt = [p for p in productos if _es_pt(p.get("producto"))]
+    prod_pt = [p for p in productos if _es_pt(p)]
     volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in prod_pt) or None
     tambores = (sum(_f(p.get("tambores")) or 0 for p in prod_pt)) or None
     peso_tambor = next((_f(p.get("peso_neto_tambor_kg")) for p in prod_pt if p.get("peso_neto_tambor_kg")), None)
