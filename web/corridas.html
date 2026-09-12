@@ -203,33 +203,41 @@ function corridaCard(c) {
       <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
         <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
         <div class="two-col" style="margin-top:10px">
-          <input type="text" id="prod-nombre-${c.id}" placeholder="Producto (ej. Concentrado)">
-          <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
+          <select id="prod-tipo-${c.id}">
+            <option value="salida" selected>Producto de salida (lo produjo esta corrida)</option>
+            <option value="entrada">Insumo de entrada (se metió desde afuera, ej. para subir Brix)</option>
+          </select>
+          <input type="text" id="prod-nombre-${c.id}" placeholder="Nombre (ej. Concentrado, o Reposición 2026)">
         </div>
         <div class="two-col" style="margin-top:8px">
+          <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
           <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
-          <input type="number" id="prod-litros-${c.id}" min="0" step="0.01" placeholder="Volumen (litros)">
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:8px 0 4px">
+        <div class="two-col" style="margin-top:8px">
+          <input type="number" id="prod-litros-${c.id}" min="0" step="0.01" placeholder="Volumen (litros)">
+          <input type="text" id="prod-obs-${c.id}" placeholder="Observaciones (opcional)">
+        </div>
+        <label id="prod-cuentapt-label-${c.id}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:8px 0 4px">
           <input type="checkbox" id="prod-cuentapt-${c.id}" style="width:auto" checked>
           Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.
         </label>
         <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
         <div id="prod-msg-${c.id}"></div>
-        <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar producto</button>
+        <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar</button>
       </div>
     </div>
   `;
 }
 
 function productoFila(p, corridaId) {
+  const esEntrada = p.tipo === "entrada";
   const litros = p.volumen_litros != null && p.volumen_litros !== "" ? ` · ${fmtKg(p.volumen_litros)} L` : "";
-  const noPt = p.cuenta_como_pt === false
+  const noPt = (!esEntrada && p.cuenta_como_pt === false)
     ? ` <span class="tag" style="background:var(--surface-2);color:var(--text-muted)">no cuenta como PT</span>`
     : "";
   return `
     <div class="prod-fila" data-producto-id="${p.id}">
-      <div><b>${escapeHtml(p.producto)}</b>${noPt}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}</span></div>
+      <div><b>${escapeHtml(p.producto)}</b>${noPt}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}${p.observaciones ? ` · ${escapeHtml(p.observaciones)}` : ""}</span></div>
       <div class="prod-pt num">${fmtKg(p.pt_kg)} kg
         <button class="btn-link" data-accion="editar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Editar">✎</button>
         <button class="btn-link" data-accion="eliminar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Eliminar">✕</button>
@@ -239,19 +247,27 @@ function productoFila(p, corridaId) {
 }
 
 function productoFilaEdicion(p, corridaId) {
+  const esEntrada = p.tipo === "entrada";
   return `
     <div class="prod-fila-edicion" data-producto-id="${p.id}" style="padding:10px 0;display:flex;flex-direction:column;gap:8px">
       <div class="two-col">
-        <input type="text" class="ed-prod-nombre" value="${escapeHtml(p.producto)}" placeholder="Producto">
-        <input type="number" class="ed-prod-tambores" min="0" step="1" value="${p.tambores ?? ""}" placeholder="Tambores">
+        <select class="ed-prod-tipo">
+          <option value="salida" ${esEntrada ? "" : "selected"}>Producto de salida</option>
+          <option value="entrada" ${esEntrada ? "selected" : ""}>Insumo de entrada (no es PT)</option>
+        </select>
+        <input type="text" class="ed-prod-nombre" value="${escapeHtml(p.producto)}" placeholder="Nombre">
       </div>
       <div class="two-col">
+        <input type="number" class="ed-prod-tambores" min="0" step="1" value="${p.tambores ?? ""}" placeholder="Tambores">
         <input type="number" class="ed-prod-peso" min="0" step="0.01" value="${p.peso_neto_tambor_kg ?? ""}" placeholder="Peso neto del tambor (kg)">
-        <input type="number" class="ed-prod-litros" min="0" step="0.01" value="${p.volumen_litros ?? ""}" placeholder="Volumen (litros)">
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer">
-        <input type="checkbox" class="ed-prod-cuentapt" style="width:auto" ${p.cuenta_como_pt === false ? "" : "checked"}>
-        Cuenta como producto terminado (PT)
+      <div class="two-col">
+        <input type="number" class="ed-prod-litros" min="0" step="0.01" value="${p.volumen_litros ?? ""}" placeholder="Volumen (litros)">
+        <input type="text" class="ed-prod-obs" value="${escapeHtml(p.observaciones || "")}" placeholder="Observaciones">
+      </div>
+      <label class="ed-prod-cuentapt-label" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;${esEntrada ? "opacity:.5" : ""}">
+        <input type="checkbox" class="ed-prod-cuentapt" style="width:auto" ${esEntrada ? "disabled" : (p.cuenta_como_pt === false ? "" : "checked")}>
+        Cuenta como producto terminado (PT)${esEntrada ? " — no aplica a un insumo de entrada" : ""}
       </label>
       <div id="prod-ed-msg-${p.id}"></div>
       <div class="two-col">
@@ -267,9 +283,15 @@ async function cargarProductosPanel(corridaId) {
   try {
     const productos = await apiGet(`/api/corridas/${corridaId}/productos`);
     cont._productos = Object.fromEntries(productos.map(p => [p.id, p]));
-    cont.innerHTML = productos.length
-      ? productos.map(p => productoFila(p, corridaId)).join("")
-      : '<div class="empty">Sin productos registrados todavía.</div>';
+    const salida = productos.filter(p => p.tipo !== "entrada");
+    const entrada = productos.filter(p => p.tipo === "entrada");
+    let html = `<div class="prod-grupo-titulo">Productos de salida</div>`;
+    html += salida.length ? salida.map(p => productoFila(p, corridaId)).join("") : '<div class="empty">Sin productos registrados todavía.</div>';
+    if (entrada.length) {
+      html += `<div class="prod-grupo-titulo" style="margin-top:12px">Insumos de entrada <span style="font-weight:400;color:var(--text-muted)">— se metieron a la corrida desde afuera, nunca cuentan como PT</span></div>`;
+      html += entrada.map(p => productoFila(p, corridaId)).join("");
+    }
+    cont.innerHTML = html;
   } catch (e) {
     cont.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
   }
@@ -420,29 +442,37 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     panel.style.display = abrir ? "block" : "none";
     if (abrir) cargarProductosPanel(id);
   } else if (accion === "guardar-producto") {
+    const tipo = document.getElementById(`prod-tipo-${id}`).value;
     const nombre = document.getElementById(`prod-nombre-${id}`).value.trim();
     const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || null;
     const peso = Number(document.getElementById(`prod-peso-${id}`).value) || null;
     const litros = Number(document.getElementById(`prod-litros-${id}`).value) || null;
+    const obs = document.getElementById(`prod-obs-${id}`).value.trim();
     const msg = document.getElementById(`prod-msg-${id}`);
     if (!nombre) {
-      msg.innerHTML = '<div class="msg bad">Ponle un nombre al producto.</div>';
+      msg.innerHTML = '<div class="msg bad">Ponle un nombre.</div>';
       return;
     }
-    const cuentaComoPt = document.getElementById(`prod-cuentapt-${id}`).checked;
+    const cuentaComoPt = tipo === "entrada" ? false : document.getElementById(`prod-cuentapt-${id}`).checked;
     try {
       await apiPost(`/api/corridas/${id}/productos`, {
         producto: nombre,
+        tipo,
         tambores,
         peso_neto_tambor_kg: peso,
         volumen_litros: litros,
         cuenta_como_pt: cuentaComoPt,
+        observaciones: obs,
       });
       document.getElementById(`prod-nombre-${id}`).value = "";
       document.getElementById(`prod-tambores-${id}`).value = "";
       document.getElementById(`prod-peso-${id}`).value = "";
       document.getElementById(`prod-litros-${id}`).value = "";
+      document.getElementById(`prod-obs-${id}`).value = "";
       document.getElementById(`prod-cuentapt-${id}`).checked = true;
+      document.getElementById(`prod-cuentapt-${id}`).disabled = false;
+      document.getElementById(`prod-cuentapt-label-${id}`).style.opacity = "1";
+      document.getElementById(`prod-tipo-${id}`).value = "salida";
       document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
       msg.innerHTML = "";
       cargarProductosPanel(id);
@@ -478,13 +508,16 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       msg.innerHTML = '<div class="msg bad">Ponle un nombre al producto.</div>';
       return;
     }
+    const tipo = v("ed-prod-tipo").value;
     try {
       await apiPost(`/api/corridas/${corridaId}/productos/${id}`, {
         producto: nombre,
+        tipo,
         tambores: Number(v("ed-prod-tambores").value) || null,
         peso_neto_tambor_kg: Number(v("ed-prod-peso").value) || null,
         volumen_litros: Number(v("ed-prod-litros").value) || null,
-        cuenta_como_pt: v("ed-prod-cuentapt").checked,
+        cuenta_como_pt: tipo === "entrada" ? false : v("ed-prod-cuentapt").checked,
+        observaciones: v("ed-prod-obs").value.trim(),
       });
       cargarProductosPanel(corridaId);
     } catch (e) {
@@ -559,6 +592,19 @@ document.getElementById("corridas").addEventListener("input", (ev) => {
   const peso = Number(document.getElementById(`prod-peso-${id}`).value) || 0;
   const ptEl = document.getElementById(`prod-pt-${id}`);
   ptEl.textContent = tambores && peso ? `PT kg: ${fmtKg(tambores * peso)}` : "PT kg: —";
+});
+
+// un "insumo de entrada" nunca cuenta como PT - al elegirlo se desmarca y se
+// bloquea el checkbox para que no quede la sensación de que sí aplica
+document.getElementById("corridas").addEventListener("change", (ev) => {
+  const el = ev.target;
+  if (!el.id.startsWith("prod-tipo-")) return;
+  const id = el.id.split("-").pop();
+  const cb = document.getElementById(`prod-cuentapt-${id}`);
+  const esEntrada = el.value === "entrada";
+  cb.checked = !esEntrada;
+  cb.disabled = esEntrada;
+  document.getElementById(`prod-cuentapt-label-${id}`).style.opacity = esEntrada ? ".5" : "1";
 });
 
 cargar();

@@ -56,13 +56,24 @@ def _tabla_lotes_simple(lotes, con_saldo=False, cerrada=False):
     return tabla(["Lote", "Proveedor"], filas, [22 * mm, 151 * mm])
 
 
+def _es_salida(producto: dict) -> bool:
+    """"salida" = lo que produjo esta corrida (va en Productos de salida).
+    "entrada" = un insumo que se metió a la corrida desde afuera (ej.
+    reposición para subir Brix) - va en Insumos de entrada, nunca es PT."""
+    return producto.get("tipo", "salida") != "entrada"
+
+
 def _cuenta_como_pt(producto: dict) -> bool:
     """Si esta fila suma al PT kg, al rendimiento y al volumen de la corrida.
     Es una marca a mano por fila (`corrida_productos.cuenta_como_pt`), NO se
     adivina por el nombre - antes se descartaba cualquier fila que dijera
     "enjuague", pero eso no cubría casos reales como un saldo de tambor sin
-    completar (Stephano: "quisiera que cuente solo el pt principal"). Igual se
-    muestra normal en la tabla de productos, solo no suma a esos 3 totales."""
+    completar, o un insumo de entrada para subir Brix (Calidad SÍ lo cuenta
+    como PT al bajar de tanques, Producción no porque no lo produjo esta
+    corrida). Un "entrada" nunca cuenta, sin importar esta marca. Igual se
+    muestra normal en la tabla que le toque, solo no suma a esos 3 totales."""
+    if not _es_salida(producto):
+        return False
     return producto.get("cuenta_como_pt", True) is not False
 
 
@@ -77,6 +88,20 @@ def _tabla_productos(productos):
     return tabla(
         ["Producto", "Tambores", "Peso/tambor", "PT kg", "Litros"], filas,
         [45 * mm, 25 * mm, 30 * mm, 30 * mm, 30 * mm], align_derecha_desde=1,
+    )
+
+
+def _tabla_insumos_entrada(insumos):
+    filas = [[
+        p.get("producto") or "—",
+        fmt_num(p.get("tambores"), 0),
+        fmt_kg(p.get("peso_neto_tambor_kg")),
+        fmt_kg(p.get("pt_kg")),
+        p.get("observaciones") or "—",
+    ] for p in insumos]
+    return tabla(
+        ["Insumo", "Tambores", "Peso/tambor", "Kg", "Detalle"], filas,
+        [40 * mm, 20 * mm, 25 * mm, 25 * mm, 46 * mm], align_derecha_desde=1,
     )
 
 
@@ -158,12 +183,21 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
             brix_ini_pond = sum(float(m.get("litros") or 1) * float(m["brix_inicial"]) for m in med_con_ini)
             brix_inicial_medido = brix_ini_pond / litros_ini
 
-    # el enjuague sale de la línea pero no es producto terminado - se deja fuera
-    # del PT kg, del rendimiento y del volumen (ver _cuenta_como_pt).
-    productos_pt = [p for p in productos if _cuenta_como_pt(p)]
+    # el enjuague y el saldo de tambor sin completar salen de la línea pero no
+    # son producto terminado - se dejan fuera del PT kg, del rendimiento y del
+    # volumen (ver _cuenta_como_pt). Los insumos de "entrada" (reposición para
+    # subir Brix) son otra cosa: ni siquiera son "salida" de esta corrida -
+    # Calidad los cuenta al pesar tambores, Producción no porque no los
+    # produjo. Se muestran aparte y se restan del total de Calidad para que
+    # quede visible cuánto es PT real vs. cuánto se metió de afuera.
+    productos_salida = [p for p in productos if _es_salida(p)]
+    productos_entrada = [p for p in productos if not _es_salida(p)]
+    productos_pt = [p for p in productos_salida if _cuenta_como_pt(p)]
     pt_total = sum(float(p["pt_kg"]) for p in productos_pt if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in productos_pt if p.get("volumen_litros") is not None)
     rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
+    entrada_kg_total = sum(float(p["pt_kg"]) for p in productos_entrada if p.get("pt_kg") is not None)
+    pt_calidad_total = pt_total + entrada_kg_total  # lo que Calidad ve salir de tanques, sin descontar la reposición
 
     paradas_cerradas = [p for p in paradas if p.get("duracion_minutos") is not None]
     min_parado = sum(p["duracion_minutos"] for p in paradas_cerradas)
@@ -234,6 +268,15 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(kpi_grid)
+    if entrada_kg_total > 0:
+        story.append(Spacer(1, 3 * mm))
+        story.append(Paragraph(
+            f"El producto terminado de arriba ya descuenta {fmt_kg(entrada_kg_total)} kg de insumos que "
+            f"entraron a la corrida desde afuera (reposición para subir Brix, ver \"Insumos de entrada\" "
+            f"más abajo) - Calidad reporta {fmt_kg(pt_calidad_total)} kg en total al pesar los tambores, "
+            f"sin hacer esa resta.",
+            style_footnote,
+        ))
     story.append(Spacer(1, 6 * mm))
 
     if kg_silo > 0 or kg_bines > 0:
@@ -297,10 +340,20 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.extend(seccion(f"Tanques medidos ({len(mediciones)})"))
         story.append(_tabla_mediciones(mediciones))
 
-    if productos:
+    if productos_salida:
         story.append(Spacer(1, 8 * mm))
-        story.extend(seccion(f"Productos de salida ({len(productos)})"))
-        story.append(_tabla_productos(productos))
+        story.extend(seccion(f"Productos de salida ({len(productos_salida)})"))
+        story.append(_tabla_productos(productos_salida))
+
+    if productos_entrada:
+        story.append(Spacer(1, 8 * mm))
+        story.extend(seccion(f"Insumos de entrada ({len(productos_entrada)})"))
+        story.append(Paragraph(
+            "Producto que se metió a la corrida desde afuera (no lo produjo ella) - nunca cuenta como PT ni suma al rendimiento.",
+            style_footnote,
+        ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(_tabla_insumos_entrada(productos_entrada))
 
     if paradas:
         story.append(Spacer(1, 8 * mm))

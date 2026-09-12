@@ -23,7 +23,10 @@ def _mp_de_corrida(c):
 
 def _es_pt(producto: dict) -> bool:
     """Si esta fila cuenta como PT real - marca a mano por fila
-    (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre."""
+    (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre. Un
+    insumo de "entrada" (reposición para subir Brix, etc.) nunca cuenta."""
+    if producto.get("tipo", "salida") == "entrada":
+        return False
     return producto.get("cuenta_como_pt", True) is not False
 
 

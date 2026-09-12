@@ -758,7 +758,7 @@ def listar_todos_productos():
             text(
                 """
                 SELECT cp.id, cp.corrida_id, c.nombre AS corrida_nombre, c.fecha_inicio,
-                       c.tipo_proceso, c.mp_kg_objetivo, cp.producto, cp.tambores,
+                       c.tipo_proceso, c.mp_kg_objetivo, cp.producto, cp.tipo, cp.tambores,
                        cp.peso_neto_tambor_kg, cp.pt_kg, cp.volumen_litros, cp.cuenta_como_pt
                 FROM corrida_productos cp
                 JOIN corridas c ON c.id = cp.corrida_id
@@ -774,7 +774,7 @@ def listar_productos_corrida(corrida_id: int):
     with engine.connect() as conn:
         result = conn.execute(
             text(
-                "SELECT id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt, observaciones "
+                "SELECT id, producto, tipo, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt, observaciones "
                 "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
             ),
             {"c": corrida_id},
@@ -863,7 +863,7 @@ def reporte_corrida_pdf(corrida_id: int):
         ))
         productos = rows(conn.execute(
             text(
-                "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
+                "SELECT producto, tipo, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
                 "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
             ),
             {"c": corrida_id},
@@ -933,7 +933,7 @@ def reporte_periodo_pdf(desde: str, hasta: str):
         ), p))
         productos = rows(conn.execute(text(
             """
-            SELECT c.nombre AS corrida, p.producto, p.pt_kg, p.volumen_litros, p.cuenta_como_pt
+            SELECT c.nombre AS corrida, p.producto, p.tipo, p.pt_kg, p.volumen_litros, p.cuenta_como_pt
             FROM corrida_productos p JOIN corridas c ON c.id = p.corrida_id
             WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
             """
@@ -1011,7 +1011,7 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
             """
         ), {"c": corrida_id, "fecha_final": corrida.get("fecha_final")}))
         productos = rows(conn.execute(text(
-            "SELECT producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
+            "SELECT producto, tipo, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
             "FROM corrida_productos WHERE corrida_id = :c ORDER BY producto"
         ), {"c": corrida_id}))
         mediciones = rows(conn.execute(text(
@@ -1046,32 +1046,46 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
 
 class NuevoProductoCorrida(BaseModel):
     producto: str
+    tipo: str = "salida"  # "salida" = lo que produjo esta corrida; "entrada" = insumo metido desde afuera (ej. reposición para subir Brix)
     tambores: Optional[int] = None
     peso_neto_tambor_kg: Optional[float] = None
     pt_kg: Optional[float] = None
     volumen_litros: Optional[float] = None  # se carga directo (medido/conocido), no se calcula con un factor
-    cuenta_como_pt: bool = True  # se desmarca a mano para enjuague, saldo de tambor sin completar, etc.
+    cuenta_como_pt: bool = True  # se desmarca a mano para enjuague, saldo de tambor sin completar, etc. - un "entrada" nunca cuenta, sin importar esto
     observaciones: Optional[str] = ""
+
+
+def _normalizar_producto(p: NuevoProductoCorrida):
+    """Valida el nombre, calcula pt_kg si no vino directo, y fuerza
+    cuenta_como_pt=False para cualquier insumo de "entrada" - un insumo que se
+    metió a la corrida desde afuera nunca es producto terminado de esta
+    corrida, sin importar qué haya marcado el checkbox."""
+    producto = p.producto.strip()
+    if not producto:
+        raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
+    if p.tipo not in ("salida", "entrada"):
+        raise HTTPException(status_code=400, detail="Tipo inválido (debe ser 'salida' o 'entrada').")
+    pt_kg = p.pt_kg
+    if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
+        pt_kg = p.tambores * p.peso_neto_tambor_kg
+    cuenta_pt = False if p.tipo == "entrada" else p.cuenta_como_pt
+    return producto, pt_kg, cuenta_pt
 
 
 @app.post("/api/corridas/{corrida_id}/productos")
 def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
-    producto = p.producto.strip()
-    if not producto:
-        raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
-    pt_kg = p.pt_kg
-    if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
-        pt_kg = p.tambores * p.peso_neto_tambor_kg
+    producto, pt_kg, cuenta_pt = _normalizar_producto(p)
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text(
                     """
                     INSERT INTO corrida_productos
-                        (corrida_id, producto, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt, observaciones)
+                        (corrida_id, producto, tipo, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt, observaciones)
                     VALUES
-                        (:corrida_id, :producto, :tambores, :peso_tambor, :pt_kg, :volumen, :cuenta_pt, :obs)
+                        (:corrida_id, :producto, :tipo, :tambores, :peso_tambor, :pt_kg, :volumen, :cuenta_pt, :obs)
                     ON CONFLICT (corrida_id, producto) DO UPDATE SET
+                        tipo = EXCLUDED.tipo,
                         tambores = EXCLUDED.tambores,
                         peso_neto_tambor_kg = EXCLUDED.peso_neto_tambor_kg,
                         pt_kg = EXCLUDED.pt_kg,
@@ -1084,11 +1098,12 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
                 {
                     "corrida_id": corrida_id,
                     "producto": producto,
+                    "tipo": p.tipo,
                     "tambores": p.tambores,
                     "peso_tambor": p.peso_neto_tambor_kg,
                     "pt_kg": pt_kg,
                     "volumen": p.volumen_litros,
-                    "cuenta_pt": p.cuenta_como_pt,
+                    "cuenta_pt": cuenta_pt,
                     "obs": p.observaciones,
                 },
             )
@@ -1100,23 +1115,18 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
 
 @app.post("/api/corridas/{corrida_id}/productos/{producto_id}")
 def editar_producto_corrida(corrida_id: int, producto_id: int, p: NuevoProductoCorrida):
-    """Corrige un producto de salida ya registrado (nombre, tambores, peso,
+    """Corrige un producto/insumo ya registrado (nombre, tipo, tambores, peso,
     volumen o si cuenta como PT) - antes la única forma de "editar" era
     borrarlo y volver a crearlo, o adivinar que reescribir el mismo nombre
     lo actualizaba (upsert por nombre, fácil de fallar con un typo)."""
-    producto = p.producto.strip()
-    if not producto:
-        raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
-    pt_kg = p.pt_kg
-    if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
-        pt_kg = p.tambores * p.peso_neto_tambor_kg
+    producto, pt_kg, cuenta_pt = _normalizar_producto(p)
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text(
                     """
                     UPDATE corrida_productos
-                    SET producto = :producto, tambores = :tambores, peso_neto_tambor_kg = :peso_tambor,
+                    SET producto = :producto, tipo = :tipo, tambores = :tambores, peso_neto_tambor_kg = :peso_tambor,
                         pt_kg = :pt_kg, volumen_litros = :volumen, cuenta_como_pt = :cuenta_pt,
                         observaciones = :obs
                     WHERE id = :id AND corrida_id = :corrida_id
@@ -1127,11 +1137,12 @@ def editar_producto_corrida(corrida_id: int, producto_id: int, p: NuevoProductoC
                     "id": producto_id,
                     "corrida_id": corrida_id,
                     "producto": producto,
+                    "tipo": p.tipo,
                     "tambores": p.tambores,
                     "peso_tambor": p.peso_neto_tambor_kg,
                     "pt_kg": pt_kg,
                     "volumen": p.volumen_litros,
-                    "cuenta_pt": p.cuenta_como_pt,
+                    "cuenta_pt": cuenta_pt,
                     "obs": p.observaciones,
                 },
             )
@@ -1741,7 +1752,7 @@ def exportar_xlsx():
         )))
         _hoja_xlsx(wb, "Productos de salida", conn.execute(text(
             """
-            SELECT c.nombre AS corrida, p.producto, p.tambores, p.peso_neto_tambor_kg,
+            SELECT c.nombre AS corrida, p.producto, p.tipo, p.tambores, p.peso_neto_tambor_kg,
                    p.pt_kg, p.volumen_litros, p.cuenta_como_pt, p.observaciones
             FROM corrida_productos p
             JOIN corridas c ON c.id = p.corrida_id

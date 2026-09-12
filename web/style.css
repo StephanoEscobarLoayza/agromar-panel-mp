@@ -154,6 +154,7 @@ td.empty{padding:20px}
 .prod-pt{display:flex;align-items:center;gap:10px;font-weight:600}
 .prod-pt .btn-link{color:var(--text-muted);font-size:14px}
 .prod-pt .btn-link:hover{color:var(--bad)}
+.prod-grupo-titulo{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:6px}
 
 /* ---------- panels / tables ---------- */
 .panel{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}

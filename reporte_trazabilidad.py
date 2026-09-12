@@ -62,7 +62,10 @@ def _f(v):
 
 def _es_pt(producto: dict) -> bool:
     """Si esta fila cuenta como PT real - marca a mano por fila
-    (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre."""
+    (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre. Un
+    insumo de "entrada" (reposición para subir Brix, etc.) nunca cuenta."""
+    if producto.get("tipo", "salida") == "entrada":
+        return False
     return producto.get("cuenta_como_pt", True) is not False
 
 
@@ -240,6 +243,11 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     tambores = (sum(_f(p.get("tambores")) or 0 for p in prod_pt)) or None
     peso_tambor = next((_f(p.get("peso_neto_tambor_kg")) for p in prod_pt if p.get("peso_neto_tambor_kg")), None)
     pt_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in prod_pt) or None
+    # insumos que entraron a la corrida desde afuera (reposición para subir
+    # Brix, etc.) - Calidad los cuenta al pesar tambores, Producción no
+    # porque no los produjo esta corrida. Se muestran restados, no se adivina
+    # nada: si no hay ninguno registrado, "PT según Calidad" = PT kg.
+    entrada_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in productos if p.get("tipo") == "entrada") or None
 
     peso_med = [(_f(m.get("litros")) or 0.0, _f(m["brix_final"]))
                 for m in mediciones if m.get("brix_final") is not None]
@@ -256,8 +264,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     _set(ws, ws.cell(row=SEC, column=2), "RESUMEN", bold=True, fill=_SEC_FILL)
 
     m0 = SEC + 1
-    (rMP, rHR, rMPh, rVol, rTam, rPesoTam, rPT, rRend,
-     rBrix, rDens, rMasa, rRJS, rSem, rCas, rCS, rGNC, rRatio) = range(m0, m0 + 17)
+    (rMP, rHR, rMPh, rVol, rTam, rPesoTam, rPT, rEntrada, rPTCalidad, rRend,
+     rBrix, rDens, rMasa, rRJS, rSem, rCas, rCS, rGNC, rRatio) = range(m0, m0 + 19)
     NEG = {rMP, rPT, rRend, rRJS, rRatio}   # valores en negrita (los "titulares")
 
     def val(fila, etiqueta, valor, fmt=None):
@@ -275,6 +283,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     val(rPT, "PT  kg",
         (f"=D{rTam}*D{rPesoTam}" if (tambores and peso_tambor) else (round(pt_kg, 2) if pt_kg else None)),
         _FMT_KG)
+    val(rEntrada, "Insumos de entrada  kg  (resta)", round(entrada_kg, 2) if entrada_kg else None, _FMT_KG)
+    val(rPTCalidad, "PT según Calidad  kg", f'=IF(D{rEntrada}="",D{rPT},D{rPT}+D{rEntrada})', _FMT_KG)
     val(rRend, "Rendimiento", f'=IF(OR(D{rPT}="",D{rMP}=0),"",D{rPT}/D{rMP})', _FMT_PCT)
     val(rBrix, "Brix Promedio TK", round(brix_tk, 2) if brix_tk is not None else None, _FMT_BRIX)
     val(rDens, "Densidad Aparente  kg/l", DENSIDAD_APARENTE, "0.00000")
