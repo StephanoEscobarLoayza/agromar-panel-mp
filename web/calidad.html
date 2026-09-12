@@ -39,7 +39,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Calidad</h1>
-    <p class="hero-sub">Encuentra qué lotes mezclar, en orden de llegada, hasta llegar al Brix y Ratio que necesitas.</p>
+    <p class="hero-sub">Calcula qué bin(es) agregar, a partir de lo que ya llevas registrado, para llegar al Brix y Ratio que necesitas.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -47,34 +47,6 @@
 </div>
 
 <div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
-  <div class="panel">
-    <div class="panel-head"><h3>Sugeridor de mezcla</h3></div>
-    <div class="form-body">
-      <div class="two-col">
-        <div class="field">
-          <label for="brixMin">Brix mínimo</label>
-          <input type="number" id="brixMin" value="11" step="0.1" min="0">
-        </div>
-        <div class="field">
-          <label for="ratioMin">Ratio mínimo</label>
-          <input type="number" id="ratioMin" value="11" step="0.1" min="0">
-        </div>
-      </div>
-      <button class="btn" id="btnBuscar" style="width:auto;padding:11px 22px">Buscar combinación</button>
-    </div>
-  </div>
-
-  <section>
-    <div class="section-head">
-      <h2>Combinación sugerida</h2>
-      <span class="hint" id="hintResultados">el silo se asume como base, los bines son el ajuste</span>
-    </div>
-    <div id="resultados"><div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Elige un mínimo y dale a "Buscar combinación".</div></div></div>
-    <div class="hint-line" style="margin-top:12px">
-      Ojo con los lotes en Silo: si ya se mezclaron físicamente con otro lote en el mismo silo, el Brix/Acidez real puede ser distinto al de recepción que se usa aquí — confía en una medición directa cuando la tengas.
-    </div>
-  </section>
-
   <section>
     <div class="section-head">
       <h2>¿Se te acabó un bin a media corrida?</h2>
@@ -83,6 +55,16 @@
     <div class="panel" style="margin-top:0">
       <div class="form-body">
         <div class="two-col">
+          <div class="field">
+            <label for="brixMin">Brix mínimo</label>
+            <input type="number" id="brixMin" value="11" step="0.1" min="0">
+          </div>
+          <div class="field">
+            <label for="ratioMin">Ratio mínimo</label>
+            <input type="number" id="ratioMin" value="11" step="0.1" min="0">
+          </div>
+        </div>
+        <div class="two-col" style="margin-top:12px">
           <div class="field">
             <label for="corridaSelect">Corrida en curso</label>
             <select id="corridaSelect"><option value="">Cargando…</option></select>
@@ -110,7 +92,7 @@
     </div>
     <div id="resultadoSiguienteBin" style="margin-top:16px"></div>
     <div class="hint-line" style="margin-top:12px">
-      Usa el Brix y Ratio mínimo de arriba. Este cálculo toma solo lo que YA aparece con kg confirmado para esta corrida en "Registrar consumo" como punto de partida real (los lotes todavía "pendientes" se muestran aparte, sin contar), y sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elijas arriba.
+      Este cálculo toma solo lo que YA aparece con kg confirmado para esta corrida en "Registrar consumo" como punto de partida real (los lotes todavía "pendientes" se muestran aparte, sin contar), y sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elijas arriba.
     </div>
   </section>
 
@@ -129,7 +111,7 @@
   <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
 </div>
 <div class="nav-dropdown-menu" id="menuCalidad" hidden>
-  <a href="calidad.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Sugeridor de mezcla</a>
+  <a href="calidad.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Siguiente bin</a>
   <a href="mediciones.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.5v4M6 3.2l1 3.6M12 3.2l-1 3.6M6 6.5h6l1.3 8a1.5 1.5 0 0 1-1.5 1.8H6.2A1.5 1.5 0 0 1 4.7 14.5Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Medición de tanques</a>
 </div>
 <div class="nav-dropdown-menu" id="menuParadas" hidden>
@@ -138,10 +120,6 @@
 
 <script src="app.js"></script>
 <script>
-const resultados = document.getElementById("resultados");
-const hintResultados = document.getElementById("hintResultados");
-const btnBuscar = document.getElementById("btnBuscar");
-
 function tagAlmacen(t) {
   return t === "BINES" ? "Bines" : t === "SILO" ? "Silo" : "Mixto";
 }
@@ -198,94 +176,6 @@ function tablaEnProcesoHtml(enProceso) {
     </div>
   `;
 }
-
-function bloqueEscenario(esc, brixMin, ratioMin, tituloOpcion) {
-  const filasSilo = (esc.silo_base || []).map((p) => filaHtml(p, false));
-  const filasBines = esc.pasos_bines.map((p, i) => filaHtml(p, i === esc.pasos_bines.length - 1 && esc.cumplido));
-
-  const totalPasos = (esc.silo_base ? esc.silo_base.length : 0) + esc.pasos_bines.length;
-  let mensaje;
-  if (esc.cumplido) {
-    const ultimo = esc.pasos_bines.length ? esc.pasos_bines[esc.pasos_bines.length - 1] : esc.silo_base[esc.silo_base.length - 1];
-    const conBines = esc.pasos_bines.length
-      ? ` + ${esc.pasos_bines.length} lote(s) de bines`
-      : " — el silo ya alcanza solo, sin agregar bines";
-    mensaje = `<div class="msg ok" style="margin:16px 20px 0">✓ Se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin}${conBines} — ${fmtKg(ultimo.kg_acumulado)} kg en total.</div>`;
-  } else if (totalPasos === 0) {
-    mensaje = '<div class="msg bad" style="margin:16px 20px 0">No hay lotes en espera (ni silo ni bines) con Brix/Acidez registrados para armar una mezcla.</div>';
-  } else {
-    const ultimo = esc.pasos_bines.length ? esc.pasos_bines[esc.pasos_bines.length - 1] : esc.silo_base[esc.silo_base.length - 1];
-    const limite = esc.pasos_bines.length >= 2 ? "ni agregando 2 lotes de bines" : "ni con los bines en espera disponibles";
-    mensaje = `<div class="msg bad" style="margin:16px 20px 0">✕ ${limite} sobre el silo se alcanza ese mínimo — lo más cerca que se llega es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}.</div>`;
-  }
-
-  const filasHtml = (filasSilo.length ? filasSilo.join("") : '<tr><td colspan="10" class="empty">Sin lote de Silo disponible — se resuelve solo con bines.</td></tr>')
-    + (filasBines.length ? filasBines.join("") : (esc.cumplido ? "" : '<tr><td colspan="10" class="empty">No hay lotes de bines en espera disponibles.</td></tr>'));
-
-  return `
-    <div class="panel" style="margin-top:${tituloOpcion ? "16px" : "0"}">
-      ${tituloOpcion ? `<div class="panel-head"><h3>${tituloOpcion}</h3></div>` : ""}
-      ${mensaje}
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Lote</th><th>Proveedor</th><th>Almacén</th><th>Fecha</th>
-              <th class="right">Kg usado</th><th class="right">Brix</th><th class="right">Acidez</th>
-              <th class="right">Kg acumulado</th><th class="right">Brix mezcla</th><th class="right">Ratio mezcla</th>
-            </tr>
-          </thead>
-          <tbody>${filasHtml}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-async function buscar() {
-  const brixMin = Number(document.getElementById("brixMin").value);
-  const ratioMin = Number(document.getElementById("ratioMin").value);
-  if (!brixMin || !ratioMin) {
-    resultados.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Ingresa un Brix y un Ratio mínimo mayores a 0.</div></div>';
-    return;
-  }
-
-  btnBuscar.disabled = true;
-  resultados.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Calculando…</div></div>';
-  try {
-    const r = await apiGet(`/api/lotes/sugerir-mezcla?brix_min=${brixMin}&ratio_min=${ratioMin}`);
-    render(r, brixMin, ratioMin);
-  } catch (e) {
-    resultados.innerHTML = `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">${escapeHtml(e.message)}</div></div>`;
-  } finally {
-    btnBuscar.disabled = false;
-  }
-}
-
-function render(r, brixMin, ratioMin) {
-  if (r.origen_base === "en_proceso") {
-    hintResultados.textContent = "silo en proceso ahora mismo como base, ajustado con bines en espera";
-  } else if (r.origen_base === "sin_silo") {
-    hintResultados.textContent = "no hay silo disponible — armado solo con bines en espera";
-  } else if (r.origen_base === "en_espera_multiple") {
-    hintResultados.textContent = "hay más de un lote de silo en espera — elige con cuál arrancarías";
-  } else {
-    hintResultados.textContent = "el silo en espera como base, ajustado con bines en espera";
-  }
-
-  if (r.modo === "opciones") {
-    resultados.innerHTML = r.escenarios.map((esc, i) => {
-      const numeroSilo = esc.silo_base && esc.silo_base[0] ? esc.silo_base[0].numero : "—";
-      return bloqueEscenario(esc, brixMin, ratioMin, `Opción ${String.fromCharCode(65 + i)} — si arranca con el lote #${numeroSilo}`);
-    }).join("");
-    return;
-  }
-
-  resultados.innerHTML = bloqueEscenario(r.escenarios[0], brixMin, ratioMin, null);
-}
-
-btnBuscar.addEventListener("click", buscar);
-buscar();
 
 // ---------- "se te acabó un bin a media corrida" ----------
 const corridaSelect = document.getElementById("corridaSelect");
