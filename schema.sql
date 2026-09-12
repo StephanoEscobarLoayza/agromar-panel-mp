@@ -299,7 +299,8 @@ SELECT
         WHEN COALESCE(SUM(a.kg_asignados), 0) > c.mp_kg_objetivo THEN 'excedido'
         ELSE 'incompleto'
     END AS estado_cuadre,
-    c.tipo_proceso
+    c.tipo_proceso,
+    COUNT(a.id) AS n_asignaciones -- filas reales (incluye "kg pendiente") - kg_asignados_total puede ser 0 con filas de sobra
 FROM corridas c
 LEFT JOIN asignaciones a ON a.corrida_id = c.id
 GROUP BY c.id, c.nombre, c.fecha_inicio, c.fecha_final, c.mp_kg_objetivo, c.stock_inicio_kg, c.stock_cierre_kg, c.tipo_proceso;
