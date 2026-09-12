@@ -154,19 +154,37 @@ function renderComparacion(estimado, medidas) {
     return;
   }
 
-  const acidezEst = estimado.ratio_actual ? estimado.brix_actual / estimado.ratio_actual : null;
+  // sin_kg_confirmado: hay lotes alimentando la corrida, pero todos con "kg
+  // pendiente" - no hay ningún kg confirmado con qué calcular un estimado
+  // ponderado real (ver sugerir-siguiente-bin en api.py), así que no hay
+  // "Estimado (de los lotes)" que mostrar todavía, solo lo medido si existe.
+  const sinEstimado = estimado.sin_kg_confirmado === true;
+  const acidezEst = (!sinEstimado && estimado.ratio_actual) ? estimado.brix_actual / estimado.ratio_actual : null;
+
+  // ojo: sinEstimado===true implica que estimado.brix_actual/ratio_actual NO
+  // vienen en la respuesta - bloqueEstimado se arma solo si no hace falta
+  // (un template literal evalúa sus ${...} de inmediato, aunque no se use).
+  const bloqueEstimado = sinEstimado ? "" : `
+    <div class="hint-line" style="font-weight:600;color:var(--text-2);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Estimado (de los lotes)</div>
+    <div class="lookup">
+      <div class="lookup-row"><span>Brix ponderado</span><span class="num">${estimado.brix_actual.toFixed(2)}</span></div>
+      <div class="lookup-row"><span>Acidez ponderada</span><span class="num">${acidezEst !== null ? acidezEst.toFixed(3) : "—"}</span></div>
+      <div class="lookup-row"><span>Ratio</span><span class="num">${estimado.ratio_actual !== null ? estimado.ratio_actual.toFixed(2) : "—"}</span></div>
+    </div>
+  `;
+  const avisoSinEstimado = 'Todavía no hay ningún lote con kg confirmado para esta corrida en "Registrar consumo" (todos siguen "pendiente"), así que no hay un estimado con qué comparar todavía.';
 
   if (medidas.length === 0) {
+    if (sinEstimado) {
+      hintComparacion.textContent = "sin estimado ni mediciones todavía";
+      comparacionDiv.innerHTML = `<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">${avisoSinEstimado}</div></div>`;
+      return;
+    }
     hintComparacion.textContent = "sin mediciones todavía — se ve solo el estimado";
     comparacionDiv.innerHTML = `
       <div class="panel" style="margin-top:0">
         <div class="form-body">
-          <div class="hint-line" style="font-weight:600;color:var(--text-2);text-transform:uppercase;font-size:11px;letter-spacing:.03em">Estimado (de los lotes)</div>
-          <div class="lookup">
-            <div class="lookup-row"><span>Brix ponderado</span><span class="num">${estimado.brix_actual.toFixed(2)}</span></div>
-            <div class="lookup-row"><span>Acidez ponderada</span><span class="num">${acidezEst !== null ? acidezEst.toFixed(3) : "—"}</span></div>
-            <div class="lookup-row"><span>Ratio</span><span class="num">${estimado.ratio_actual !== null ? estimado.ratio_actual.toFixed(2) : "—"}</span></div>
-          </div>
+          ${bloqueEstimado}
           <div class="hint-line">Todavía no hay ninguna medición de tanque para esta corrida — agrega una abajo para comparar contra lo real.</div>
         </div>
       </div>`;
@@ -189,30 +207,37 @@ function renderComparacion(estimado, medidas) {
   const brixInicialMed = litrosConInicial > 0 ? brixInicialPond / litrosConInicial : null;
   const acidezMed = acidezPond / litrosTotal;
   const ratioMed = acidezMed > 0 ? brixMed / acidezMed : null;
-  const deltaBrix = brixMed - estimado.brix_actual;
   const todosConLitros = medidas.every(m => m.litros !== null && m.litros !== undefined);
 
+  const bloqueMedido = `
+    <div class="hint-line" style="font-weight:600;color:var(--ok);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Medido (${medidas.length} tanque${medidas.length > 1 ? "s" : ""}${todosConLitros ? ", " + fmtKg(litrosTotal) + " L" : ""})</div>
+    <div class="lookup">
+      <div class="lookup-row saldo"><span>Brix inicial promedio</span><span class="num">${brixInicialMed !== null ? brixInicialMed.toFixed(2) : "—"}</span></div>
+      <div class="lookup-row saldo"><span>Brix final promedio</span><span class="num">${brixMed.toFixed(2)}</span></div>
+      <div class="lookup-row saldo"><span>Acidez promedio</span><span class="num">${acidezMed.toFixed(3)}</span></div>
+      <div class="lookup-row saldo"><span>Ratio promedio</span><span class="num">${ratioMed !== null ? ratioMed.toFixed(2) : "—"}</span></div>
+    </div>
+  `;
+
+  if (sinEstimado) {
+    hintComparacion.textContent = `${medidas.length} tanque(s) medido(s) — sin estimado todavía`;
+    comparacionDiv.innerHTML = `
+      <div class="panel" style="margin-top:0">
+        <div class="form-body">
+          ${bloqueMedido}
+          <div class="hint-line">${avisoSinEstimado}</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const deltaBrix = brixMed - estimado.brix_actual;
   hintComparacion.textContent = `${medidas.length} tanque(s) medido(s)`;
   comparacionDiv.innerHTML = `
     <div class="panel" style="margin-top:0">
       <div class="two-col" style="padding:18px 20px 4px">
-        <div>
-          <div class="hint-line" style="font-weight:600;color:var(--text-2);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Estimado (de los lotes)</div>
-          <div class="lookup">
-            <div class="lookup-row"><span>Brix ponderado</span><span class="num">${estimado.brix_actual.toFixed(2)}</span></div>
-            <div class="lookup-row"><span>Acidez ponderada</span><span class="num">${acidezEst !== null ? acidezEst.toFixed(3) : "—"}</span></div>
-            <div class="lookup-row"><span>Ratio</span><span class="num">${estimado.ratio_actual !== null ? estimado.ratio_actual.toFixed(2) : "—"}</span></div>
-          </div>
-        </div>
-        <div>
-          <div class="hint-line" style="font-weight:600;color:var(--ok);text-transform:uppercase;font-size:11px;letter-spacing:.03em;margin-bottom:8px">Medido (${medidas.length} tanque${medidas.length > 1 ? "s" : ""}${todosConLitros ? ", " + fmtKg(litrosTotal) + " L" : ""})</div>
-          <div class="lookup">
-            <div class="lookup-row saldo"><span>Brix inicial promedio</span><span class="num">${brixInicialMed !== null ? brixInicialMed.toFixed(2) : "—"}</span></div>
-            <div class="lookup-row saldo"><span>Brix final promedio</span><span class="num">${brixMed.toFixed(2)}</span></div>
-            <div class="lookup-row saldo"><span>Acidez promedio</span><span class="num">${acidezMed.toFixed(3)}</span></div>
-            <div class="lookup-row saldo"><span>Ratio promedio</span><span class="num">${ratioMed !== null ? ratioMed.toFixed(2) : "—"}</span></div>
-          </div>
-        </div>
+        <div>${bloqueEstimado}</div>
+        <div>${bloqueMedido}</div>
       </div>
       <div class="hint-line" style="padding:8px 20px 18px">
         El Brix real sale <b>${Math.abs(deltaBrix).toFixed(2)} puntos ${deltaBrix >= 0 ? "por encima" : "por debajo"}</b> del estimado de los lotes.
