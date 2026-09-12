@@ -47,10 +47,11 @@ def _tabla_completos(lotes):
         _tag_almacen(l.get("tipo_almacen")),
         fmt_fecha(l.get("fecha_ingreso")),
         fmt_kg(l.get("peso_neto_kg")),
+        fmt_num(l.get("bines_saldo"), 0) if l.get("bines_saldo") is not None else "—",
     ] for l in lotes]
     return tabla(
-        ["Lote", "Proveedor", "Almacén", "Ingreso", "Peso"], filas,
-        [18 * mm, 60 * mm, 20 * mm, 26 * mm, 30 * mm], align_derecha_desde=4,
+        ["Lote", "Proveedor", "Almacén", "Ingreso", "Peso", "Bines"], filas,
+        [18 * mm, 54 * mm, 18 * mm, 24 * mm, 28 * mm, 16 * mm], align_derecha_desde=4,
     )
 
 
