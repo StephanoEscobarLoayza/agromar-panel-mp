@@ -119,6 +119,40 @@ def _cuadro_stock(ws, fila0, titulo, filas):
     return tr
 
 
+def _cuadro_insumos_entrada(ws, fila0, insumos):
+    """Cuadrito con el detalle de lo que entró a la corrida desde afuera
+    (reposición para subir Brix, etc.) - lo que ya se restó del PT bruto en
+    el resumen. Mismo layout que _cuadro_stock, en col H. `insumos` = filas
+    de corrida_productos con tipo='entrada'."""
+    h = 8  # col H
+    _set(ws, ws.cell(row=fila0, column=h), "Insumos de entrada  —  ya restados del PT", bold=True, fill=_SEC_FILL)
+    hdr = ["Insumo", "Tambores", "Peso/tambor", "Kg", "Detalle"]
+    for k, nom in enumerate(hdr):
+        c = _set(ws, ws.cell(row=fila0 + 1, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
+        c.font = _HEAD_FONT
+    if not insumos:
+        _set(ws, ws.cell(row=fila0 + 2, column=h), "Ninguno registrado.", borde=True)
+        for k in range(1, 5):
+            ws.cell(row=fila0 + 2, column=h + k).border = _BORDE
+        return fila0 + 2
+    i = 0
+    for i, p in enumerate(insumos, start=1):
+        rr = fila0 + 1 + i
+        _set(ws, ws.cell(row=rr, column=h), p.get("producto") or "—", borde=True)
+        _set(ws, ws.cell(row=rr, column=h + 1), _f(p.get("tambores")), borde=True, centro=True)
+        _set(ws, ws.cell(row=rr, column=h + 2), _f(p.get("peso_neto_tambor_kg")), fmt=_FMT_KG, borde=True)
+        _set(ws, ws.cell(row=rr, column=h + 3), _f(p.get("pt_kg")), fmt=_FMT_KG, borde=True)
+        _set(ws, ws.cell(row=rr, column=h + 4), p.get("observaciones") or "—", borde=True)
+    tr = fila0 + 2 + i
+    _set(ws, ws.cell(row=tr, column=h + 2), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
+    _set(ws, ws.cell(row=tr, column=h + 3), f"=SUM(K{fila0 + 2}:K{tr - 1})",
+         fmt=_FMT_KG, bold=True, fill=_TOTAL_FILL, borde=True)
+    for k in (0, 1, 4):
+        ws.cell(row=tr, column=h + k).fill = _TOTAL_FILL
+        ws.cell(row=tr, column=h + k).border = _BORDE
+    return tr
+
+
 def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None) -> bytes:
     """corrida: fila de v_cuadre_corridas + corridas. lotes: una fila por
     asignación (join a lotes + v_saldo_lotes). productos: corrida_productos.
@@ -238,16 +272,24 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
              fmt=_FMT_BRIX, bold=True)
 
     # ---------- datos de entrada del bloque de resumen ----------
+    # el PT real siempre resta los insumos de "entrada" (reposición para subir
+    # Brix, etc.) del bruto que reportan las filas de "salida" - Calidad
+    # registra el bruto tal cual se lo dan (ej. 78 cilindros), Producción no
+    # los produjo todos ella. No hace falta restar a mano antes de cargarlo:
+    # se registra el bruto en "salida" + cada insumo en "entrada", y el
+    # Excel ya sale con el neto. Mismo criterio en reporte_corrida.py.
     prod_pt = [p for p in productos if _es_pt(p)]
-    volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in prod_pt) or None
-    tambores = (sum(_f(p.get("tambores")) or 0 for p in prod_pt)) or None
+    productos_entrada = [p for p in productos if p.get("tipo") == "entrada"]
+    volumen_bruto = sum(_f(p.get("volumen_litros")) or 0.0 for p in prod_pt)
+    tambores_bruto = sum(_f(p.get("tambores")) or 0 for p in prod_pt)
     peso_tambor = next((_f(p.get("peso_neto_tambor_kg")) for p in prod_pt if p.get("peso_neto_tambor_kg")), None)
-    pt_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in prod_pt) or None
-    # insumos que entraron a la corrida desde afuera (reposición para subir
-    # Brix, etc.) - Calidad los cuenta al pesar tambores, Producción no
-    # porque no los produjo esta corrida. Se muestran restados, no se adivina
-    # nada: si no hay ninguno registrado, "PT según Calidad" = PT kg.
-    entrada_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in productos if p.get("tipo") == "entrada") or None
+    pt_kg_bruto = sum(_f(p.get("pt_kg")) or 0.0 for p in prod_pt)
+    entrada_volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in productos_entrada)
+    entrada_tambores = sum(_f(p.get("tambores")) or 0 for p in productos_entrada)
+    entrada_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in productos_entrada)
+    volumen = (volumen_bruto - entrada_volumen) or None
+    tambores = (tambores_bruto - entrada_tambores) or None
+    pt_kg = (pt_kg_bruto - entrada_kg) or None
 
     peso_med = [(_f(m.get("litros")) or 0.0, _f(m["brix_final"]))
                 for m in mediciones if m.get("brix_final") is not None]
@@ -264,8 +306,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     _set(ws, ws.cell(row=SEC, column=2), "RESUMEN", bold=True, fill=_SEC_FILL)
 
     m0 = SEC + 1
-    (rMP, rHR, rMPh, rVol, rTam, rPesoTam, rPT, rEntrada, rPTCalidad, rRend,
-     rBrix, rDens, rMasa, rRJS, rSem, rCas, rCS, rGNC, rRatio) = range(m0, m0 + 19)
+    (rMP, rHR, rMPh, rVol, rTam, rPesoTam, rPT, rEntrada, rRend,
+     rBrix, rDens, rMasa, rRJS, rSem, rCas, rCS, rGNC, rRatio) = range(m0, m0 + 18)
     NEG = {rMP, rPT, rRend, rRJS, rRatio}   # valores en negrita (los "titulares")
 
     def val(fila, etiqueta, valor, fmt=None):
@@ -283,8 +325,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     val(rPT, "PT  kg",
         (f"=D{rTam}*D{rPesoTam}" if (tambores and peso_tambor) else (round(pt_kg, 2) if pt_kg else None)),
         _FMT_KG)
-    val(rEntrada, "Insumos de entrada  kg  (resta)", round(entrada_kg, 2) if entrada_kg else None, _FMT_KG)
-    val(rPTCalidad, "PT según Calidad  kg", f'=IF(D{rEntrada}="",D{rPT},D{rPT}+D{rEntrada})', _FMT_KG)
+    val(rEntrada, "Insumos de entrada  kg  (ya restado arriba)", round(entrada_kg, 2) if entrada_kg else None, _FMT_KG)
     val(rRend, "Rendimiento", f'=IF(OR(D{rPT}="",D{rMP}=0),"",D{rPT}/D{rMP})', _FMT_PCT)
     val(rBrix, "Brix Promedio TK", round(brix_tk, 2) if brix_tk is not None else None, _FMT_BRIX)
     val(rDens, "Densidad Aparente  kg/l", DENSIDAD_APARENTE, "0.00000")
@@ -317,7 +358,9 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     completos = [s for s in stock if s.get("numero") not in mis_lotes]
 
     fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales)
-    _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos)
+    fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos)
+    if productos_entrada:
+        _cuadro_insumos_entrada(ws, fin2 + 3, productos_entrada)
 
     # ---------- anchos de columna ----------
     anchos = {1: 3, 2: 12, 3: 8, 4: 18, 5: 18, 6: 13, 7: 13, 8: 26, 9: 34, 10: 14,

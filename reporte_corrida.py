@@ -187,17 +187,20 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # son producto terminado - se dejan fuera del PT kg, del rendimiento y del
     # volumen (ver _cuenta_como_pt). Los insumos de "entrada" (reposición para
     # subir Brix) son otra cosa: ni siquiera son "salida" de esta corrida -
-    # Calidad los cuenta al pesar tambores, Producción no porque no los
-    # produjo. Se muestran aparte y se restan del total de Calidad para que
-    # quede visible cuánto es PT real vs. cuánto se metió de afuera.
+    # Calidad los cuenta al pesar tambores (registra el bruto tal cual se lo
+    # dan, ej. 78 cilindros), Producción no porque no los produjo. El PT real
+    # SIEMPRE se calcula restando el bruto de Calidad menos lo que entró de
+    # afuera - no hace falta que Stephano reste a mano antes de registrar.
     productos_salida = [p for p in productos if _es_salida(p)]
     productos_entrada = [p for p in productos if not _es_salida(p)]
     productos_pt = [p for p in productos_salida if _cuenta_como_pt(p)]
-    pt_total = sum(float(p["pt_kg"]) for p in productos_pt if p.get("pt_kg") is not None)
-    litros_total = sum(float(p["volumen_litros"]) for p in productos_pt if p.get("volumen_litros") is not None)
-    rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
+    pt_bruto_total = sum(float(p["pt_kg"]) for p in productos_pt if p.get("pt_kg") is not None)
+    litros_bruto_total = sum(float(p["volumen_litros"]) for p in productos_pt if p.get("volumen_litros") is not None)
     entrada_kg_total = sum(float(p["pt_kg"]) for p in productos_entrada if p.get("pt_kg") is not None)
-    pt_calidad_total = pt_total + entrada_kg_total  # lo que Calidad ve salir de tanques, sin descontar la reposición
+    entrada_litros_total = sum(float(p["volumen_litros"]) for p in productos_entrada if p.get("volumen_litros") is not None)
+    pt_total = pt_bruto_total - entrada_kg_total
+    litros_total = litros_bruto_total - entrada_litros_total
+    rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
 
     paradas_cerradas = [p for p in paradas if p.get("duracion_minutos") is not None]
     min_parado = sum(p["duracion_minutos"] for p in paradas_cerradas)
@@ -273,7 +276,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(Paragraph(
             f"El producto terminado de arriba ya descuenta {fmt_kg(entrada_kg_total)} kg de insumos que "
             f"entraron a la corrida desde afuera (reposición para subir Brix, ver \"Insumos de entrada\" "
-            f"más abajo) - Calidad reporta {fmt_kg(pt_calidad_total)} kg en total al pesar los tambores, "
+            f"más abajo) - Calidad reporta {fmt_kg(pt_bruto_total)} kg en total al pesar los tambores, "
             f"sin hacer esa resta.",
             style_footnote,
         ))

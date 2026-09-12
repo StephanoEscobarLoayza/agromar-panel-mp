@@ -48,9 +48,16 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
     doc = nuevo_doc(buf, f"Resumen de producción {desde} a {hasta}")
 
     mp_total = sum(_mp_de_corrida(c) for c in corridas)
+    # el PT real siempre resta los insumos de "entrada" (reposición para subir
+    # Brix, etc.) del bruto que reportan las filas de "salida" - Calidad
+    # registra el bruto tal cual (ej. 78 cilindros), Producción no lo produjo
+    # todo ella. Ver mismo criterio en reporte_corrida.py.
     prod_pt = [p for p in productos if _es_pt(p)]
-    pt_total = sum(float(p["pt_kg"]) for p in prod_pt if p.get("pt_kg") is not None)
-    litros_total = sum(float(p["volumen_litros"]) for p in prod_pt if p.get("volumen_litros") is not None)
+    prod_entrada = [p for p in productos if p.get("tipo") == "entrada"]
+    pt_total = sum(float(p["pt_kg"]) for p in prod_pt if p.get("pt_kg") is not None) - \
+        sum(float(p["pt_kg"]) for p in prod_entrada if p.get("pt_kg") is not None)
+    litros_total = sum(float(p["volumen_litros"]) for p in prod_pt if p.get("volumen_litros") is not None) - \
+        sum(float(p["volumen_litros"]) for p in prod_entrada if p.get("volumen_litros") is not None)
     min_parado = sum(float(p.get("minutos") or 0) for p in paradas)
 
     periodo = f"{fmt_fecha(desde)} — {fmt_fecha(hasta)}"
@@ -105,6 +112,9 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         for p in prod_pt:
             if p.get("pt_kg") is not None:
                 pt_por_corrida[p["corrida"]] = pt_por_corrida.get(p["corrida"], 0) + float(p["pt_kg"])
+        for p in prod_entrada:
+            if p.get("pt_kg") is not None:
+                pt_por_corrida[p["corrida"]] = pt_por_corrida.get(p["corrida"], 0) - float(p["pt_kg"])
         filas = []
         for c in corridas:
             pt_c = pt_por_corrida.get(c.get("nombre"))
