@@ -190,6 +190,7 @@ function corridaCard(c) {
       <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
       <div class="corrida-acciones">${acciones.join("")}</div>
       <div class="finalizar-panel" id="fin-panel-${c.id}" style="display:none">
+        <div id="fin-checklist-${c.id}" style="margin-bottom:10px"></div>
         <div class="field">
           <label>Fecha y hora en que de verdad terminó</label>
           <input type="datetime-local" id="fin-fecha-${c.id}">
@@ -293,6 +294,29 @@ async function cargarProductosPanel(corridaId) {
     cont.innerHTML = html;
   } catch (e) {
     cont.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// checklist de "lo típico" antes de finalizar una corrida - no bloquea el
+// cierre, solo avisa si algo usual todavía no se cargó, para no tener que
+// volver después a completarlo.
+async function cargarChecklistFinalizar(corridaId) {
+  const cont = document.getElementById(`fin-checklist-${corridaId}`);
+  cont.innerHTML = '<div class="empty">Revisando…</div>';
+  try {
+    const [productos, mediciones] = await Promise.all([
+      apiGet(`/api/corridas/${corridaId}/productos`),
+      apiGet(`/api/corridas/${corridaId}/mediciones-tanque`),
+    ]);
+    const nSalida = productos.filter((p) => p.tipo !== "entrada").length;
+    const item = (ok, textoOk, textoFalta) => ok
+      ? `<div class="msg ok" style="margin:0 0 6px">✓ ${textoOk}</div>`
+      : `<div class="msg warn" style="margin:0 0 6px">⚠ ${textoFalta}</div>`;
+    cont.innerHTML =
+      item(nSalida > 0, `${nSalida} producto${nSalida === 1 ? "" : "s"} de salida registrado${nSalida === 1 ? "" : "s"}.`, "Todavía no registraste ningún producto de salida.") +
+      item(mediciones.length > 0, `${mediciones.length} ${mediciones.length === 1 ? "medición" : "mediciones"} de tanque registrada${mediciones.length === 1 ? "" : "s"}.`, "Todavía no registraste ninguna medición de tanque.");
+  } catch (e) {
+    cont.innerHTML = "";
   }
 }
 
@@ -402,7 +426,10 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const panel = document.getElementById(`fin-panel-${id}`);
     const abrir = panel.style.display === "none";
     panel.style.display = abrir ? "block" : "none";
-    if (abrir) document.getElementById(`fin-fecha-${id}`).value = ahoraLocal();
+    if (abrir) {
+      document.getElementById(`fin-fecha-${id}`).value = ahoraLocal();
+      cargarChecklistFinalizar(id);
+    }
   } else if (accion === "cancelar-finalizar") {
     document.getElementById(`fin-panel-${id}`).style.display = "none";
   } else if (accion === "confirmar-finalizar") {
