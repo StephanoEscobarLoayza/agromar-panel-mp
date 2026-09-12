@@ -42,6 +42,16 @@ CSV_URL = (
 # PLANTA, BRIX REFRACTÓMETRO, BINES/TOLVA, pH, ACIDEZ, RATIO, PROCEDENCIA,
 # PESO, ESTADO
 
+# la hoja trae el nombre del proveedor truncado/abreviado para algunos - acá
+# se completa a la razón social real que confirmó Stephano, para que salga
+# bien en reportes/dashboards. Se aplica en cada sync (no en una columna
+# "manual" aparte) porque es la misma corrección siempre para el mismo
+# proveedor, no algo distinto por lote.
+PROVEEDOR_NOMBRE_COMPLETO = {
+    "AGRONEGOCIOS Y MULTISERVICIOS VILLEGAS": "AGRONEGOCIOS Y MULTISERVICIOS VILLEGAS SOCIEDAD ANONIMA CERRADA",
+    "COOPERATIVA AGRARIA INDUSTRIAL VRAEM": "COOPERATIVA AGRARIA INDUSTRIAL VRAEM SUMAQ PERU",
+}
+
 
 def num(s):
     """'10,04' / '  14,76 ' -> 10.04 / 14.76 (decimal con coma). '' -> None."""
@@ -105,6 +115,7 @@ def sincronizar_lotes(engine):
 
             peso = num(peso_s)
             proveedor = proveedor.strip()
+            proveedor = PROVEEDOR_NOMBRE_COMPLETO.get(proveedor, proveedor)
             fecha_ingreso = fecha(fecha_s)
 
             # lotes "EN ESPERA" que aun no llegaron/pesaron no tienen estos
