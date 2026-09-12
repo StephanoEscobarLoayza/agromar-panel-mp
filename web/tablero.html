@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Tablero de planta · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root{
+    --bg:#0E1F16; --surface:#15301F; --surface-2:#1B3B26; --border:#2B4B36;
+    --text:#F4EFE0; --text-2:#BFD3C4; --text-muted:#7FA084;
+    --citrus:#F2A93C; --citrus-2:#F6C177;
+    --ok:#4CC787;
+    --bad:#F0776C; --bad-bg:#3B1D1B; --bad-line:#7A362E;
+    --shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Public Sans',system-ui,sans-serif;
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:40px 20px;
+    background-image:
+      radial-gradient(1100px circle at 82% -14%, color-mix(in srgb, var(--citrus) 16%, transparent), transparent 60%),
+      radial-gradient(rgba(244,239,224,.05) 1px, transparent 1.4px);
+    background-size:auto, 18px 18px;
+  }
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif;margin:0;text-wrap:balance}
+  .num{font-family:'IBM Plex Mono','SFMono-Regular',monospace;font-variant-numeric:tabular-nums}
+  a{color:inherit}
+
+  .board{width:100%;max-width:1180px;margin:0 auto;padding:34px 40px 44px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:22px;border-bottom:1px solid var(--border)}
+  .mark{display:flex;align-items:baseline;gap:2px;font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:22px;text-decoration:none}
+  .mark .agro{color:var(--citrus-2)}
+  .mark .dot{width:6px;height:6px;border-radius:50%;background:var(--citrus);display:inline-block;margin:0 2px 3px}
+  .mark-sub{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted);margin-top:3px}
+  .clock{text-align:right}
+  .clock .hora{font-size:22px;font-weight:600}
+  .clock .fecha{font-size:12px;color:var(--text-muted);margin-top:2px}
+
+  .hero-corrida{padding:32px 0 26px;display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap}
+  .hc-label{display:flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0;animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent)}50%{box-shadow:0 0 0 7px transparent}}
+  .hc-nombre{font-size:50px;font-weight:700;letter-spacing:-.01em;line-height:1.04}
+  .hc-desde{font-size:15px;color:var(--text-2);margin-top:10px}
+  .hc-kg{text-align:right}
+  .hc-kg .valor{font-size:50px;font-weight:600;color:var(--citrus-2)}
+  .hc-kg .etiqueta{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
+
+  .alerta-parada{
+    display:none; align-items:center; gap:18px; margin:0 0 26px;
+    background:var(--bad-bg); border:1px solid var(--bad-line); border-radius:14px;
+    padding:20px 26px; box-shadow:var(--shadow);
+  }
+  .alerta-parada.activa{display:flex}
+  .alerta-icono{width:46px;height:46px;flex-shrink:0;border-radius:50%;background:var(--bad);display:flex;align-items:center;justify-content:center;
+    animation:latido 1.6s ease-in-out infinite}
+  @keyframes latido{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  .alerta-icono svg{width:24px;height:24px}
+  .alerta-texto .titulo{font-size:20px;font-weight:700;color:var(--bad)}
+  .alerta-texto .detalle{font-size:14.5px;color:var(--text-2);margin-top:4px}
+  .alerta-tiempo{margin-left:auto;text-align:right}
+  .alerta-tiempo .valor{font-size:30px;font-weight:600;color:var(--bad)}
+  .alerta-tiempo .etiqueta{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+
+  .seccion-titulo{font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin:30px 0 12px}
+  .registros{display:flex;flex-direction:column;gap:1px;background:var(--border);border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+  .registro{display:flex;align-items:center;gap:16px;background:var(--surface);padding:16px 20px}
+  .registro .lote{font-size:17px;font-weight:600;min-width:80px}
+  .registro .tag{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--text-2);letter-spacing:.03em;white-space:nowrap}
+  .registro .proveedor{color:var(--text-2);font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .registro .kg{font-size:17px;font-weight:600;color:var(--citrus-2);min-width:110px;text-align:right;white-space:nowrap}
+  .registro .hace{color:var(--text-muted);font-size:13px;min-width:80px;text-align:right;white-space:nowrap}
+  .vacio{padding:22px 20px;color:var(--text-muted);font-size:14.5px;background:var(--surface);border-radius:12px;border:1px solid var(--border)}
+
+  .pie{display:flex;align-items:center;justify-content:space-between;margin-top:26px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted)}
+  .pie a{text-decoration:none;color:var(--text-muted)}
+  .pie a:hover{color:var(--text-2)}
+</style>
+</head>
+<body>
+
+<div class="board">
+  <div class="topbar">
+    <a href="index.html" class="mark" title="Ir a Dashboards">
+      <div>
+        <div><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Tablero de planta</div>
+      </div>
+    </a>
+    <div class="clock">
+      <div class="hora num" id="reloj">--:--</div>
+      <div class="fecha" id="relojFecha">—</div>
+    </div>
+  </div>
+
+  <div class="alerta-parada" id="alertaParada">
+    <div class="alerta-icono">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5" stroke="#3B1D1B" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16.4" r="1.15" fill="#3B1D1B"/><path d="M10.6 3.6c.62-1.07 2.18-1.07 2.8 0l8.2 14.2c.62 1.07-.16 2.4-1.4 2.4H3.8c-1.24 0-2.02-1.33-1.4-2.4l8.2-14.2Z" stroke="#3B1D1B" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="alerta-texto">
+      <div class="titulo">Parada en curso</div>
+      <div class="detalle" id="alertaDetalle">—</div>
+    </div>
+    <div class="alerta-tiempo">
+      <div class="valor num" id="alertaTiempo">—</div>
+      <div class="etiqueta">parada</div>
+    </div>
+  </div>
+
+  <div id="contenidoCorrida"><div class="vacio">Cargando…</div></div>
+
+  <div class="seccion-titulo">Últimos lotes registrados</div>
+  <div id="listaRegistros"><div class="vacio">Cargando…</div></div>
+
+  <div class="pie">
+    <span>Se actualiza solo — no hace falta tocar nada.</span>
+    <a href="corridas.html">Ir a Corridas →</a>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const REFRESCO_DATOS_MS = 45000;
+
+let estado = { corrida: null, registros: [], paradaActiva: null };
+
+function fmtHoraReloj(d) {
+  return d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+}
+function fmtFechaReloj(d) {
+  const s = d.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function transcurrido(desde) {
+  const ms = Date.now() - new Date(desde).getTime();
+  const min = Math.max(0, Math.round(ms / 60000));
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return `${h}h ${m}m`;
+}
+function haceTexto(desde) {
+  const ms = Date.now() - new Date(desde).getTime();
+  const min = Math.max(0, Math.round(ms / 60000));
+  if (min < 1) return "recién";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return `hace ${h}h${m ? " " + m + "m" : ""}`;
+}
+function tagAlmacen(t) {
+  return t === "BINES" ? "Bines" : t === "SILO" ? "Silo" : "—";
+}
+
+function actualizarReloj() {
+  const ahora = new Date();
+  document.getElementById("reloj").textContent = fmtHoraReloj(ahora);
+  document.getElementById("relojFecha").textContent = fmtFechaReloj(ahora);
+}
+
+function renderizar() {
+  const contCorrida = document.getElementById("contenidoCorrida");
+  const contRegistros = document.getElementById("listaRegistros");
+  const alerta = document.getElementById("alertaParada");
+
+  if (estado.paradaActiva) {
+    alerta.classList.add("activa");
+    const p = estado.paradaActiva;
+    document.getElementById("alertaDetalle").textContent =
+      [p.tipo_parada, p.area_proceso].filter(Boolean).join(" · ") || "Sin detalle registrado";
+    document.getElementById("alertaTiempo").textContent = transcurrido(p.hora_inicio);
+  } else {
+    alerta.classList.remove("activa");
+  }
+
+  if (!estado.corrida) {
+    contCorrida.innerHTML = '<div class="vacio">No hay ninguna corrida en curso ahora mismo.</div>';
+    contRegistros.innerHTML = '<div class="vacio">—</div>';
+    return;
+  }
+
+  const c = estado.corrida;
+  contCorrida.innerHTML = `
+    <div class="hero-corrida">
+      <div>
+        <div class="hc-label"><span class="live-dot"></span> Corrida en curso</div>
+        <h1 class="hc-nombre">${escapeHtml(c.nombre)}</h1>
+        <div class="hc-desde">Desde las ${new Date(c.fecha_inicio).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })} · hace ${transcurrido(c.fecha_inicio)}</div>
+      </div>
+      <div class="hc-kg">
+        <div class="valor num">${fmtKg(c.kg_asignados_total)}</div>
+        <div class="etiqueta">kg registrados</div>
+      </div>
+    </div>
+  `;
+
+  if (!estado.registros.length) {
+    contRegistros.innerHTML = '<div class="vacio">Todavía no hay ningún lote registrado en esta corrida.</div>';
+    return;
+  }
+  contRegistros.innerHTML = `<div class="registros">${estado.registros.map((a) => `
+    <div class="registro">
+      <div class="lote num">#${a.lote_numero}</div>
+      <div class="tag">${tagAlmacen(a.tipo_almacen_origen)}</div>
+      <div class="proveedor">${escapeHtml(a.proveedor || "—")}</div>
+      <div class="kg num">${a.kg_asignados !== null ? fmtKg(a.kg_asignados) + " kg" : "pendiente"}</div>
+      <div class="hace">${haceTexto(a.creado_en)}</div>
+    </div>
+  `).join("")}</div>`;
+}
+
+async function cargarDatos() {
+  try {
+    const corridas = await apiGet("/api/corridas");
+    const activas = corridas.filter((c) => c.fecha_final === null);
+    const corrida = activas[0] || null;
+
+    if (!corrida) {
+      estado = { corrida: null, registros: [], paradaActiva: null };
+      renderizar();
+      return;
+    }
+
+    const [registros, paradas] = await Promise.all([
+      apiGet(`/api/corridas/${corrida.id}/asignaciones`),
+      apiGet(`/api/corridas/${corrida.id}/paradas`),
+    ]);
+    estado = {
+      corrida,
+      registros: registros.slice(0, 5),
+      paradaActiva: paradas.find((p) => p.hora_fin === null) || null,
+    };
+    renderizar();
+  } catch (e) {
+    document.getElementById("contenidoCorrida").innerHTML =
+      `<div class="vacio">No se pudo actualizar (${escapeHtml(e.message)}) — reintentando…</div>`;
+  }
+}
+
+actualizarReloj();
+setInterval(actualizarReloj, 1000);
+setInterval(renderizar, 1000);
+cargarDatos();
+setInterval(cargarDatos, REFRESCO_DATOS_MS);
+</script>
+</body>
+</html>
