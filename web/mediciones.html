@@ -279,6 +279,32 @@ async function cargarTodo() {
   `).join("");
 }
 
+function filaEdicionMedicion(fila, id) {
+  const d = fila.dataset;
+  const campo = (label, cls, val, tipo, step, placeholder) =>
+    `<div class="field"><label>${label}</label><input type="${tipo}" ${step ? `step="${step}"` : ""} class="${cls}" value="${escapeHtml(val ?? "")}" placeholder="${placeholder || ""}" style="width:100%"></div>`;
+  return `<tr><td colspan="8" style="background:var(--surface-2)">
+    <div class="form-body" style="padding:14px 4px">
+      <div class="two-col">
+        ${campo("Tanque", "edit-tanque", d.tanque, "text")}
+        ${campo("Litros", "edit-litros", d.litros, "number", 1, "opcional")}
+      </div>
+      <div class="two-col">
+        ${campo("Brix inicial", "edit-brix-inicial", d.brixInicial, "number", 0.01)}
+        ${campo("Brix final", "edit-brix-final", d.brixFinal, "number", 0.01)}
+      </div>
+      <div class="two-col">
+        ${campo("Acidez", "edit-acidez", d.acidez, "number", 0.001)}
+        ${campo("pH", "edit-ph", d.ph, "number", 0.01, "opcional")}
+      </div>
+      <div class="two-col">
+        <button class="btn" data-accion="guardar" data-id="${id}">Guardar</button>
+        <button class="btn" data-accion="cancelar" data-id="${id}" style="background:var(--surface-2);color:var(--text)">Cancelar</button>
+      </div>
+    </div>
+  </td></tr>`;
+}
+
 lista.addEventListener("click", async (ev) => {
   const btn = ev.target.closest("button[data-accion]");
   if (!btn) return;
@@ -294,18 +320,8 @@ lista.addEventListener("click", async (ev) => {
       alert(e.message);
     }
   } else if (btn.dataset.accion === "editar") {
-    const celdas = fila.querySelectorAll("td");
-    celdas[0].innerHTML = `<input type="text" class="edit-tanque" value="${fila.dataset.tanque}" style="width:60px">`;
-    celdas[1].innerHTML = `<input type="number" step="1" class="edit-litros" value="${fila.dataset.litros}" style="width:70px;text-align:right">`;
-    celdas[2].innerHTML = `<input type="number" step="0.01" class="edit-brix-inicial" value="${fila.dataset.brixInicial}" style="width:60px;text-align:right">`;
-    celdas[3].innerHTML = `<input type="number" step="0.01" class="edit-brix-final" value="${fila.dataset.brixFinal}" style="width:60px;text-align:right">`;
-    celdas[4].innerHTML = `<input type="number" step="0.001" class="edit-acidez" value="${fila.dataset.acidez}" style="width:60px;text-align:right">`;
-    celdas[5].innerHTML = `<input type="number" step="0.01" class="edit-ph" value="${fila.dataset.ph}" style="width:55px;text-align:right">`;
-    celdas[6].textContent = "";
-    celdas[7].innerHTML = `
-      <button class="btn-link strong" data-accion="guardar" data-id="${id}">Guardar</button>
-      <button class="btn-link" data-accion="cancelar" data-id="${id}">Cancelar</button>
-    `;
+    fila.insertAdjacentHTML("afterend", filaEdicionMedicion(fila, id));
+    fila.style.display = "none";
   } else if (btn.dataset.accion === "cancelar") {
     cargarTodo();
   } else if (btn.dataset.accion === "guardar") {
