@@ -85,13 +85,7 @@
         <div class="two-col">
           <div class="field">
             <label for="ncTipo">Tipo de proceso</label>
-            <select id="ncTipo">
-              <option value="JSA">JSA Aseptic</option>
-              <option value="JCC">JCC</option>
-              <option value="JCC TASTE">JCC TASTE</option>
-              <option value="JSC">JSC</option>
-              <option value="ICEGEN">ICEGEN</option>
-            </select>
+            <select id="ncTipo"></select>
           </div>
           <div class="field">
             <label for="ncFecha">Fecha y hora de inicio</label>
@@ -139,6 +133,14 @@
 <script src="app.js"></script>
 <script>
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Setiembre","Octubre","Noviembre","Diciembre"];
+const TIPOS_PROCESO = [
+  { value: "JSA", label: "JSA Aseptic" },
+  { value: "JCC", label: "JCC" },
+  { value: "JCC TASTE", label: "JCC TASTE" },
+  { value: "JSC", label: "JSC" },
+  { value: "ICEGEN", label: "ICEGEN" },
+];
+document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option value="${t.value}">${t.label}</option>`).join("");
 
 function nowLocalDatetime() {
   const d = new Date();
@@ -171,6 +173,7 @@ function corridaCard(c) {
   } else {
     acciones.push(`<button class="btn-link" data-accion="reabrir" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}" title="Por si se te olvidó registrar el consumo de algún lote antes de cerrarla">Reabrir corrida</button>`);
   }
+  acciones.push(`<button class="btn-link" data-accion="editar-corrida" data-id="${c.id}">Editar</button>`);
   acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
   acciones.push(`<a class="btn-link" href="/api/corridas/${c.id}/reporte.pdf" target="_blank" rel="noopener" style="text-decoration:none"
     onclick="this.href='/api/corridas/${c.id}/reporte.pdf?t='+Date.now()">Reporte PDF</a>`);
@@ -179,6 +182,10 @@ function corridaCard(c) {
   if (Number(c.n_asignaciones) === 0) {
     acciones.push(`<button class="btn-link btn-link-bad" data-accion="eliminar-corrida" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Eliminar</button>`);
   }
+
+  const opcionesTipo = TIPOS_PROCESO.map(t =>
+    `<option value="${t.value}" ${t.value === c.tipo_proceso ? "selected" : ""}>${t.label}</option>`
+  ).join("");
 
   return `
     <div class="corrida${abierta ? " live" : ""}">
@@ -190,6 +197,17 @@ function corridaCard(c) {
       </div>
       <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
       <div class="corrida-acciones">${acciones.join("")}</div>
+      <div class="editar-panel" id="ed-panel-${c.id}" style="display:none">
+        <div class="two-col">
+          <div class="field"><label>Nombre</label><input type="text" id="ed-nombre-${c.id}" value="${escapeHtml(c.nombre)}"></div>
+          <div class="field"><label>Tipo de proceso</label><select id="ed-tipo-${c.id}">${opcionesTipo}</select></div>
+        </div>
+        <div id="ed-msg-${c.id}"></div>
+        <div class="two-col" style="margin-top:8px">
+          <button class="btn-link strong" data-accion="guardar-editar" data-id="${c.id}">Guardar cambios</button>
+          <button class="btn-link" data-accion="cancelar-editar" data-id="${c.id}">Cancelar</button>
+        </div>
+      </div>
       <div class="finalizar-panel" id="fin-panel-${c.id}" style="display:none">
         <div id="fin-checklist-${c.id}" style="margin-bottom:10px"></div>
         <div class="field">
@@ -423,7 +441,26 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
   const accion = btn.dataset.accion;
   const id = btn.dataset.id;
 
-  if (accion === "finalizar") {
+  if (accion === "editar-corrida") {
+    const panel = document.getElementById(`ed-panel-${id}`);
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  } else if (accion === "cancelar-editar") {
+    document.getElementById(`ed-panel-${id}`).style.display = "none";
+  } else if (accion === "guardar-editar") {
+    const nombre = document.getElementById(`ed-nombre-${id}`).value.trim();
+    const tipo = document.getElementById(`ed-tipo-${id}`).value;
+    const msg = document.getElementById(`ed-msg-${id}`);
+    if (!nombre) {
+      msg.innerHTML = '<div class="msg bad">Ponle un nombre a la corrida.</div>';
+      return;
+    }
+    try {
+      await apiPost(`/api/corridas/${id}`, { nombre, tipo_proceso: tipo });
+      cargar();
+    } catch (e) {
+      msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    }
+  } else if (accion === "finalizar") {
     const panel = document.getElementById(`fin-panel-${id}`);
     const abrir = panel.style.display === "none";
     panel.style.display = abrir ? "block" : "none";

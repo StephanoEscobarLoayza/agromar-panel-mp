@@ -596,6 +596,31 @@ def crear_corrida(c: NuevaCorrida):
         raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
 
 
+class EditarCorrida(BaseModel):
+    nombre: str
+    tipo_proceso: Optional[str] = None
+
+
+@app.post("/api/corridas/{corrida_id}")
+def editar_corrida(corrida_id: int, c: EditarCorrida):
+    """Corrige nombre/tipo de proceso de una corrida ya creada (ej. se eligió
+    el tipo equivocado al crearla) - no toca fecha_inicio ni asignaciones."""
+    nombre = c.nombre.strip()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="El nombre de la corrida no puede estar vacío.")
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                "UPDATE corridas SET nombre = :nombre, tipo_proceso = :tipo_proceso "
+                "WHERE id = :id RETURNING id"
+            ),
+            {"id": corrida_id, "nombre": nombre, "tipo_proceso": c.tipo_proceso},
+        )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+    return {"ok": True}
+
+
 class FinalizarCorrida(BaseModel):
     fecha_final: str
 
