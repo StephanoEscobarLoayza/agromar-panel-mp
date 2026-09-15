@@ -80,7 +80,7 @@
     </div>
 
     <div class="panel">
-      <div class="panel-head"><h3>Últimas asignaciones</h3></div>
+      <div class="panel-head"><h3>Asignaciones de esta corrida</h3></div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th><th class="right">Saldo restante</th><th></th></tr></thead>
@@ -145,7 +145,7 @@ async function cargarRecientes() {
   if (asigs.length === 0) {
     recientesBody.innerHTML = '<tr><td colspan="5" class="empty">Sin asignaciones todavía</td></tr>';
   } else {
-    recientesBody.innerHTML = asigs.slice(0, 10).map(a => `
+    recientesBody.innerHTML = asigs.map(a => `
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
           data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
         <td class="strong num">${a.lote_numero}</td>
@@ -285,7 +285,7 @@ function renderCamposPeso() {
     camposPeso.innerHTML = `
       <div class="msg warn">
         Este lote ya está registrado en esta corrida (${kgTxt}, turno ${escapeHtml(yaAsignado.turno || "—")}).
-        Si necesitas sumarle más kg, edítalo con ✎ en "Últimas asignaciones" en vez de crear otro registro.
+        Si necesitas sumarle más kg, edítalo con ✎ en "Asignaciones de esta corrida" en vez de crear otro registro.
       </div>
     `;
     btnGuardar.disabled = true;
@@ -319,7 +319,7 @@ function renderCamposOrigen() {
 
   if (pendiente) {
     cont.innerHTML = `
-      <div class="hint-line" style="margin-bottom:8px">Se registra el lote como iniciado en esta corrida, sin comprometer un kg todavía. Complétalo después con el kg real (✎ en "Últimas asignaciones").</div>
+      <div class="hint-line" style="margin-bottom:8px">Se registra el lote como iniciado en esta corrida, sin comprometer un kg todavía. Complétalo después con el kg real (✎ en "Asignaciones de esta corrida").</div>
       <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
     `;
     btnGuardar.disabled = false;
