@@ -162,7 +162,7 @@ def sincronizar_lotes(engine):
                         placa = EXCLUDED.placa,
                         fecha_ingreso = EXCLUDED.fecha_ingreso,
                         tipo_almacen = EXCLUDED.tipo_almacen,
-                        peso_neto_kg = EXCLUDED.peso_neto_kg,
+                        peso_neto_kg = CASE WHEN lotes.peso_congelado THEN lotes.peso_neto_kg ELSE EXCLUDED.peso_neto_kg END,
                         bines_totales = EXCLUDED.bines_totales,
                         brix_recepcion = EXCLUDED.brix_recepcion,
                         ph_recepcion = EXCLUDED.ph_recepcion,

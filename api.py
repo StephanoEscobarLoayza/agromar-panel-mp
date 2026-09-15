@@ -483,6 +483,37 @@ def actualizar_ubicacion_lote(numero: int, body: ActualizarUbicacionLote):
     return {"ok": True}
 
 
+class ActualizarPesoLote(BaseModel):
+    peso_neto_kg: Optional[float] = None  # None = destrabar y volver a usar el peso que trae el Sheet
+
+
+@app.post("/api/lotes/{numero}/peso")
+def actualizar_peso_lote(numero: int, body: ActualizarPesoLote):
+    """Corrige a mano el peso neto de un lote (ej. el Sheet trae un peso
+    viejo/equivocado) y lo congela contra el sincronizador automático -
+    mandar peso_neto_kg=null lo destraba y vuelve a dejar que el Sheet
+    mande ese valor en la próxima sincronización."""
+    if body.peso_neto_kg is not None and body.peso_neto_kg <= 0:
+        raise HTTPException(status_code=400, detail="El peso debe ser mayor a 0.")
+    with engine.begin() as conn:
+        if body.peso_neto_kg is None:
+            result = conn.execute(
+                text("UPDATE lotes SET peso_congelado = false WHERE numero = :n RETURNING numero"),
+                {"n": numero},
+            )
+        else:
+            result = conn.execute(
+                text(
+                    "UPDATE lotes SET peso_neto_kg = :peso, peso_congelado = true "
+                    "WHERE numero = :n RETURNING numero"
+                ),
+                {"peso": body.peso_neto_kg, "n": numero},
+            )
+        if result.scalar() is None:
+            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro.")
+    return {"ok": True}
+
+
 SYNC_INTERVAL_SEGUNDOS = 20 * 60  # cada 20 minutos
 
 # Estado en memoria del último sync (manual o automático) - se reinicia con

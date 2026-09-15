@@ -26,6 +26,7 @@ CREATE TABLE lotes (
     estado_fuente       TEXT,                 -- "PROCESADO"/"EN PROCESO"/"EN ESPERA" tal cual llega de recepción
     estado_manual       TEXT,                 -- override de producción cuando Calidad aún no actualizó el Sheet; NULL = usar estado_fuente
     ubicacion_manual    TEXT,                 -- override de producción sobre ubicacion; NULL = usar ubicacion
+    peso_congelado      BOOLEAN NOT NULL DEFAULT false, -- si es true, la sincronización deja de pisar peso_neto_kg con el valor del Sheet (para un peso corregido a mano)
     materia_prima       TEXT NOT NULL DEFAULT 'NARANJA ORGÁNICA',
     creado_en           TIMESTAMPTZ NOT NULL DEFAULT now(),
     actualizado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
