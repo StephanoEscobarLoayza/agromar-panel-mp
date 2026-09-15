@@ -188,7 +188,7 @@ function fila(l) {
       <td>${ubicacionBoton(l)}</td>
       <td>${estadoBoton(l)}</td>
       <td class="right num">${fmtKg(l.peso_neto_kg)}${binesTotalesSub}</td>
-      <td class="right num"><span class="saldo-bar"><i style="width:${pct}%;background:${colorSaldo(pct)}"></i></span>${fmtKg(l.kg_saldo)}${binesSaldoSub}</td>
+      <td class="right num"><span class="saldo-bar"><i style="width:${pct}%;background:${colorSaldo(pct)}"></i></span>${fmtSaldo(l.kg_saldo)}${binesSaldoSub}</td>
       <td class="right num">${l.brix_recepcion ?? "—"}</td>
       <td class="right num">${l.acidez ?? "—"}</td>
       <td class="right num">${l.ratio ?? "—"}</td>

@@ -257,7 +257,7 @@ function renderListaSaldo(lotes) {
   // barra a medias solo por ser más chicos que el más grande de la lista).
   cont.innerHTML = conSaldo.map(l => statBarRow(
     `#${l.numero} <span class="stat-bar-sub">${escapeHtml(l.ubicacion_actual || "—")}</span>`,
-    `${fmtKg(l.kg_saldo)} kg`,
+    `${fmtSaldo(l.kg_saldo)} kg`,
     Math.min(100, Math.max(2, (Number(l.kg_saldo) / Number(l.peso_neto_kg)) * 100)),
     "background:var(--forest-2)",
     "120px",

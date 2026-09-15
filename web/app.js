@@ -81,6 +81,16 @@ function fmtKg(n) {
   return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Pedido explicito de Stephano: los "saldo" (cuanto le queda a un lote) se
+// muestran SIEMPRE redondeados, sin decimales - a diferencia de fmtKg(), que
+// conserva el decimal cuando el numero de verdad lo tiene (kg_asignados,
+// peso_neto_kg, etc. - esos datos de registro/consumo no se tocan). Redondea
+// solo la VISTA, nunca el numero real guardado en la base.
+function fmtSaldo(n) {
+  if (n === null || n === undefined) return "—";
+  return Math.round(Number(n)).toLocaleString("es-PE");
+}
+
 // Si un numero de KPI no entra en su tarjeta (ej. el total de MP de toda la
 // campaña, que va creciendo), el navegador lo cortaba o lo partia en
 // cualquier lado (a veces justo despues de un solo digito - se ve peor que

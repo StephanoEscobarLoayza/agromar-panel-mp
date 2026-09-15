@@ -153,7 +153,7 @@ async function cargarRecientes() {
           ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)">pendiente</span>'
           : fmtKg(a.kg_asignados)}</td>
         <td>${a.turno || ""}</td>
-        <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtKg(a.saldo_actual_lote)}</td>
+        <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtSaldo(a.saldo_actual_lote)}</td>
         <td class="right" data-celda="acciones" style="white-space:nowrap">
           <button class="btn-link" data-accion="editar-asig" data-id="${a.id}" data-kg="${a.kg_asignados ?? ""}" title="Editar">✎</button>
           <button class="btn-link btn-link-bad" data-accion="eliminar-asig" data-id="${a.id}" title="Eliminar">✕</button>
@@ -374,7 +374,7 @@ async function buscarLote() {
       <div class="lookup">
         <div class="lookup-row"><span>Proveedor</span><span>${escapeHtml(lote.proveedor)}</span></div>
         <div class="lookup-row"><span>Procedencia</span><span>${escapeHtml(lote.procedencia || "—")}</span></div>
-        <div class="lookup-row saldo"><span>Saldo disponible</span><span class="num">${fmtKg(lote.kg_saldo)} kg</span></div>
+        <div class="lookup-row saldo"><span>Saldo disponible</span><span class="num">${fmtSaldo(lote.kg_saldo)} kg</span></div>
       </div>
     `;
     renderCamposPeso();
