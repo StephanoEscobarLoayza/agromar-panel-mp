@@ -83,6 +83,20 @@ async def _guardia_auth(request, call_next):
     return RedirectResponse(url="/login.html", status_code=303)
 
 
+@app.middleware("http")
+async def _sin_cache_html(request, call_next):
+    """Las páginas .html se sirven por StaticFiles sin ningún header de
+    cache explícito (a diferencia de /style.css y /app.js, que ya
+    forzaban no-cache) - un navegador (sobre todo en tablet/celular) puede
+    quedarse con una copia vieja de una página entera, incluido su <script>
+    inline, y mostrar comportamiento desactualizado sin que nadie lo note."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 class LoginPayload(BaseModel):
     usuario: str = ""
     password: str
