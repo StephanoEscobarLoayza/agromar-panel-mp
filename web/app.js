@@ -71,25 +71,15 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function fmtKg(n) {
-  // los kg casi nunca traen decimales que de verdad importen - mostrar
-  // ".00" en un numero exacto solo confunde (y en numeros grandes, como el
-  // total de MP de toda la campaña, ese ".00" de mas hace que se salga de
-  // su tarjeta). Mismo criterio que fmt_kg() en reporte_base.py (PDFs).
-  if (n === null || n === undefined) return "—";
-  n = Number(n);
-  if (Number.isInteger(n)) return n.toLocaleString("es-PE");
-  return n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-// Pedido explicito de Stephano: los "saldo" (cuanto le queda a un lote) se
-// muestran SIEMPRE redondeados, sin decimales - a diferencia de fmtKg(), que
-// conserva el decimal cuando el numero de verdad lo tiene (kg_asignados,
-// peso_neto_kg, etc. - esos datos de registro/consumo no se tocan). Redondea
-// solo la VISTA, nunca el numero real guardado en la base.
-function fmtSaldo(n) {
+  // Pedido explicito de Stephano: ningun kg se muestra con decimales, nunca
+  // (antes solo se redondeaba el "saldo" - lo corrigio: quiere esto en TODA
+  // la app). Redondea solo la VISTA, el numero real en la base no se toca.
   if (n === null || n === undefined) return "—";
   return Math.round(Number(n)).toLocaleString("es-PE");
 }
+
+// alias - el saldo usa la misma regla que cualquier otro kg ahora.
+const fmtSaldo = fmtKg;
 
 // Si un numero de KPI no entra en su tarjeta (ej. el total de MP de toda la
 // campaña, que va creciendo), el navegador lo cortaba o lo partia en
