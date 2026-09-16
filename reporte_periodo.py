@@ -30,6 +30,15 @@ def _es_pt(producto: dict) -> bool:
     return producto.get("cuenta_como_pt", True) is not False
 
 
+def _aplica_descuento(producto: dict) -> bool:
+    """Solo aplica a filas "entrada" - mismo criterio que reporte_corrida.py:
+    el mismo campo (cuenta_como_pt) significa "¿se resta del total?" para un
+    insumo de entrada, no "¿cuenta como PT?"."""
+    if producto.get("tipo", "salida") != "entrada":
+        return False
+    return producto.get("cuenta_como_pt", True) is not False
+
+
 def _rend_txt(r):
     if r is None:
         return "—"
@@ -54,10 +63,11 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
     # todo ella. Ver mismo criterio en reporte_corrida.py.
     prod_pt = [p for p in productos if _es_pt(p)]
     prod_entrada = [p for p in productos if p.get("tipo") == "entrada"]
+    prod_entrada_desc = [p for p in prod_entrada if _aplica_descuento(p)]
     pt_total = sum(float(p["pt_kg"]) for p in prod_pt if p.get("pt_kg") is not None) - \
-        sum(float(p["pt_kg"]) for p in prod_entrada if p.get("pt_kg") is not None)
+        sum(float(p["pt_kg"]) for p in prod_entrada_desc if p.get("pt_kg") is not None)
     litros_total = sum(float(p["volumen_litros"]) for p in prod_pt if p.get("volumen_litros") is not None) - \
-        sum(float(p["volumen_litros"]) for p in prod_entrada if p.get("volumen_litros") is not None)
+        sum(float(p["volumen_litros"]) for p in prod_entrada_desc if p.get("volumen_litros") is not None)
     min_parado = sum(float(p.get("minutos") or 0) for p in paradas)
 
     periodo = f"{fmt_fecha(desde)} — {fmt_fecha(hasta)}"
@@ -112,7 +122,7 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         for p in prod_pt:
             if p.get("pt_kg") is not None:
                 pt_por_corrida[p["corrida"]] = pt_por_corrida.get(p["corrida"], 0) + float(p["pt_kg"])
-        for p in prod_entrada:
+        for p in prod_entrada_desc:
             if p.get("pt_kg") is not None:
                 pt_por_corrida[p["corrida"]] = pt_por_corrida.get(p["corrida"], 0) - float(p["pt_kg"])
         filas = []

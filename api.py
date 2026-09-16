@@ -1116,15 +1116,17 @@ class NuevoProductoCorrida(BaseModel):
     peso_neto_tambor_kg: Optional[float] = None
     pt_kg: Optional[float] = None
     volumen_litros: Optional[float] = None  # se carga directo (medido/conocido), no se calcula con un factor
-    cuenta_como_pt: bool = True  # se desmarca a mano para enjuague, saldo de tambor sin completar, etc. - un "entrada" nunca cuenta, sin importar esto
+    cuenta_como_pt: bool = True  # en "salida": si cuenta como PT (desmarcar para enjuague, saldo de tambor sin completar, etc.). En "entrada": mismo checkbox, pero significa "¿se descuenta del total de la corrida?" - un insumo puesto solo para ajustar Brix/Ratio puede no deber restarse del total reportado
     observaciones: Optional[str] = ""
 
 
 def _normalizar_producto(p: NuevoProductoCorrida):
-    """Valida el nombre, calcula pt_kg si no vino directo, y fuerza
-    cuenta_como_pt=False para cualquier insumo de "entrada" - un insumo que se
-    metió a la corrida desde afuera nunca es producto terminado de esta
-    corrida, sin importar qué haya marcado el checkbox."""
+    """Valida el nombre y calcula pt_kg si no vino directo. cuenta_como_pt se
+    guarda tal cual venga del checkbox - los reportes son los que le dan un
+    significado distinto según tipo (¿cuenta como PT? en salida, ¿se
+    descuenta del total? en entrada) - ver _cuenta_como_pt/_aplica_descuento
+    en reporte_corrida.py. Un "entrada" nunca cuenta como PT sin importar
+    esta marca, eso lo sigue forzando el reporte, no el guardado."""
     producto = p.producto.strip()
     if not producto:
         raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
@@ -1133,8 +1135,7 @@ def _normalizar_producto(p: NuevoProductoCorrida):
     pt_kg = p.pt_kg
     if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
         pt_kg = p.tambores * p.peso_neto_tambor_kg
-    cuenta_pt = False if p.tipo == "entrada" else p.cuenta_como_pt
-    return producto, pt_kg, cuenta_pt
+    return producto, pt_kg, p.cuenta_como_pt
 
 
 @app.post("/api/corridas/{corrida_id}/productos")

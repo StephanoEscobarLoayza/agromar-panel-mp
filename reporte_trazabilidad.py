@@ -69,6 +69,17 @@ def _es_pt(producto: dict) -> bool:
     return producto.get("cuenta_como_pt", True) is not False
 
 
+def _aplica_descuento(producto: dict) -> bool:
+    """Solo aplica a filas "entrada". Mismo campo (cuenta_como_pt) que en
+    "salida" significa "¿cuenta como PT?", aquí significa "¿se resta del
+    total de la corrida?" - un insumo de entrada no siempre debe descontarse
+    (ej. uno puesto solo para ajustar Brix/Ratio). Mismo criterio que
+    reporte_corrida.py."""
+    if producto.get("tipo", "salida") != "entrada":
+        return False
+    return producto.get("cuenta_como_pt", True) is not False
+
+
 def _set(ws, celda, valor, *, fmt=None, bold=False, fill=None, borde=False, centro=False):
     c = ws[celda] if isinstance(celda, str) else celda
     c.value = valor
@@ -125,7 +136,7 @@ def _cuadro_insumos_entrada(ws, fila0, insumos):
     el resumen. Mismo layout que _cuadro_stock, en col H. `insumos` = filas
     de corrida_productos con tipo='entrada'."""
     h = 8  # col H
-    _set(ws, ws.cell(row=fila0, column=h), "Insumos de entrada  —  ya restados del PT", bold=True, fill=_SEC_FILL)
+    _set(ws, ws.cell(row=fila0, column=h), "Insumos de entrada", bold=True, fill=_SEC_FILL)
     hdr = ["Insumo", "Tambores", "Peso/tambor", "Kg", "Detalle"]
     for k, nom in enumerate(hdr):
         c = _set(ws, ws.cell(row=fila0 + 1, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
@@ -142,7 +153,10 @@ def _cuadro_insumos_entrada(ws, fila0, insumos):
         _set(ws, ws.cell(row=rr, column=h + 1), _f(p.get("tambores")), borde=True, centro=True)
         _set(ws, ws.cell(row=rr, column=h + 2), _f(p.get("peso_neto_tambor_kg")), fmt=_FMT_KG, borde=True)
         _set(ws, ws.cell(row=rr, column=h + 3), _f(p.get("pt_kg")), fmt=_FMT_KG, borde=True)
-        _set(ws, ws.cell(row=rr, column=h + 4), p.get("observaciones") or "—", borde=True)
+        detalle = p.get("observaciones") or "—"
+        if not _aplica_descuento(p):
+            detalle = "(no resta del total) " + (p.get("observaciones") or "")
+        _set(ws, ws.cell(row=rr, column=h + 4), detalle, borde=True)
     tr = fila0 + 2 + i
     _set(ws, ws.cell(row=tr, column=h + 2), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
     _set(ws, ws.cell(row=tr, column=h + 3), f"=SUM(K{fila0 + 2}:K{tr - 1})",
@@ -280,13 +294,14 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     # Excel ya sale con el neto. Mismo criterio en reporte_corrida.py.
     prod_pt = [p for p in productos if _es_pt(p)]
     productos_entrada = [p for p in productos if p.get("tipo") == "entrada"]
+    productos_entrada_desc = [p for p in productos_entrada if _aplica_descuento(p)]
     volumen_bruto = sum(_f(p.get("volumen_litros")) or 0.0 for p in prod_pt)
     tambores_bruto = sum(_f(p.get("tambores")) or 0 for p in prod_pt)
     peso_tambor = next((_f(p.get("peso_neto_tambor_kg")) for p in prod_pt if p.get("peso_neto_tambor_kg")), None)
     pt_kg_bruto = sum(_f(p.get("pt_kg")) or 0.0 for p in prod_pt)
-    entrada_volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in productos_entrada)
-    entrada_tambores = sum(_f(p.get("tambores")) or 0 for p in productos_entrada)
-    entrada_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in productos_entrada)
+    entrada_volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in productos_entrada_desc)
+    entrada_tambores = sum(_f(p.get("tambores")) or 0 for p in productos_entrada_desc)
+    entrada_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in productos_entrada_desc)
     volumen = (volumen_bruto - entrada_volumen) or None
     tambores = (tambores_bruto - entrada_tambores) or None
     pt_kg = (pt_kg_bruto - entrada_kg) or None

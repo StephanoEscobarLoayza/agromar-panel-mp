@@ -242,7 +242,7 @@ function corridaCard(c) {
           </div>
           <label id="prod-cuentapt-label-${c.id}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:8px 0 4px">
             <input type="checkbox" id="prod-cuentapt-${c.id}" style="width:auto" checked>
-            Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.
+            <span id="prod-cuentapt-texto-${c.id}">Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.</span>
           </label>
           <div id="prod-msg-${c.id}"></div>
           <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar</button>
@@ -254,9 +254,11 @@ function corridaCard(c) {
 
 function productoFila(p, corridaId) {
   const litros = p.volumen_litros != null && p.volumen_litros !== "" ? ` · ${fmtKg(p.volumen_litros)} L` : "";
+  const noDescuenta = p.tipo === "entrada" && p.cuenta_como_pt === false
+    ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">no resta del total</span>' : "";
   return `
     <div class="prod-fila" data-producto-id="${p.id}">
-      <div><b>${escapeHtml(p.producto)}</b><span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}${p.observaciones ? ` · ${escapeHtml(p.observaciones)}` : ""}</span></div>
+      <div><b>${escapeHtml(p.producto)}</b>${noDescuenta}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}${p.observaciones ? ` · ${escapeHtml(p.observaciones)}` : ""}</span></div>
       <div class="prod-pt num">${fmtKg(p.pt_kg)} kg
         <button class="btn-link" data-accion="editar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Editar">✎</button>
         <button class="btn-link" data-accion="eliminar-producto" data-id="${p.id}" data-corrida="${corridaId}" title="Eliminar">✕</button>
@@ -284,9 +286,11 @@ function productoFilaEdicion(p, corridaId) {
         <input type="number" class="ed-prod-litros" min="0" step="0.01" value="${p.volumen_litros ?? ""}" placeholder="Volumen (litros)">
         <input type="text" class="ed-prod-obs" value="${escapeHtml(p.observaciones || "")}" placeholder="Observaciones">
       </div>
-      <label class="ed-prod-cuentapt-label" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;${esEntrada ? "opacity:.5" : ""}">
-        <input type="checkbox" class="ed-prod-cuentapt" style="width:auto" ${esEntrada ? "disabled" : (p.cuenta_como_pt === false ? "" : "checked")}>
-        Cuenta como producto terminado (PT)${esEntrada ? " — no aplica a un insumo de entrada" : ""}
+      <label class="ed-prod-cuentapt-label" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer">
+        <input type="checkbox" class="ed-prod-cuentapt" style="width:auto" ${p.cuenta_como_pt === false ? "" : "checked"}>
+        ${esEntrada
+          ? "Descontar del total de la corrida (kg, litros, tambores) — desmárcalo si este insumo no debe restarse del total reportado"
+          : "Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc."}
       </label>
       <div id="prod-ed-msg-${p.id}"></div>
       <div class="two-col">
@@ -527,7 +531,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       msg.innerHTML = '<div class="msg bad">Ponle un nombre.</div>';
       return;
     }
-    const cuentaComoPt = tipo === "entrada" ? false : document.getElementById(`prod-cuentapt-${id}`).checked;
+    const cuentaComoPt = document.getElementById(`prod-cuentapt-${id}`).checked;
     try {
       await apiPost(`/api/corridas/${id}/productos`, {
         producto: nombre,
@@ -544,8 +548,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       document.getElementById(`prod-litros-${id}`).value = "";
       document.getElementById(`prod-obs-${id}`).value = "";
       document.getElementById(`prod-cuentapt-${id}`).checked = true;
-      document.getElementById(`prod-cuentapt-${id}`).disabled = false;
-      document.getElementById(`prod-cuentapt-label-${id}`).style.opacity = "1";
+      document.getElementById(`prod-cuentapt-texto-${id}`).textContent = "Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.";
       document.getElementById(`prod-tipo-${id}`).value = "salida";
       document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
       msg.innerHTML = "";
@@ -590,7 +593,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
         tambores: Number(v("ed-prod-tambores").value) || null,
         peso_neto_tambor_kg: Number(v("ed-prod-peso").value) || null,
         volumen_litros: Number(v("ed-prod-litros").value) || null,
-        cuenta_como_pt: tipo === "entrada" ? false : v("ed-prod-cuentapt").checked,
+        cuenta_como_pt: v("ed-prod-cuentapt").checked,
         observaciones: v("ed-prod-obs").value.trim(),
       });
       cargarProductosPanel(corridaId);
@@ -668,17 +671,19 @@ document.getElementById("corridas").addEventListener("input", (ev) => {
   ptEl.textContent = tambores && peso ? `PT kg: ${fmtKg(tambores * peso)}` : "PT kg: —";
 });
 
-// un "insumo de entrada" nunca cuenta como PT - al elegirlo se desmarca y se
-// bloquea el checkbox para que no quede la sensación de que sí aplica
+// el mismo checkbox cambia de significado según el tipo: en "salida" es
+// "cuenta como PT", en "entrada" es "se descuenta del total de la corrida"
+// (un insumo de entrada no siempre debe restar - ej. uno puesto solo para
+// ajustar Brix/Ratio). Se deja siempre marcado por default (mismo criterio
+// de "siempre descuenta" que tenía antes), el checkbox solo cambia el texto.
 document.getElementById("corridas").addEventListener("change", (ev) => {
   const el = ev.target;
   if (!el.id.startsWith("prod-tipo-")) return;
   const id = el.id.split("-").pop();
-  const cb = document.getElementById(`prod-cuentapt-${id}`);
   const esEntrada = el.value === "entrada";
-  cb.checked = !esEntrada;
-  cb.disabled = esEntrada;
-  document.getElementById(`prod-cuentapt-label-${id}`).style.opacity = esEntrada ? ".5" : "1";
+  document.getElementById(`prod-cuentapt-texto-${id}`).textContent = esEntrada
+    ? "Descontar del total de la corrida (kg, litros, tambores) — desmárcalo si este insumo no debe restarse del total reportado"
+    : "Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.";
 });
 
 cargar();

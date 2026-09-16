@@ -77,6 +77,19 @@ def _cuenta_como_pt(producto: dict) -> bool:
     return producto.get("cuenta_como_pt", True) is not False
 
 
+def _aplica_descuento(producto: dict) -> bool:
+    """Solo tiene sentido para filas "entrada". Mismo campo de base
+    (`cuenta_como_pt`) que para "salida" significa "¿cuenta como PT?", pero
+    aquí significa "¿se resta del total de la corrida?" - un insumo de
+    entrada no siempre debe descontarse (ej. un cilindro que solo ajusta
+    Brix/Ratio, no un producto "extra" que haya que restarle a lo que salió).
+    Se registra igual en "Insumos de entrada" para trazabilidad, con este
+    check en false simplemente no resta nada."""
+    if _es_salida(producto):
+        return False
+    return producto.get("cuenta_como_pt", True) is not False
+
+
 def _tabla_productos(productos):
     filas = [[
         p.get("producto") or "—",
@@ -97,7 +110,7 @@ def _tabla_insumos_entrada(insumos):
         fmt_num(p.get("tambores"), 0),
         fmt_kg(p.get("peso_neto_tambor_kg")),
         fmt_kg(p.get("pt_kg")),
-        p.get("observaciones") or "—",
+        (p.get("observaciones") or "—") if _aplica_descuento(p) else "(no resta del total) " + (p.get("observaciones") or ""),
     ] for p in insumos]
     return tabla(
         ["Insumo", "Tambores", "Peso/tambor", "Kg", "Detalle"], filas,
@@ -194,10 +207,14 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     productos_salida = [p for p in productos if _es_salida(p)]
     productos_entrada = [p for p in productos if not _es_salida(p)]
     productos_pt = [p for p in productos_salida if _cuenta_como_pt(p)]
+    # un insumo de entrada se sigue mostrando siempre en "Insumos de entrada"
+    # (productos_entrada, completo) - pero solo los que tienen el check
+    # activado restan de los totales (productos_entrada_desc).
+    productos_entrada_desc = [p for p in productos_entrada if _aplica_descuento(p)]
     pt_bruto_total = sum(float(p["pt_kg"]) for p in productos_pt if p.get("pt_kg") is not None)
     litros_bruto_total = sum(float(p["volumen_litros"]) for p in productos_pt if p.get("volumen_litros") is not None)
-    entrada_kg_total = sum(float(p["pt_kg"]) for p in productos_entrada if p.get("pt_kg") is not None)
-    entrada_litros_total = sum(float(p["volumen_litros"]) for p in productos_entrada if p.get("volumen_litros") is not None)
+    entrada_kg_total = sum(float(p["pt_kg"]) for p in productos_entrada_desc if p.get("pt_kg") is not None)
+    entrada_litros_total = sum(float(p["volumen_litros"]) for p in productos_entrada_desc if p.get("volumen_litros") is not None)
     pt_total = pt_bruto_total - entrada_kg_total
     litros_total = litros_bruto_total - entrada_litros_total
     rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
@@ -209,7 +226,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # sumara tambores a ojo se quedaba con el número de Calidad sin descontar
     # los cilindros de entrada - Stephano reportó justo esta confusión.
     tambores_bruto_total = sum(int(p["tambores"]) for p in productos_pt if p.get("tambores") is not None)
-    entrada_tambores_total = sum(int(p["tambores"]) for p in productos_entrada if p.get("tambores") is not None)
+    entrada_tambores_total = sum(int(p["tambores"]) for p in productos_entrada_desc if p.get("tambores") is not None)
     tambores_total = tambores_bruto_total - entrada_tambores_total
 
     paradas_cerradas = [p for p in paradas if p.get("duracion_minutos") is not None]
