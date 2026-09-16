@@ -1767,10 +1767,21 @@ def _hoja_xlsx(wb, nombre, result):
     ws = wb.create_sheet(nombre[:31])  # Excel: máximo 31 chars por nombre de hoja
     cols = list(result.keys())
     ws.append(cols)
+    # columnas de peso (kg) se ven sin decimales, igual que en la app y los
+    # reportes PDF - pedido explícito de Stephano ("ningún kg con decimales,
+    # en ningún lado"). Solo cambia el formato de vista, el valor real de la
+    # celda no se toca (sigue con su precisión real, por si alguien construye
+    # su propia fórmula sobre esta hoja). Brix/Acidez/Ratio/litros/tambores no
+    # son "kg" y conservan sus decimales reales.
+    cols_kg = {i for i, c in enumerate(cols, 1) if "kg" in c.lower()}
     n = 0
     for row in result:
-        ws.append([_celda_xlsx(v) for v in row])
         n += 1
+        ws.append([_celda_xlsx(v) for v in row])
+        for i in cols_kg:
+            celda = ws.cell(row=n + 1, column=i)
+            if isinstance(celda.value, (int, float)):
+                celda.number_format = "#,##0"
     for c in ws[1]:
         c.font = Font(bold=True)
     ws.freeze_panes = "A2"
