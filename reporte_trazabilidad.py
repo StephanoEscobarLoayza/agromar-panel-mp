@@ -32,7 +32,7 @@ _HEAD_FONT = Font(bold=True, size=9)
 _THIN = Side("thin", color="9BB08C")
 _BORDE = Border(_THIN, _THIN, _THIN, _THIN)
 _CENTRO = Alignment(horizontal="center", vertical="center", wrap_text=True)
-_FMT_KG = "#,##0.00"
+_FMT_KG = "#,##0"  # sin decimales (pedido de Stephano) - es solo formato de vista, las formulas siguen usando el valor real de la celda
 _FMT_BRIX = "0.00"
 _FMT_PCT = "0.0%"
 _FMT_FECHA = "DD/MM/YYYY"
