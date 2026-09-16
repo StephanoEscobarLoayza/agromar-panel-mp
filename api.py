@@ -608,6 +608,64 @@ def listar_corridas(abiertas: bool = False):
         return rows(result)
 
 
+def _sql_stock_total_asof(fecha_param: str) -> str:
+    """Stock total de planta (todos los lotes, no solo los de una corrida)
+    "as of" una fecha - mismo criterio de corte que _SQL_KG_SALDO_AL_CIERRE
+    (solo cuenta asignaciones con creado_en <= fecha+5h, Perú->UTC), pero
+    aplicado a TODOS los lotes en vez de a los de una sola corrida.
+
+    Corrige un bug real: antes, stock_inicio_kg/stock_cierre_kg se
+    calculaban con el stock EN VIVO al momento de ejecutar el INSERT/UPDATE
+    - si alguien crea o finaliza una corrida con una fecha_inicio/fecha_final
+    atrasada (ej. "en realidad empezó/terminó hace unas horas"), el número
+    quedaba contaminado con consumo registrado DESPUÉS de esa fecha (incluido
+    el de una corrida nueva que ya estaba corriendo). Stephano lo detectó:
+    el stock de cierre de una corrida ya cerrada coincidía exacto con el
+    stock EN VIVO de ese momento, en vez de quedarse fijo en su propia fecha
+    de cierre real.
+
+    Un lote cuenta si su saldo reconstruido "as of" la fecha es > 0, Y
+    ADEMÁS (ese saldo reconstruido es distinto del saldo EN VIVO de hoy -
+    o sea que sí hubo consumo real registrado entre la fecha y ahora que
+    explica la diferencia, así que el número reconstruido es confiable) O
+    (su estado actual sigue siendo EN PROCESO/EN ESPERA). Sin esto, un lote
+    que ya está "Procesado" HOY (por consumo real de una corrida posterior)
+    quedaba excluido incluso de una fecha de corte anterior a ese consumo -
+    exactamente el bug que reportó Stephano. La segunda condición (estado
+    actual) sigue haciendo falta para no reintroducir el "ruido" ya conocido
+    de lotes que Trazabilidad marca Procesado sin que la app tenga registrado
+    su consumo real (ver nota de #2396 en memoria) - esos nunca cambian entre
+    la fecha de corte y ahora, así que la primera condición los excluye.
+
+    También filtra l.fecha_ingreso <= la fecha de corte - un lote que
+    todavía no había llegado a planta en esa fecha no puede contar como
+    stock disponible en ese momento. Sin esto, cualquier lote sincronizado
+    DESPUÉS de la fecha de corte se contaba igual con su peso completo
+    (nunca tuvo asignaciones antes del corte, así que su "saldo
+    reconstruido" salía = peso_neto completo) - inflaba muchísimo el
+    número para fechas de corte antiguas (se detectó con corridas de
+    varios días atrás, ~400-500 mil kg de más)."""
+    return f"""
+        (SELECT COALESCE(SUM(t.asof_saldo), 0) FROM (
+            SELECT
+                l.peso_neto_kg - COALESCE((
+                    SELECT SUM(a2.kg_asignados) FROM asignaciones a2
+                    WHERE a2.lote_numero = l.numero
+                      AND a2.creado_en <= (CAST(:{fecha_param} AS timestamp) + interval '5 hours')
+                ), 0) AS asof_saldo,
+                l.peso_neto_kg - COALESCE((
+                    SELECT SUM(a3.kg_asignados) FROM asignaciones a3
+                    WHERE a3.lote_numero = l.numero
+                ), 0) AS live_saldo,
+                UPPER(TRIM(COALESCE(l.estado_manual, l.estado_fuente))) AS estado_actual
+            FROM lotes l
+            WHERE l.fecha_ingreso <= CAST(:{fecha_param} AS timestamp)
+        ) t
+        WHERE t.asof_saldo > 0.01
+          AND (t.asof_saldo IS DISTINCT FROM t.live_saldo OR t.estado_actual IN ('EN PROCESO', 'EN ESPERA')))
+    """
+
+
 class NuevaCorrida(BaseModel):
     nombre: str
     tipo_proceso: Optional[str] = None
@@ -623,11 +681,10 @@ def crear_corrida(c: NuevaCorrida):
         with engine.begin() as conn:
             result = conn.execute(
                 text(
-                    """
+                    f"""
                     INSERT INTO corridas (nombre, tipo_proceso, fecha_inicio, estado, stock_inicio_kg)
                     VALUES (:nombre, :tipo_proceso, :fecha_inicio, 'abierta',
-                            (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes
-                             WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')))
+                            {_sql_stock_total_asof('fecha_inicio')})
                     RETURNING id
                     """
                 ),
@@ -680,10 +737,9 @@ def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                """
+                f"""
                 UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada',
-                       stock_cierre_kg = (SELECT COALESCE(SUM(kg_saldo), 0) FROM v_saldo_lotes
-                                          WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA'))
+                       stock_cierre_kg = {_sql_stock_total_asof('fecha_final')}
                 WHERE id = :id AND estado = 'abierta'
                 RETURNING id
                 """

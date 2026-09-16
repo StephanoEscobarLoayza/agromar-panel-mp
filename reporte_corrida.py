@@ -202,6 +202,16 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     litros_total = litros_bruto_total - entrada_litros_total
     rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
 
+    # mismo criterio de "bruto - entrada" que ya tenía PT kg y Volumen, pero
+    # faltaba para Tambores - sin esto, el conteo de tambores que de verdad
+    # salió de la corrida no aparecía en ningún lado del PDF (solo el bruto
+    # por fila, en la tabla de "Productos de salida"), así que alguien que
+    # sumara tambores a ojo se quedaba con el número de Calidad sin descontar
+    # los cilindros de entrada - Stephano reportó justo esta confusión.
+    tambores_bruto_total = sum(int(p["tambores"]) for p in productos_pt if p.get("tambores") is not None)
+    entrada_tambores_total = sum(int(p["tambores"]) for p in productos_entrada if p.get("tambores") is not None)
+    tambores_total = tambores_bruto_total - entrada_tambores_total
+
     paradas_cerradas = [p for p in paradas if p.get("duracion_minutos") is not None]
     min_parado = sum(p["duracion_minutos"] for p in paradas_cerradas)
     hay_en_curso = any(p.get("duracion_minutos") is None for p in paradas)
@@ -244,6 +254,8 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         kpis.append(("Rendimiento", f"{rendimiento * 100:.1f} %", TEXT))
     if pt_total:
         kpis.append(("Producto terminado", f"{fmt_kg(pt_total)} kg", TEXT))
+    if tambores_total:
+        kpis.append(("Tambores", fmt_num(tambores_total, 0), TEXT))
     if litros_total:
         kpis.append(("Volumen", f"{fmt_kg(litros_total)} L", TEXT))
     kpis.append((
@@ -271,12 +283,13 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.append(kpi_grid)
-    if entrada_kg_total > 0:
+    if entrada_kg_total > 0 or entrada_tambores_total > 0:
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
-            f"El producto terminado ya descuenta {fmt_kg(entrada_kg_total)} kg correspondientes a insumos "
-            f"de entrada (ver \"Insumos de entrada\" más abajo). Calidad reporta {fmt_kg(pt_bruto_total)} kg "
-            f"brutos al pesar los tambores, antes de este descuento.",
+            f"El producto terminado ya descuenta {fmt_kg(entrada_kg_total)} kg y {entrada_tambores_total} "
+            f"tambor(es) correspondientes a insumos de entrada (ver \"Insumos de entrada\" más abajo). "
+            f"Calidad reporta {fmt_kg(pt_bruto_total)} kg y {tambores_bruto_total} tambor(es) brutos al "
+            f"pesar, antes de este descuento.",
             style_footnote,
         ))
     story.append(Spacer(1, 6 * mm))
