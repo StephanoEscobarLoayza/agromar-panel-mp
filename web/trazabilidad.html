@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Trazabilidad de lote · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <button type="button" class="nav-dropdown-btn active" data-menu="menuRegistro">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2.3" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="2.3" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Registro
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuCalidad">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Calidad
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuParadas">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Paradas
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Trazabilidad de lote</h1>
+    <p class="hero-sub">Un lote, de dónde vino y en qué terminó — a qué corridas alimentó y qué salió de cada una.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
+
+  <section>
+    <div class="panel">
+      <div class="form-body">
+        <div class="field">
+          <label for="numLote">Número de lote</label>
+          <input type="number" id="numLote" min="0" step="1" placeholder="ej. 2456">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultado" style="margin-top:22px"></section>
+
+  <div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<div class="nav-dropdown-menu" id="menuRegistro" hidden>
+  <a href="tablero.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 15.5h5M9 12.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tablero</a>
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+  <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+  <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+  <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+  <a href="trazabilidad.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="7.8" cy="7.8" r="4.8" stroke="currentColor" stroke-width="1.5"/><path d="M11.5 11.5L15.5 15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Trazabilidad de lote</a>
+  <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
+</div>
+<div class="nav-dropdown-menu" id="menuCalidad" hidden>
+  <a href="calidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Siguiente bin</a>
+  <a href="mediciones.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.5v4M6 3.2l1 3.6M12 3.2l-1 3.6M6 6.5h6l1.3 8a1.5 1.5 0 0 1-1.5 1.8H6.2A1.5 1.5 0 0 1 4.7 14.5Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Medición de tanques</a>
+</div>
+<div class="nav-dropdown-menu" id="menuParadas" hidden>
+  <a href="paradas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Registrar paradas</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+const numLoteInput = document.getElementById("numLote");
+const resultado = document.getElementById("resultado");
+
+function panelLote(lote) {
+  const esBines = lote.tipo_almacen !== "SILO" && lote.bines_totales != null;
+  const saldoTxt = esBines
+    ? `${fmtSaldo(lote.kg_saldo)} kg · ${fmtInt(lote.bines_saldo ?? 0)} bines`
+    : `${fmtSaldo(lote.kg_saldo)} kg`;
+  return `
+    <div class="panel">
+      <div class="panel-head"><h3>Lote #${lote.numero}</h3></div>
+      <div class="form-body">
+        <div class="lookup">
+          <div class="lookup-row"><span>Proveedor</span><span>${escapeHtml(lote.proveedor)}</span></div>
+          <div class="lookup-row"><span>Procedencia</span><span>${escapeHtml(lote.procedencia || "—")}</span></div>
+          <div class="lookup-row"><span>Fecha de ingreso</span><span>${fmtFechaSola(lote.fecha_ingreso)}</span></div>
+          <div class="lookup-row"><span>Almacén</span><span>${lote.tipo_almacen === "SILO" ? "Silo" : "Bines"}</span></div>
+          <div class="lookup-row"><span>Ubicación</span><span>${escapeHtml(lote.ubicacion_actual || "—")}</span></div>
+          <div class="lookup-row"><span>Estado</span><span>${escapeHtml(lote.estado_actual || "—")}</span></div>
+          <div class="lookup-row"><span>Peso neto</span><span>${fmtKg(lote.peso_neto_kg)} kg</span></div>
+          <div class="lookup-row saldo"><span>Saldo disponible</span><span class="num">${saldoTxt}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function filaProducto(p) {
+  const litros = p.volumen_litros != null && p.volumen_litros !== "" ? ` · ${fmtKg(p.volumen_litros)} L` : "";
+  const noPt = p.cuenta_como_pt === false ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">no cuenta como PT</span>' : "";
+  return `
+    <div class="prod-fila">
+      <div><b>${escapeHtml(p.producto)}</b>${noPt}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}</span></div>
+      <div class="prod-pt num">${fmtKg(p.pt_kg)} kg</div>
+    </div>
+  `;
+}
+
+function panelCorrida(c) {
+  const rango = c.fecha_final
+    ? `${fmtDate(c.fecha_inicio)} — ${fmtDate(c.fecha_final)}`
+    : `En curso desde ${fmtDate(c.fecha_inicio)}`;
+  const abierta = c.fecha_final === null;
+  const esBines = c.tipo_almacen_origen === "BINES";
+  const kgTxt = c.kg_asignados === null
+    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)">pendiente</span>'
+    : `${fmtKg(c.kg_asignados)} kg${esBines && c.bines_consumidos != null ? ` (${fmtInt(c.bines_consumidos)} bines)` : ""}`;
+
+  const salida = c.productos.filter(p => p.tipo !== "entrada");
+  const entrada = c.productos.filter(p => p.tipo === "entrada");
+  let productosHtml;
+  if (c.productos.length === 0) {
+    productosHtml = '<div class="empty" style="padding:10px 0">Todavía sin productos de salida registrados en esta corrida.</div>';
+  } else {
+    productosHtml = "";
+    if (salida.length) {
+      productosHtml += '<div class="prod-grupo-titulo" style="margin-top:10px">Productos de salida</div>' +
+        salida.map(filaProducto).join("");
+    }
+    if (entrada.length) {
+      productosHtml += '<div class="prod-grupo-titulo" style="margin-top:10px">Insumos de entrada</div>' +
+        entrada.map(filaProducto).join("");
+    }
+  }
+
+  return `
+    <div class="corrida${abierta ? " live" : ""}">
+      <div class="corrida-top">
+        <div>
+          <div class="corrida-name">${abierta ? '<span class="live-dot" title="En curso"></span>' : ""}${escapeHtml(c.corrida_nombre)}</div>
+          <div class="corrida-range">${rango}${c.tipo_proceso ? " · " + escapeHtml(c.tipo_proceso) : ""}</div>
+        </div>
+      </div>
+      <div class="running-total">Este lote le dio <span class="num">${kgTxt}</span>${c.turno ? ` · turno ${escapeHtml(c.turno)}` : ""}</div>
+      ${productosHtml}
+    </div>
+  `;
+}
+
+async function buscar() {
+  const n = parseInt(numLoteInput.value, 10);
+  if (!n) {
+    resultado.innerHTML = "";
+    return;
+  }
+  resultado.innerHTML = '<div class="empty">Buscando…</div>';
+  try {
+    const data = await apiGet(`/api/lotes/${n}/trazabilidad`);
+    let html = panelLote(data.lote);
+    html += `<div class="section-head" style="margin-top:22px"><h2>Corridas donde participó (${data.corridas.length})</h2></div>`;
+    if (data.corridas.length === 0) {
+      html += '<div class="panel"><div class="empty" style="padding:20px">Todavía no se le ha asignado a ninguna corrida.</div></div>';
+    } else {
+      html += data.corridas.map(panelCorrida).join("");
+    }
+    resultado.innerHTML = html;
+  } catch (e) {
+    resultado.innerHTML = `<div class="panel"><div class="msg bad" style="margin:16px 20px">${escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+let buscarTimer;
+numLoteInput.addEventListener("input", () => {
+  clearTimeout(buscarTimer);
+  buscarTimer = setTimeout(buscar, 350);
+});
+
+// si llega con ?lote=NNNN (ej. desde un link en Lotes), busca directo
+const params = new URLSearchParams(location.search);
+if (params.get("lote")) {
+  numLoteInput.value = params.get("lote");
+  buscar();
+}
+</script>
+</body>
+</html>

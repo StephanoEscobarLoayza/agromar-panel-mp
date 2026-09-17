@@ -17,7 +17,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-HR_PULPEADO = 11             # fijo al generar el Excel (lo confirmó Stephano)
+HR_PULPEADO = 9.5            # fijo al generar el Excel (lo confirmó Stephano) - la celda se ve "10" (formato sin decimales) pero MP kg/hr calcula con el 9.5 real
 DENSIDAD_APARENTE = 1.04332  # kg/l - suele ser siempre este valor
 
 _MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO",
@@ -132,9 +132,11 @@ def _cuadro_stock(ws, fila0, titulo, filas):
 
 def _cuadro_insumos_entrada(ws, fila0, insumos):
     """Cuadrito con el detalle de lo que entró a la corrida desde afuera
-    (reposición para subir Brix, etc.) - lo que ya se restó del PT bruto en
-    el resumen. Mismo layout que _cuadro_stock, en col H. `insumos` = filas
-    de corrida_productos con tipo='entrada'."""
+    (reposición para subir Brix, etc.) - solo los que tienen el check de
+    "descontar del total" activado se restan del PT bruto en el resumen
+    (marcados "(no resta del total)" en Detalle los que no). Mismo layout
+    que _cuadro_stock, en col H. `insumos` = filas de corrida_productos
+    con tipo='entrada'."""
     h = 8  # col H
     _set(ws, ws.cell(row=fila0, column=h), "Insumos de entrada", bold=True, fill=_SEC_FILL)
     hdr = ["Insumo", "Tambores", "Peso/tambor", "Kg", "Detalle"]
@@ -340,7 +342,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     val(rPT, "PT  kg",
         (f"=D{rTam}*D{rPesoTam}" if (tambores and peso_tambor) else (round(pt_kg, 2) if pt_kg else None)),
         _FMT_KG)
-    val(rEntrada, "Insumos de entrada  kg  (ya restado arriba)", round(entrada_kg, 2) if entrada_kg else None, _FMT_KG)
+    val(rEntrada, "Insumos de entrada  kg", round(entrada_kg, 2) if entrada_kg else None, _FMT_KG)
     val(rRend, "Rendimiento", f'=IF(OR(D{rPT}="",D{rMP}=0),"",D{rPT}/D{rMP})', _FMT_PCT)
     val(rBrix, "Brix Promedio TK", round(brix_tk, 2) if brix_tk is not None else None, _FMT_BRIX)
     val(rDens, "Densidad Aparente  kg/l", DENSIDAD_APARENTE, "0.00000")

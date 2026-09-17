@@ -176,6 +176,8 @@ tbody tr:hover td{background:var(--surface-2)}
 .saldo-bar i{display:block;height:100%;background:var(--citrus)}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:6px;background:var(--forest-tint);color:var(--forest-2);font-weight:600}
 .num-sub{font-size:11px;color:var(--text-muted);font-weight:400;margin-top:2px;white-space:nowrap}
+.lote-link{color:var(--citrus);text-decoration:none}
+.lote-link:hover{text-decoration:underline}
 
 /* ---------- dropdown propio para celdas editables (lotes: estado/ubicación) ---------- */
 .edit-inline{display:inline-flex;align-items:center;gap:4px}

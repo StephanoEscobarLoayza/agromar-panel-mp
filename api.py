@@ -441,6 +441,53 @@ def obtener_lote(numero: int):
         return lote
 
 
+@app.get("/api/lotes/{numero}/trazabilidad")
+def trazabilidad_lote(numero: int):
+    """Trazabilidad "hacia adelante" de un lote: a qué corridas alimentó y
+    qué productos de salida dio cada una de esas corridas - la pregunta
+    "este lote, ¿en qué terminó?" (útil ante un reclamo de un proveedor,
+    o para un auditor). No reparte el PT entre lotes a prorrata (no hay
+    forma honesta de saber cuánto de un tambor vino de cada lote una vez
+    mezclados en tanque) - se muestra, por cada corrida que usó este lote,
+    la lista completa de lo que esa corrida produjo, igual que ya se
+    reporta en el PDF/Excel de esa corrida."""
+    with engine.connect() as conn:
+        lote = one(conn.execute(text("SELECT * FROM v_saldo_lotes WHERE numero = :n"), {"n": numero}))
+        if lote is None:
+            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro. Sincronízalo primero.")
+
+        corridas = rows(conn.execute(
+            text(
+                """
+                SELECT a.id AS asignacion_id, c.id AS corrida_id, c.nombre AS corrida_nombre,
+                       c.tipo_proceso, c.fecha_inicio, c.fecha_final, c.estado,
+                       a.kg_asignados, a.bines_consumidos, a.turno, a.creado_en
+                FROM asignaciones a
+                JOIN corridas c ON c.id = a.corrida_id
+                WHERE a.lote_numero = :n
+                ORDER BY c.fecha_inicio
+                """
+            ),
+            {"n": numero},
+        ))
+
+        for c in corridas:
+            c["productos"] = rows(conn.execute(
+                text(
+                    """
+                    SELECT id, producto, tipo, tambores, peso_neto_tambor_kg,
+                           pt_kg, volumen_litros, cuenta_como_pt
+                    FROM corrida_productos
+                    WHERE corrida_id = :cid
+                    ORDER BY producto
+                    """
+                ),
+                {"cid": c["corrida_id"]},
+            ))
+
+        return {"lote": lote, "corridas": corridas}
+
+
 ESTADOS_VALIDOS = {"PROCESADO", "EN PROCESO", "EN ESPERA"}
 
 # un lote puede estar repartido entre varios sitios a la vez (dos lotes
@@ -1924,6 +1971,17 @@ def _css_sin_cache():
 @app.get("/app.js")
 def _js_sin_cache():
     return FileResponse(BASE_DIR / "web" / "app.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
+# Tablero (no Dashboards) es la página de entrada - pedido de Stephano: es
+# la pantalla "en vivo" que quiere que vea primero quien abra el link (ej.
+# su jefe en una demo), Dashboards sigue accesible desde el menú Registro.
+# Declarada ANTES del mount de StaticFiles para que Starlette la resuelva
+# primero (StaticFiles con html=True serviría index.html - Dashboards - para
+# "/" si esta ruta no existiera).
+@app.get("/")
+def _raiz():
+    return RedirectResponse(url="/tablero.html")
 
 
 app.mount("/", StaticFiles(directory=BASE_DIR / "web", html=True), name="web")
