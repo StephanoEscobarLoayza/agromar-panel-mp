@@ -121,28 +121,16 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
         story.append(Spacer(1, 4 * mm))
 
     story.extend(seccion(f"Lotes con saldo parcial, del más antiguo al más nuevo ({len(lotes_parciales)})"))
-    story.append(Paragraph(
-        "Ya se les asignó algo a alguna corrida y todavía les queda un resto por usar.",
-        style_footnote,
-    ))
-    story.append(Spacer(1, 3 * mm))
     story.append(_tabla_stock(lotes_parciales) if lotes_parciales else Paragraph("Ninguno en este momento.", style_footnote))
 
     story.append(Spacer(1, 8 * mm))
     story.extend(seccion(f"Lotes completos, todavía sin tocar ({len(lotes_completos)})"))
-    story.append(Paragraph(
-        "Llegaron a planta pero todavía no se les registró ningún consumo - el peso de acá es el completo, no un sobrante.",
-        style_footnote,
-    ))
-    story.append(Spacer(1, 3 * mm))
     story.append(_tabla_completos(lotes_completos) if lotes_completos else Paragraph("Ninguno en este momento.", style_footnote))
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
-        "Cálculo en vivo del sistema (peso neto menos lo ya asignado a corridas), para ir siguiendo el stock mientras dura la "
-        "campaña. El conteo físico real de la MP se hace al cierre y ese es el número que manda. "
-        "Solo se cuentan lotes \"En proceso\" o \"En espera\" - un lote \"Procesado\" con algo de saldo casi siempre es ruido de "
-        "medición de Trazabilidad, no materia prima real disponible para usar.",
+        "Cálculo en vivo (peso neto menos lo ya asignado a corridas). El conteo físico real de la MP se hace al cierre. "
+        "Solo se cuentan lotes \"En proceso\" o \"En espera\".",
         style_footnote,
     ))
 

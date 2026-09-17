@@ -329,8 +329,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     if n_pendientes:
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
-            f"{n_pendientes} lote(s) con kg pendiente todavía no se cuentan en los KPIs de arriba ni en el gráfico Silo/Bines - "
-            "se sabrá cuánto entró recién cuando se registre el kg real.",
+            f"{n_pendientes} lote(s) con kg pendiente no se cuentan en los KPIs ni en el gráfico Silo/Bines.",
             style_footnote,
         ))
 
@@ -348,16 +347,6 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
 
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion("Estado de estos lotes al cerrar esta corrida" if cerrada else "Estado de estos lotes hoy"))
-        story.append(Paragraph(
-            (
-                "Foto de cuando se cerró esta corrida - queda fija así, aunque después otra "
-                "corrida siga consumiendo el saldo de estos mismos lotes."
-            ) if cerrada else (
-                "Foto de ahora mismo (esta corrida sigue abierta) - el saldo de un lote puede "
-                "seguir cambiando mientras se registra más consumo, acá o en otra corrida."
-            ),
-            style_footnote,
-        ))
         story.append(Spacer(1, 4 * mm))
         story.append(Paragraph(f"Terminados ({len(lotes_terminados)})", style_kpi_label))
         story.append(Spacer(1, 2 * mm))

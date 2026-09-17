@@ -110,7 +110,7 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
             "Producto terminado y volumen: solo de las corridas con tambores cargados a mano. "
             "El rendimiento (columna «Rend.») se muestra corrida por corrida: sale de PT kg ÷ MP kg "
             "si la corrida ya tiene tambores, o del que trae su hoja de Trazabilidad; «—» si aún no "
-            "hay ninguno de los dos. No se promedia — cada proceso mide el rendimiento a su manera.",
+            "hay ninguno de los dos. No se promedia entre corridas.",
             style_footnote,
         ))
 
