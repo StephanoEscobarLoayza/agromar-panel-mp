@@ -220,7 +220,7 @@ def _paso_mezcla(l, kg_usado, es_parcial, kg_acum, brix_pond, acidez_pond):
     return paso
 
 
-def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=MAX_BINES_AJUSTE):
+def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, acidez_max, max_bines=MAX_BINES_AJUSTE):
     """Agrega hasta max_bines lotes de bines COMPLETOS (nunca corta a una
     fracción) - por defecto 2, porque en planta siempre entran 2 lotes de
     bines a la vez sobre el silo al arrancar una corrida desde cero, sin
@@ -242,11 +242,17 @@ def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_m
         brix_pond += brix_lote * kg_disponible
         acidez_pond += acidez_lote * kg_disponible
         pasos_bines.append(_paso_mezcla(l, kg_disponible, False, kg_acum, brix_pond, acidez_pond))
-    cumplido = kg_acum > 0 and (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
+    cumplido = (
+        kg_acum > 0
+        and (brix_pond / kg_acum) >= brix_min
+        and acidez_pond > 0
+        and (brix_pond / acidez_pond) >= ratio_min
+        and (acidez_pond / kg_acum) <= acidez_max
+    )
     return pasos_bines, cumplido
 
 
-def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=MAX_BINES_AJUSTE):
+def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, acidez_max, max_bines=MAX_BINES_AJUSTE):
     """Igual que _ajustar_con_bines (hasta max_bines lotes COMPLETOS, nunca a
     fracción) pero en vez de ir por orden de llegada, en cada uno de los
     cupos elige - de lo que queda disponible - el bin que deja la MEJOR
@@ -254,10 +260,12 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
     lleva acumulado (no solo comparando el brix/ratio propio de cada lote
     suelto). Stephano pidió esto como alternativa a "el que sigue por
     fecha" - acá la prioridad es ayudar a mantener o subir el Brix Y el
-    Ratio, no solo uno de los dos a costa del otro - por eso se compara qué
-    tan por encima de CADA mínimo queda (brix/brix_min y ratio/ratio_min) y
-    se elige el candidato cuyo peor de los dos sea el más alto (maximin) -
-    así no gana un bin que dispara el ratio pero hunde el brix, ni al revés."""
+    Ratio sin pasarse de la Acidez máxima, no solo mirar uno de los tres a
+    costa de los otros - por eso se compara qué tan por encima de CADA
+    mínimo (brix/brix_min y ratio/ratio_min) y por debajo del máximo
+    (acidez_max/acidez_test) queda, y se elige el candidato cuyo peor de
+    los tres sea el más alto (maximin) - así no gana un bin que dispara el
+    ratio pero hunde el brix o dispara la acidez, ni al revés."""
     disponibles = list(bines)
     pasos_bines = []
     while disponibles and len(pasos_bines) < max_bines:
@@ -270,8 +278,9 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
             brix_pond_test = brix_pond + brix_l * kg_l
             acidez_pond_test = acidez_pond + acidez_l * kg_l
             brix_test = brix_pond_test / kg_test
-            ratio_test = brix_test / (acidez_pond_test / kg_test) if acidez_pond_test > 0 else 0
-            score = (min(brix_test / brix_min, ratio_test / ratio_min), brix_test, ratio_test)
+            acidez_test = acidez_pond_test / kg_test
+            ratio_test = brix_test / acidez_test if acidez_test > 0 else 0
+            score = (min(brix_test / brix_min, ratio_test / ratio_min, acidez_max / acidez_test if acidez_test > 0 else 0), brix_test, ratio_test)
             if mejor is None or score > mejor_score:
                 mejor, mejor_score = l, score
         kg_disponible = float(mejor["kg_saldo"])
@@ -282,7 +291,13 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
         acidez_pond += acidez_lote * kg_disponible
         pasos_bines.append(_paso_mezcla(mejor, kg_disponible, False, kg_acum, brix_pond, acidez_pond))
         disponibles.remove(mejor)
-    cumplido = kg_acum > 0 and (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
+    cumplido = (
+        kg_acum > 0
+        and (brix_pond / kg_acum) >= brix_min
+        and acidez_pond > 0
+        and (brix_pond / acidez_pond) >= ratio_min
+        and (acidez_pond / kg_acum) <= acidez_max
+    )
     return pasos_bines, cumplido
 
 
@@ -307,14 +322,15 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
 
 
 @app.get("/api/corridas/{corrida_id}/sugerir-siguiente-bin")
-def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, modo: str = "fecha", n_bines: int = 1):
+def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, acidez_max: float, modo: str = "fecha", n_bines: int = 1):
     """Para cuando ya estás a mitad de una corrida y un lote de bines se te
     acaba: a diferencia del sugeridor general (que arranca de cero asumiendo
     que vas a usar el lote de Silo completo), este parte de lo que YA
     registraste de verdad en 'Registrar consumo' para esta corrida (Silo +
-    bines ya usados) - ese es el Brix/Ratio acumulado real que ya está
-    mezclado en la máquina - y sugiere el/los siguiente(s) bin(es) que hacen
-    falta para llegar al mínimo.
+    bines ya usados) - ese es el Brix/Ratio/Acidez acumulado real que ya
+    está mezclado en la máquina - y sugiere el/los siguiente(s) bin(es) que
+    hacen falta para llegar al Brix y Ratio mínimos sin pasarse de la
+    Acidez máxima.
 
     n_bines: cuántos bines se te acabaron de verdad (1 o 2) - eso es lo que
     se repone, no siempre 2 (si solo se te acabó uno de los dos que tenías
@@ -409,12 +425,17 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
             "lotes_sin_calidad": lotes_sin_calidad,
         }
 
-    ya_cumple = (brix_pond / kg_acum) >= brix_min and acidez_pond > 0 and (brix_pond / acidez_pond) >= ratio_min
+    ya_cumple = (
+        (brix_pond / kg_acum) >= brix_min
+        and acidez_pond > 0
+        and (brix_pond / acidez_pond) >= ratio_min
+        and (acidez_pond / kg_acum) <= acidez_max
+    )
 
     if modo == "calidad":
-        pasos_bines, cumplido = _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=n_bines)
+        pasos_bines, cumplido = _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, acidez_max, max_bines=n_bines)
     else:
-        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, max_bines=n_bines)
+        pasos_bines, cumplido = _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_min, acidez_max, max_bines=n_bines)
 
     return {
         "corrida_nombre": corrida["nombre"],
@@ -425,6 +446,7 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, mo
         "lotes_sin_calidad": lotes_sin_calidad,
         "brix_actual": round(brix_pond / kg_acum, 2),
         "ratio_actual": round(brix_pond / acidez_pond, 2) if acidez_pond > 0 else None,
+        "acidez_actual": round(acidez_pond / kg_acum, 3),
         "cumplido_ya": ya_cumple,
         "pasos_bines": pasos_bines,
         "cumplido": cumplido,

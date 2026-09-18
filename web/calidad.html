@@ -39,7 +39,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Calidad</h1>
-    <p class="hero-sub">Calcula qué bin(es) agregar, a partir de lo que ya llevas registrado, para llegar al Brix y Ratio que necesitas.</p>
+    <p class="hero-sub">Calcula qué bin(es) agregar, a partir de lo que ya llevas registrado, para llegar al Brix y Ratio que necesitas sin pasarte de Acidez.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -63,6 +63,13 @@
             <label for="ratioMin">Ratio mínimo</label>
             <input type="number" id="ratioMin" value="11" step="0.1" min="0">
           </div>
+        </div>
+        <div class="two-col" style="margin-top:12px">
+          <div class="field">
+            <label for="acidezMax">Acidez máximo</label>
+            <input type="number" id="acidezMax" value="1.00" step="0.01" min="0">
+          </div>
+          <div></div>
         </div>
         <div class="two-col" style="margin-top:12px">
           <div class="field">
@@ -223,7 +230,7 @@ function bloqueEnProceso(enProceso) {
   `;
 }
 
-function bloqueSiguienteBin(r, brixMin, ratioMin) {
+function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   if (!r.tiene_registros) {
     return `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Todavía no hay consumo registrado para "${escapeHtml(r.corrida_nombre)}" — registra lo que ya se metió en "Registrar consumo" antes de calcular el siguiente bin.</div></div>`;
   }
@@ -243,6 +250,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
       <div class="lookup-row"><span>Kg confirmados ya mezclados</span><span class="num">${fmtKg(ultimoYaAlimentado.kg_acumulado)} kg</span></div>
       <div class="lookup-row"><span>Brix actual</span><span class="num">${r.brix_actual.toFixed(2)}</span></div>
       <div class="lookup-row"><span>Ratio actual</span><span class="num">${r.ratio_actual !== null ? r.ratio_actual.toFixed(2) : "—"}</span></div>
+      <div class="lookup-row"><span>Acidez actual</span><span class="num">${r.acidez_actual.toFixed(3)}</span></div>
     </div>
   `;
 
@@ -252,24 +260,25 @@ function bloqueSiguienteBin(r, brixMin, ratioMin) {
 
   let mensajeSiguiente;
   const filasBines = r.pasos_bines.map((p, i) => filaHtml(p, i === r.pasos_bines.length - 1 && r.cumplido)).join("");
+  const metaTexto = `Brix ≥ ${brixMin}, Ratio ≥ ${ratioMin} y Acidez ≤ ${acidezMax}`;
   if (r.cumplido_ya) {
     if (n === 0) {
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas confirmado — y no hay bines en espera disponibles para reponer.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo ${metaTexto} con lo que llevas confirmado — y no hay bines en espera disponibles para reponer.</div>`;
     } else if (r.cumplido) {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} con lo que llevas. Repón ${refBin} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, sobre el mínimo.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples ${metaTexto} con lo que llevas. Repón ${refBin} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo pedido.</div>`;
     } else {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: al reponer con ${refBin} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}, por debajo del mínimo${porCalidad ? " — ni eligiendo el mejor de los disponibles alcanza" : ""}.</div>`;
+      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: al reponer con ${refBin} la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo pedido${porCalidad ? " — ni eligiendo el mejor de los disponibles alcanza" : ""}.</div>`;
     }
   } else if (r.cumplido) {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${refBin} se alcanza Brix ≥ ${brixMin} y Ratio ≥ ${ratioMin} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}.</div>`;
+    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${refBin} se alcanza ${metaTexto} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   } else if (n === 0) {
     mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px 0">No hay lotes de bines en espera disponibles para reponer.</div>';
   } else {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px 0">✕ ni agregando ${refBin} se alcanza ese mínimo — lo más cerca que se llega es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)}.</div>`;
+    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px 0">✕ ni agregando ${refBin} se alcanza ${metaTexto} — lo más cerca que se llega es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   }
 
   return `
@@ -295,8 +304,9 @@ async function calcularSiguienteBin() {
   }
   const brixMin = Number(document.getElementById("brixMin").value);
   const ratioMin = Number(document.getElementById("ratioMin").value);
-  if (!brixMin || !ratioMin) {
-    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Ingresa un Brix y un Ratio mínimo mayores a 0 arriba.</div></div>';
+  const acidezMax = Number(document.getElementById("acidezMax").value);
+  if (!brixMin || !ratioMin || !acidezMax) {
+    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Ingresa un Brix mínimo, Ratio mínimo y Acidez máximo mayores a 0 arriba.</div></div>';
     return;
   }
 
@@ -306,8 +316,8 @@ async function calcularSiguienteBin() {
   btnSiguienteBin.disabled = true;
   resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Calculando…</div></div>';
   try {
-    const r = await apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=${brixMin}&ratio_min=${ratioMin}&modo=${modo}&n_bines=${nBines}`);
-    resultadoSiguienteBin.innerHTML = bloqueSiguienteBin(r, brixMin, ratioMin);
+    const r = await apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=${brixMin}&ratio_min=${ratioMin}&acidez_max=${acidezMax}&modo=${modo}&n_bines=${nBines}`);
+    resultadoSiguienteBin.innerHTML = bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax);
   } catch (e) {
     resultadoSiguienteBin.innerHTML = `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">${escapeHtml(e.message)}</div></div>`;
   } finally {
