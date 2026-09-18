@@ -115,11 +115,13 @@ function panelLote(lote) {
 }
 
 function filaProducto(p) {
+  const esEntrada = p.tipo === "entrada";
   const litros = p.volumen_litros != null && p.volumen_litros !== "" ? ` · ${fmtKg(p.volumen_litros)} L` : "";
-  const noPt = p.cuenta_como_pt === false ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">no cuenta como PT</span>' : "";
+  const tagTxt = p.cuenta_como_pt === false ? (esEntrada ? "no resta del total" : "no cuenta como PT") : "";
+  const tag = tagTxt ? ` <span class="tag" style="background:var(--warn-bg);color:var(--warn)">${tagTxt}</span>` : "";
   return `
-    <div class="prod-fila">
-      <div><b>${escapeHtml(p.producto)}</b>${noPt}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}</span></div>
+    <div class="prod-fila${esEntrada ? " prod-fila-entrada" : ""}">
+      <div><b>${escapeHtml(p.producto)}</b>${tag}<span class="prod-detalle">${p.tambores ?? "—"} tambores × ${p.peso_neto_tambor_kg ?? "—"} kg${litros}</span></div>
       <div class="prod-pt num">${fmtKg(p.pt_kg)} kg</div>
     </div>
   `;
@@ -143,12 +145,12 @@ function panelCorrida(c) {
   } else {
     productosHtml = "";
     if (salida.length) {
-      productosHtml += '<div class="prod-grupo-titulo" style="margin-top:10px">Productos de salida</div>' +
-        salida.map(filaProducto).join("");
+      productosHtml += '<div class="prod-grupo-titulo" style="margin-top:14px">Productos de salida</div>' +
+        `<div class="prod-lista">${salida.map(filaProducto).join("")}</div>`;
     }
     if (entrada.length) {
-      productosHtml += '<div class="prod-grupo-titulo" style="margin-top:10px">Insumos de entrada</div>' +
-        entrada.map(filaProducto).join("");
+      productosHtml += '<div class="prod-grupo-titulo" style="margin-top:14px">Insumos de entrada</div>' +
+        `<div class="prod-lista">${entrada.map(filaProducto).join("")}</div>`;
     }
   }
 
