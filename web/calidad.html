@@ -99,7 +99,7 @@
     </div>
     <div id="resultadoSiguienteBin" style="margin-top:16px"></div>
     <div class="hint-line" style="margin-top:12px">
-      Este cálculo toma solo lo que YA aparece con kg confirmado para esta corrida en "Registrar consumo" como punto de partida real (los lotes todavía "pendientes" se muestran aparte, sin contar), y sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elijas arriba.
+      Este cálculo parte de lo que ya aparece registrado para esta corrida en "Registrar consumo" — los lotes con kg confirmado tal cual, y los que todavía están "en proceso" con una etiqueta "estimado" (se asume que terminan de meterse enteros) — y sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elijas arriba.
     </div>
   </section>
 
@@ -137,9 +137,12 @@ function filaHtml(p, resaltada) {
   // los bines siempre se meten completos (nunca a fracción), así que
   // kg_usado ya es el total del lote.
   const kgTexto = fmtKg(p.kg_usado);
+  const estimadoTag = p.estimado
+    ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Todavía no tiene kg confirmado en Registrar consumo — se asume que se mete el saldo completo del lote">estimado</span>'
+    : "";
   return `
     <tr${resaltada ? ' style="background:var(--ok-bg)"' : ""}>
-      <td class="strong num">#${p.numero}</td>
+      <td class="strong num">#${p.numero}${estimadoTag}</td>
       <td>${escapeHtml(p.proveedor)}</td>
       <td><span class="tag">${tagAlmacen(p.tipo_almacen)}</span></td>
       <td>${fmtFechaSola(p.fecha_ingreso)}</td>
@@ -245,9 +248,10 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   }
 
   const ultimoYaAlimentado = r.ya_alimentado[r.ya_alimentado.length - 1];
+  const hayEstimados = r.ya_alimentado.some((p) => p.estimado);
   const resumen = `
     <div class="lookup" style="margin:16px 20px 0">
-      <div class="lookup-row"><span>Kg confirmados ya mezclados</span><span class="num">${fmtKg(ultimoYaAlimentado.kg_acumulado)} kg</span></div>
+      <div class="lookup-row"><span>Kg usados hasta ahora${hayEstimados ? " (incluye estimados)" : ""}</span><span class="num">${fmtKg(ultimoYaAlimentado.kg_acumulado)} kg</span></div>
       <div class="lookup-row"><span>Brix actual</span><span class="num">${r.brix_actual.toFixed(2)}</span></div>
       <div class="lookup-row"><span>Ratio actual</span><span class="num">${r.ratio_actual !== null ? r.ratio_actual.toFixed(2) : "—"}</span></div>
       <div class="lookup-row"><span>Acidez actual</span><span class="num">${r.acidez_actual.toFixed(3)}</span></div>
@@ -283,7 +287,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
 
   return `
     <div class="panel" style="margin-top:0">
-      <div class="panel-head"><h3>Lo que ya llevas confirmado — ${escapeHtml(r.corrida_nombre)}</h3></div>
+      <div class="panel-head"><h3>Lo que ya llevas${hayEstimados ? " (con estimados)" : " confirmado"} — ${escapeHtml(r.corrida_nombre)}</h3></div>
       ${resumen}
       ${tablaHtml(r.ya_alimentado.map((p) => filaHtml(p, false)).join(""))}
     </div>

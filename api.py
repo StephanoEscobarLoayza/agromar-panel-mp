@@ -303,7 +303,7 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
     return pasos_bines, cumplido
 
 
-def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
+def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=False):
     brix_mezcla = brix_pond / kg_acum
     acidez_mezcla = acidez_pond / kg_acum
     ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
@@ -320,6 +320,7 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond):
         "brix_mezcla": round(brix_mezcla, 2),
         "acidez_mezcla": round(acidez_mezcla, 3),
         "ratio_mezcla": round(ratio_mezcla, 2) if ratio_mezcla is not None else None,
+        "estimado": estimado,
     }
 
 
@@ -355,9 +356,11 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
             text(
                 """
                 SELECT a.lote_numero, a.kg_asignados, a.tipo_almacen_origen, a.creado_en,
-                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio
+                       l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio,
+                       v.kg_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
+                JOIN v_saldo_lotes v ON v.numero = a.lote_numero
                 WHERE a.corrida_id = :c
                 ORDER BY a.creado_en ASC
                 """
@@ -392,19 +395,20 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
             continue
         if r["kg_asignados"] is None:
             # "kg pendiente": el lote ya empezó a alimentar la corrida pero
-            # todavía no se sabe cuánto lleva metido hasta ahora - se muestra
-            # como referencia (Brix/Acidez de recepción) pero SIN inventar un
-            # kg, porque asumir que ya entró completo (o cualquier otro
-            # número) puede estar muy lejos de lo que en realidad lleva.
-            en_proceso.append({
-                "numero": r["lote_numero"],
-                "proveedor": r["proveedor"],
-                "fecha_ingreso": r["fecha_ingreso"],
-                "tipo_almacen": r["tipo_almacen_origen"],
-                "brix_lote": float(r["brix_recepcion"]),
-                "acidez_lote": float(r["acidez"]),
-                "ratio_lote": float(r["ratio"]) if r["ratio"] is not None else None,
-            })
+            # todavía no se sabe cuánto lleva metido hasta ahora - Stephano
+            # pidió que esto SÍ entre al cálculo (está aportando Brix/Acidez
+            # a la mezcla ahora mismo, aunque no se sepa el kg exacto), con
+            # una estimación: se asume que va a terminar de meterse el saldo
+            # completo que le queda al lote (kg_saldo ya excluye cualquier
+            # otro consumo confirmado de ese mismo lote). Se marca
+            # "estimado": true para no confundirlo con un kg ya confirmado.
+            kg = float(r["kg_saldo"]) if r["kg_saldo"] is not None else 0.0
+            if kg <= 0:
+                continue
+            kg_acum += kg
+            brix_pond += float(r["brix_recepcion"]) * kg
+            acidez_pond += float(r["acidez"]) * kg
+            ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=True))
             continue
         kg = float(r["kg_asignados"])
         if kg <= 0:
