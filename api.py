@@ -18,10 +18,11 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
@@ -58,7 +59,8 @@ APP_PASSWORD = (os.environ.get("APP_PASSWORD") or "").strip()
 _SESSION_SECRET = (os.environ.get("APP_SESSION_SECRET") or "").strip()
 AUTH_ON = bool(APP_USER and APP_PASSWORD and _SESSION_SECRET)
 _COOKIE_NAME = "agromar_auth"
-_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días sin volver a entrar
+# sin max_age: cookie de sesión - se borra sola al cerrar el navegador, así
+# que pide login de nuevo cada vez que se vuelve a abrir (no "recordarme").
 _COOKIE_SECURE = os.environ.get("APP_INSECURE_COOKIE") != "1"  # =1 solo para probar en http local
 # rutas visibles sin login (para que la pantalla de login cargue y pueda enviar)
 _RUTAS_LIBRES = {"/login.html", "/login-bg.jpg", "/login-bg-mobile.jpg", "/api/login", "/api/sesion", "/style.css", "/app.js", "/favicon.svg"}
@@ -117,7 +119,7 @@ def login(p: LoginPayload):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
     resp = JSONResponse({"ok": True})
     resp.set_cookie(
-        _COOKIE_NAME, _token_sesion(), max_age=_COOKIE_MAX_AGE,
+        _COOKIE_NAME, _token_sesion(),
         httponly=True, samesite="lax", secure=_COOKIE_SECURE, path="/",
     )
     return resp
@@ -2004,6 +2006,17 @@ def _js_sin_cache():
 @app.get("/")
 def _raiz():
     return RedirectResponse(url="/tablero.html")
+
+
+# 404 con la marca de la app en vez del JSON crudo de FastAPI - pero solo
+# para páginas (lo que ve alguien navegando); /api/* sigue devolviendo JSON
+# tal cual, porque apiGet/apiPost en app.js leen el campo "detail" del JSON
+# para mostrar el mensaje de error real (ej. "Este lote solo tiene X kg...").
+@app.exception_handler(StarletteHTTPException)
+async def _404_con_marca(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404 and not request.url.path.startswith("/api/"):
+        return FileResponse(BASE_DIR / "web" / "404.html", status_code=404)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
 app.mount("/", StaticFiles(directory=BASE_DIR / "web", html=True), name="web")
