@@ -154,6 +154,13 @@ function estadoBoton(l) {
   return `<span class="edit-inline"><button type="button" class="csel-btn pill-select ${pillClase}" data-lote="${l.numero}" data-kind="estado">${escapeHtml(label)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
 }
 
+function pesoBoton(l) {
+  const reset = l.peso_congelado
+    ? `<button class="btn-link reset-peso" data-lote="${l.numero}" title="Volver a dejar que el Sheet actualice este peso">↺</button>`
+    : "";
+  return `<span class="edit-inline"><button type="button" class="csel-btn pill-select neutral" data-lote="${l.numero}" data-kind="peso" title="Corregir el peso neto real">${fmtKg(l.peso_neto_kg)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
+}
+
 function ubicacionBoton(l) {
   const elegidos = canonicalUbicacion(parseUbicaciones(l.ubicacion_actual));
   const label = elegidos.length ? elegidos.join(" / ") : (l.ubicacion_actual || "—");
@@ -188,7 +195,7 @@ function fila(l) {
       <td>${fmtFechaSola(l.fecha_ingreso)}</td>
       <td>${ubicacionBoton(l)}</td>
       <td>${estadoBoton(l)}</td>
-      <td class="right num">${fmtKg(l.peso_neto_kg)}${binesTotalesSub}</td>
+      <td class="right num">${pesoBoton(l)}${binesTotalesSub}</td>
       <td class="right num"><span class="saldo-bar"><i style="width:${pct}%;background:${colorSaldo(pct)}"></i></span>${fmtSaldo(l.kg_saldo)}${binesSaldoSub}</td>
       <td class="right num">${l.brix_recepcion ?? "—"}</td>
       <td class="right num">${l.acidez ?? "—"}</td>
@@ -257,6 +264,14 @@ function abrirCsel(btn, numero, kind) {
     popup.innerHTML = ESTADOS.map(e =>
       `<li data-value="${escapeHtml(e)}" class="${e === actual ? "csel-selected" : ""}">${escapeHtml(ESTADO_LABEL[e])}</li>`
     ).join("");
+  } else if (kind === "peso") {
+    popup.innerHTML = `
+      <li class="csel-check" style="cursor:default">
+        <div class="hint-line" style="margin-bottom:6px">Peso neto real (ej. el de Trazabilidad en papel)</div>
+        <input type="number" class="csel-peso-input" min="0" step="0.01" value="${Number(lote.peso_neto_kg).toFixed(2)}">
+      </li>
+      <li class="csel-apply-row"><button type="button" class="btn csel-apply">Aplicar</button></li>
+    `;
   } else {
     // ubicación: casillas (puede estar marcada mas de una a la vez) + botón Aplicar
     const set = parseUbicaciones(lote.ubicacion_actual);
@@ -300,6 +315,23 @@ popup.addEventListener("click", async (ev) => {
     return;
   }
 
+  if (kind === "peso") {
+    if (!ev.target.closest(".csel-apply")) return;
+    const valor = Number(popup.querySelector(".csel-peso-input").value);
+    if (!valor || valor <= 0) {
+      alert("Ingresa un peso mayor a 0.");
+      return;
+    }
+    cerrarCsel();
+    try {
+      await apiPost(`/api/lotes/${numero}/peso`, { peso_neto_kg: valor });
+      await cargar();
+    } catch (e) {
+      alert(e.message);
+    }
+    return;
+  }
+
   const li = ev.target.closest("li[data-value]");
   if (!li) return;
   const valor = li.dataset.value;
@@ -336,6 +368,8 @@ filasBody.addEventListener("click", async (ev) => {
       await apiPost(`/api/lotes/${numero}/estado`, { estado: null });
     } else if (btn.classList.contains("reset-ubicacion")) {
       await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: null });
+    } else if (btn.classList.contains("reset-peso")) {
+      await apiPost(`/api/lotes/${numero}/peso`, { peso_neto_kg: null });
     } else {
       return;
     }

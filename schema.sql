@@ -189,11 +189,13 @@ SELECT
     l.estado_manual,
     l.ubicacion_manual,
     COALESCE(l.estado_manual, l.estado_fuente) AS estado_actual,
-    COALESCE(l.ubicacion_manual, l.ubicacion) AS ubicacion_actual
+    COALESCE(l.ubicacion_manual, l.ubicacion) AS ubicacion_actual,
+    l.peso_congelado
 FROM lotes l
 LEFT JOIN asignaciones a ON a.lote_numero = l.numero
 GROUP BY l.numero, l.proveedor, l.procedencia, l.tipo_almacen, l.ubicacion, l.estado_fuente, l.fecha_ingreso,
-         l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales, l.estado_manual, l.ubicacion_manual;
+         l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales, l.estado_manual, l.ubicacion_manual,
+         l.peso_congelado;
 
 -- ----------------------------------------------------------------------------
 -- CORRIDA_PRODUCTOS: cuando una corrida produce más de un producto terminado
