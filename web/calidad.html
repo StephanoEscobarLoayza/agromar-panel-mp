@@ -230,7 +230,7 @@ function bloqueHistorial(historial) {
   if (!historial || !historial.length) return "";
   return `
     <div class="panel" style="margin-top:16px">
-      <div class="panel-head"><h3>Historial — tanques que ya salieron en esta corrida</h3></div>
+      <div class="panel-head"><h3>Historial — lotes con kg ya confirmado</h3></div>
       <div class="hint-line" style="margin:0 20px 12px">Ya tienen el kg confirmado en "Registrar consumo", así que ya se midieron y salieron como producto — no cuentan para el tanque que se está llenando ahora.</div>
       ${tablaHistorialHtml(historial)}
     </div>
