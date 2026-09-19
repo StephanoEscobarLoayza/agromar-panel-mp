@@ -303,7 +303,7 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
     return pasos_bines, cumplido
 
 
-def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=False):
+def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=False, saldo_completo=False):
     brix_mezcla = brix_pond / kg_acum
     acidez_mezcla = acidez_pond / kg_acum
     ratio_mezcla = brix_mezcla / acidez_mezcla if acidez_mezcla > 0 else None
@@ -321,6 +321,7 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=F
         "acidez_mezcla": round(acidez_mezcla, 3),
         "ratio_mezcla": round(ratio_mezcla, 2) if ratio_mezcla is not None else None,
         "estimado": estimado,
+        "saldo_completo": saldo_completo,
     }
 
 
@@ -362,7 +363,7 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
                 """
                 SELECT a.lote_numero, a.kg_asignados, a.tipo_almacen_origen, a.creado_en,
                        l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio,
-                       v.kg_saldo,
+                       l.peso_neto_kg, v.kg_saldo,
                        (a.creado_en = (
                            SELECT MAX(a2.creado_en) FROM asignaciones a2
                            WHERE a2.lote_numero = a.lote_numero
@@ -438,15 +439,21 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
         if r["kg_asignados"] is not None:
             kg = float(r["kg_asignados"])
             estimado = False
+            saldo_completo = False
         else:
             kg = saldo
             estimado = True
+            # si el saldo es igual al peso neto del lote, todavía no se le
+            # ha tocado nada (ni acá ni en ninguna otra corrida) - "saldo"
+            # confunde ahí, porque no es un resto, es el lote completo.
+            peso_neto = float(r["peso_neto_kg"]) if r["peso_neto_kg"] is not None else None
+            saldo_completo = peso_neto is not None and abs(saldo - peso_neto) < 0.01
         if kg <= 0:
             continue
         kg_acum += kg
         brix_pond += float(r["brix_recepcion"]) * kg
         acidez_pond += float(r["acidez"]) * kg
-        actual.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=estimado))
+        actual.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=estimado, saldo_completo=saldo_completo))
 
     if kg_acum == 0:
         # o no hay ningún lote "pendiente" ahora mismo (todo lo registrado ya

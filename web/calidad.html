@@ -136,7 +136,7 @@ function tagAlmacen(t) {
 function filaHtml(p, resaltada, conAcumulado) {
   // los bines siempre se meten completos (nunca a fracción), así que
   // kg_usado ya es el total del lote.
-  const kgTexto = fmtKg(p.kg_usado);
+  const kgTexto = fmtKg(p.kg_usado) + (p.estimado ? `<div class="num-sub">${p.saldo_completo ? "completo" : "saldo"}</div>` : "");
   const estimadoTag = p.estimado
     ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Todavía no tiene kg confirmado en Registrar consumo — se asume que se mete el saldo completo del lote">estimado</span>'
     : "";
@@ -216,7 +216,7 @@ function tablaHtml(filasHtml, conAcumulado) {
         <thead>
           <tr>
             <th>Lote</th><th>Proveedor</th><th>Almacén</th><th>Fecha</th>
-            <th class="right">Kg usado</th><th class="right">Brix</th><th class="right">Acidez</th>
+            <th class="right">Kg</th><th class="right">Brix</th><th class="right">Acidez</th>
             ${thAcumulado}<th class="right">Brix mezcla</th><th class="right">Ratio mezcla</th>
           </tr>
         </thead>
