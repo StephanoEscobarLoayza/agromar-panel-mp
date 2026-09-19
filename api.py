@@ -328,12 +328,15 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=F
 def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, acidez_max: float, modo: str = "fecha", n_bines: int = 1):
     """Para cuando ya estás a mitad de una corrida y un lote de bines se te
     acaba: a diferencia del sugeridor general (que arranca de cero asumiendo
-    que vas a usar el lote de Silo completo), este parte de lo que YA
-    registraste de verdad en 'Registrar consumo' para esta corrida (Silo +
-    bines ya usados) - ese es el Brix/Ratio/Acidez acumulado real que ya
-    está mezclado en la máquina - y sugiere el/los siguiente(s) bin(es) que
-    hacen falta para llegar al Brix y Ratio mínimos sin pasarse de la
-    Acidez máxima.
+    que vas a usar el lote de Silo completo), este parte de lo que está
+    entrando AHORA MISMO al tanque que se está llenando - los lotes todavía
+    "pendientes" (sin kg confirmado) en 'Registrar consumo' de esta corrida.
+    Los lotes que YA tienen kg confirmado no cuentan para este cálculo: ese
+    kg recién se confirma cuando el tanque que alimentaron ya se midió y
+    salió como producto, así que ya son historia, no parte de la mezcla
+    actual - se devuelven aparte como referencia. Sugiere el/los
+    siguiente(s) bin(es) que hacen falta para llegar al Brix y Ratio
+    mínimos sin pasarse de la Acidez máxima.
 
     n_bines: cuántos bines se te acabaron de verdad (1 o 2) - eso es lo que
     se repone, no siempre 2 (si solo se te acabó uno de los dos que tenías
@@ -385,49 +388,57 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
             "lotes_sin_calidad": [],
         }
 
+    # El kg CONFIRMADO en Registrar consumo se llena recién cuando el tanque
+    # que ese lote alimentó ya se midió y salió como producto - o sea, un
+    # lote con kg confirmado ya es historia, no sigue mezclado en el tanque
+    # que está llenándose ahora. Al revés, un lote "pendiente" (kg_asignados
+    # = null) es justo el que está entrando al tanque activo en este
+    # momento. Por eso el cálculo de "qué tienes mezclado ahora mismo" usa
+    # SOLO los pendientes (con una estimación: se asume que cada uno termina
+    # de meterse el saldo completo que le queda) - los confirmados se
+    # muestran aparte, como historial, pero no cuentan (Stephano lo aclaró
+    # explícitamente: contarlos también inflaba la mezcla con tanques que ya
+    # no existen).
     kg_acum = brix_pond = acidez_pond = 0.0
-    ya_alimentado = []
-    en_proceso = []
+    actual = []
+    historial = []
     lotes_sin_calidad = []
     for r in registrado:
         if r["brix_recepcion"] is None or r["acidez"] is None or float(r["acidez"]) <= 0:
             lotes_sin_calidad.append(r["lote_numero"])
             continue
-        if r["kg_asignados"] is None:
-            # "kg pendiente": el lote ya empezó a alimentar la corrida pero
-            # todavía no se sabe cuánto lleva metido hasta ahora - Stephano
-            # pidió que esto SÍ entre al cálculo (está aportando Brix/Acidez
-            # a la mezcla ahora mismo, aunque no se sepa el kg exacto), con
-            # una estimación: se asume que va a terminar de meterse el saldo
-            # completo que le queda al lote (kg_saldo ya excluye cualquier
-            # otro consumo confirmado de ese mismo lote). Se marca
-            # "estimado": true para no confundirlo con un kg ya confirmado.
-            kg = float(r["kg_saldo"]) if r["kg_saldo"] is not None else 0.0
+        if r["kg_asignados"] is not None:
+            kg = float(r["kg_asignados"])
             if kg <= 0:
                 continue
-            kg_acum += kg
-            brix_pond += float(r["brix_recepcion"]) * kg
-            acidez_pond += float(r["acidez"]) * kg
-            ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=True))
+            historial.append({
+                "numero": r["lote_numero"],
+                "proveedor": r["proveedor"],
+                "fecha_ingreso": r["fecha_ingreso"],
+                "tipo_almacen": r["tipo_almacen_origen"],
+                "brix_lote": float(r["brix_recepcion"]),
+                "acidez_lote": float(r["acidez"]),
+                "ratio_lote": float(r["ratio"]) if r["ratio"] is not None else None,
+                "kg_usado": round(kg, 2),
+            })
             continue
-        kg = float(r["kg_asignados"])
+        kg = float(r["kg_saldo"]) if r["kg_saldo"] is not None else 0.0
         if kg <= 0:
             continue
         kg_acum += kg
         brix_pond += float(r["brix_recepcion"]) * kg
         acidez_pond += float(r["acidez"]) * kg
-        ya_alimentado.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond))
+        actual.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=True))
 
     if kg_acum == 0:
-        # sí hay lotes alimentando la corrida (por eso no es "sin registros"),
-        # pero ninguno con kg confirmado todavía - no se puede calcular un
-        # Brix/Ratio real de la mezcla hasta que se registre al menos uno
-        # (se completa el "kg pendiente" desde "Registrar consumo").
+        # o no hay ningún lote "pendiente" ahora mismo (todo lo registrado ya
+        # tiene kg confirmado - la corrida está entre un tanque y el
+        # siguiente), o los que hay no tienen saldo/calidad para estimar.
         return {
             "corrida_nombre": corrida["nombre"],
             "tiene_registros": True,
             "sin_kg_confirmado": True,
-            "en_proceso": en_proceso,
+            "historial": historial,
             "lotes_sin_calidad": lotes_sin_calidad,
         }
 
@@ -447,8 +458,8 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
         "corrida_nombre": corrida["nombre"],
         "modo": modo,
         "tiene_registros": True,
-        "ya_alimentado": ya_alimentado,
-        "en_proceso": en_proceso,
+        "actual": actual,
+        "historial": historial,
         "lotes_sin_calidad": lotes_sin_calidad,
         "brix_actual": round(brix_pond / kg_acum, 2),
         "ratio_actual": round(brix_pond / acidez_pond, 2) if acidez_pond > 0 else None,
