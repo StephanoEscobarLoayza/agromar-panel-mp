@@ -133,13 +133,14 @@ function tagAlmacen(t) {
   return t === "BINES" ? "Bines" : t === "SILO" ? "Silo" : "Mixto";
 }
 
-function filaHtml(p, resaltada) {
+function filaHtml(p, resaltada, conAcumulado) {
   // los bines siempre se meten completos (nunca a fracción), así que
   // kg_usado ya es el total del lote.
   const kgTexto = fmtKg(p.kg_usado);
   const estimadoTag = p.estimado
     ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Todavía no tiene kg confirmado en Registrar consumo — se asume que se mete el saldo completo del lote">estimado</span>'
     : "";
+  const celdaAcumulado = conAcumulado ? `<td class="right num">${fmtKg(p.kg_acumulado)}</td>` : "";
   return `
     <tr${resaltada ? ' style="background:var(--ok-bg)"' : ""}>
       <td class="strong num">#${p.numero}${estimadoTag}</td>
@@ -149,7 +150,7 @@ function filaHtml(p, resaltada) {
       <td class="right num">${kgTexto}</td>
       <td class="right num">${p.brix_lote.toFixed(2)}</td>
       <td class="right num">${p.acidez_lote.toFixed(2)}</td>
-      <td class="right num">${fmtKg(p.kg_acumulado)}</td>
+      ${celdaAcumulado}
       <td class="right num">${p.brix_mezcla.toFixed(2)}</td>
       <td class="right num">${p.ratio_mezcla !== null ? p.ratio_mezcla.toFixed(2) : "—"}</td>
     </tr>
@@ -207,7 +208,8 @@ async function cargarCorridasAbiertas() {
   }
 }
 
-function tablaHtml(filasHtml) {
+function tablaHtml(filasHtml, conAcumulado) {
+  const thAcumulado = conAcumulado ? '<th class="right">Kg acumulado</th>' : "";
   return `
     <div class="table-wrap">
       <table>
@@ -215,7 +217,7 @@ function tablaHtml(filasHtml) {
           <tr>
             <th>Lote</th><th>Proveedor</th><th>Almacén</th><th>Fecha</th>
             <th class="right">Kg usado</th><th class="right">Brix</th><th class="right">Acidez</th>
-            <th class="right">Kg acumulado</th><th class="right">Brix mezcla</th><th class="right">Ratio mezcla</th>
+            ${thAcumulado}<th class="right">Brix mezcla</th><th class="right">Ratio mezcla</th>
           </tr>
         </thead>
         <tbody>${filasHtml}</tbody>
@@ -268,13 +270,13 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   const metaTexto = `Brix ≥ ${brixMin}, Ratio ≥ ${ratioMin} y Acidez ≤ ${acidezMax}`;
   if (r.cumplido_ya) {
     if (n === 0) {
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya vas cumpliendo ${metaTexto} con lo que llevas confirmado — y no hay bines en espera disponibles para reponer.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Se cumple ${metaTexto} con el tanque actual — no hay bines en espera disponibles para reponer.</div>`;
     } else if (r.cumplido) {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya cumples ${metaTexto} con lo que llevas. Repón ${refBin} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo pedido.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya se cumple ${metaTexto}. Al reponer ${refBin}, la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo pedido.</div>`;
     } else {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Ya cumples ahora, pero ojo: al reponer con ${refBin} la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo pedido${porCalidad ? " — ni eligiendo el mejor de los disponibles alcanza" : ""}.</div>`;
+      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Se cumple ${metaTexto} ahora, pero al reponer ${refBin} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo pedido${porCalidad ? " — ni eligiendo el mejor disponible se mantiene" : ""}.</div>`;
     }
   } else if (r.cumplido) {
     const ultimo = r.pasos_bines[n - 1];
@@ -283,7 +285,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
     mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px 0">No hay lotes de bines en espera disponibles para reponer.</div>';
   } else {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px 0">✕ ni agregando ${refBin} se alcanza ${metaTexto} — lo más cerca que se llega es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
+    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px 0">✕ No se alcanza ${metaTexto} ni agregando ${refBin} — lo más cerca posible es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   }
 
   return `
@@ -291,7 +293,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
       <div class="panel-head"><h3>Tanque actual (estimado) — ${escapeHtml(r.corrida_nombre)}</h3></div>
       <div class="hint-line" style="margin:0 20px 12px">Lotes todavía "pendientes" en Registrar consumo — se asume que cada uno termina de meterse su saldo completo.</div>
       ${resumen}
-      ${tablaHtml(r.actual.map((p) => filaHtml(p, false)).join(""))}
+      ${tablaHtml(r.actual.map((p) => filaHtml(p, false, true)).join(""), true)}
     </div>
     ${bloqueHistorial(r.historial)}
     <div class="panel" style="margin-top:16px">

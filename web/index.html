@@ -161,13 +161,27 @@ const ICON_PROMEDIO = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 14 L8 8 
 // La etiqueta nunca envuelve a 2 lineas (se veia mal, cada fila quedaba de
 // alto distinto) - se recorta con "..." si no entra, y el nombre completo
 // queda en el title (tooltip al pasar el mouse / mantener tocado).
-function statBarRow(label, valorTexto, pct, colorStyle, labelWidth, tituloCompleto, wrap) {
-  const labelStyle = `${labelWidth ? `width:${labelWidth};` : ""}${wrap ? "white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25" : ""}`;
+function statBarRow(label, valorTexto, pct, colorStyle, labelWidth, tituloCompleto) {
   return `
-    <div class="stat-bar-row"${wrap ? ' style="align-items:flex-start"' : ""}>
-      <div class="stat-bar-label" style="${labelStyle}" title="${escapeHtml(tituloCompleto || "")}">${label}</div>
+    <div class="stat-bar-row">
+      <div class="stat-bar-label" style="${labelWidth ? `width:${labelWidth}` : ""}" title="${escapeHtml(tituloCompleto || "")}">${label}</div>
       <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
       <div class="stat-bar-value num">${valorTexto}</div>
+    </div>
+  `;
+}
+
+// nombre completo arriba, barra + kg debajo - a diferencia de statBarRow(),
+// esto es para etiquetas largas (razón social) donde ponerlas al lado de la
+// barra deja la barra flotando con un montón de espacio vacío alrededor.
+function statBarRowStacked(label, valorTexto, pct, colorStyle) {
+  return `
+    <div class="stat-bar-row-stacked">
+      <div class="stat-bar-name">${label}</div>
+      <div class="stat-bar-row">
+        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
+        <div class="stat-bar-value num">${valorTexto}</div>
+      </div>
     </div>
   `;
 }
@@ -281,14 +295,11 @@ function renderPorProveedor(lotes) {
     return;
   }
   const max = entradas[0][1] || 1;
-  cont.innerHTML = entradas.map(([prov, valor]) => statBarRow(
+  cont.innerHTML = entradas.map(([prov, valor]) => statBarRowStacked(
     escapeHtml(prov),
     `${fmtKg(valor)} kg`,
     Math.max(2, (valor / max) * 100),
-    "background:var(--citrus)",
-    "190px",
-    prov,
-    true
+    "background:var(--citrus)"
   )).join("");
 }
 

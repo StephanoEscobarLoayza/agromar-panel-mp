@@ -300,6 +300,10 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .stat-bar-fill.series-5{background:var(--series-5)}
 .stat-bar-fill.series-otro{background:var(--text-muted)}
 .stat-bar-value{width:104px;text-align:right;flex-shrink:0;font-weight:600;white-space:nowrap}
+.stat-bar-row-stacked{display:flex;flex-direction:column;gap:5px}
+.stat-bar-row-stacked .stat-bar-name{color:var(--text-2);line-height:1.3;font-size:12px}
+.stat-bar-row-stacked .stat-bar-track{height:8px}
+.stat-bar-row-stacked .stat-bar-value{width:auto}
 .hero-figure{font-size:15px;color:var(--text-2)}
 .hero-figure b{font-size:15px}
 .scroll-y{max-height:420px;overflow-y:auto;padding-right:6px}
