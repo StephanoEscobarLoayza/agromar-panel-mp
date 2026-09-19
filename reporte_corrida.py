@@ -216,7 +216,12 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     entrada_kg_total = sum(float(p["pt_kg"]) for p in productos_entrada_desc if p.get("pt_kg") is not None)
     entrada_litros_total = sum(float(p["volumen_litros"]) for p in productos_entrada_desc if p.get("volumen_litros") is not None)
     pt_total = pt_bruto_total - entrada_kg_total
-    litros_total = litros_bruto_total - entrada_litros_total
+    # mismo criterio que el Brix/Acidez medido arriba: el litraje tipeado a
+    # mano en "productos de salida" es un estimado - si hay mediciones reales
+    # de tanque, se suman esos litros en vez de restar el insumo de entrada
+    # del bruto tipeado.
+    litros_medidos_total = sum(float(m.get("litros") or 0) for m in mediciones)
+    litros_total = litros_medidos_total if litros_medidos_total > 0 else (litros_bruto_total - entrada_litros_total)
     rendimiento = pt_total / kg_total if kg_total > 0 and pt_total > 0 else None
 
     # mismo criterio de "bruto - entrada" que ya tenía PT kg y Volumen, pero

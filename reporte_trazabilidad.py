@@ -304,9 +304,16 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     entrada_volumen = sum(_f(p.get("volumen_litros")) or 0.0 for p in productos_entrada_desc)
     entrada_tambores = sum(_f(p.get("tambores")) or 0 for p in productos_entrada_desc)
     entrada_kg = sum(_f(p.get("pt_kg")) or 0.0 for p in productos_entrada_desc)
-    volumen = (volumen_bruto - entrada_volumen) or None
     tambores = (tambores_bruto - entrada_tambores) or None
     pt_kg = (pt_kg_bruto - entrada_kg) or None
+
+    # el litraje que se escribe a mano en "productos de salida" es un
+    # estimado - si hay mediciones reales de tanque para esta corrida, esas
+    # mandan (mismo criterio que ya se usa para el Brix/Acidez ponderado más
+    # abajo): se suman los litros de cada tanque medido en vez de restar el
+    # insumo de entrada del bruto tipeado.
+    litros_medidos = sum(_f(m.get("litros")) or 0.0 for m in mediciones if m.get("litros") is not None)
+    volumen = litros_medidos if litros_medidos > 0 else ((volumen_bruto - entrada_volumen) or None)
 
     peso_med = [(_f(m.get("litros")) or 0.0, _f(m["brix_final"]))
                 for m in mediciones if m.get("brix_final") is not None]
