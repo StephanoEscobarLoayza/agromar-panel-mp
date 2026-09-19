@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "panel-cuadre-streamlit",
+      "name": "panel-cuadre-api",
       "runtimeExecutable": "C:/Users/Stephano/AppData/Local/Programs/Python/Python311/python.exe",
-      "runtimeArgs": ["-m", "streamlit", "run", "app.py", "--server.headless", "true"],
-      "port": 8501
+      "runtimeArgs": ["-m", "uvicorn", "api:app", "--port", "8000"],
+      "port": 8000
     }
   ]
 }
