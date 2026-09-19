@@ -256,7 +256,7 @@ async function cargarTodo() {
   const corridaId = corridaSel.value;
   if (!corridaId) return;
   const [estimado, medidas] = await Promise.all([
-    apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=11&ratio_min=11`),
+    apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=11&ratio_min=11&acidez_max=999`),
     apiGet(`/api/corridas/${corridaId}/mediciones-tanque`),
   ]);
   renderComparacion(estimado, medidas);
