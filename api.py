@@ -329,14 +329,16 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
     """Para cuando ya estás a mitad de una corrida y un lote de bines se te
     acaba: a diferencia del sugeridor general (que arranca de cero asumiendo
     que vas a usar el lote de Silo completo), este parte de lo que está
-    entrando AHORA MISMO al tanque que se está llenando - los lotes todavía
-    "pendientes" (sin kg confirmado) en 'Registrar consumo' de esta corrida.
-    Los lotes que YA tienen kg confirmado no cuentan para este cálculo: ese
-    kg recién se confirma cuando el tanque que alimentaron ya se midió y
-    salió como producto, así que ya son historia, no parte de la mezcla
-    actual - se devuelven aparte como referencia. Sugiere el/los
-    siguiente(s) bin(es) que hacen falta para llegar al Brix y Ratio
-    mínimos sin pasarse de la Acidez máxima.
+    entrando AHORA MISMO al tanque que se está llenando. La señal de si un
+    lote sigue ahí no es si su kg está confirmado en 'Registrar consumo'
+    (a veces se confirma un "avance" del kg mientras el lote sigue
+    metiéndose) sino si todavía le queda SALDO: sin saldo, ya no puede
+    seguir aportando, así que se cuenta como historia (se devuelve aparte,
+    sin sumar al cálculo); con saldo, sigue siendo parte del tanque activo
+    - se usa el kg confirmado tal cual si ya lo hay, o el saldo como
+    estimado si sigue pendiente. Sugiere el/los siguiente(s) bin(es) que
+    hacen falta para llegar al Brix y Ratio mínimos sin pasarse de la
+    Acidez máxima.
 
     n_bines: cuántos bines se te acabaron de verdad (1 o 2) - eso es lo que
     se repone, no siempre 2 (si solo se te acabó uno de los dos que tenías
@@ -360,7 +362,11 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
                 """
                 SELECT a.lote_numero, a.kg_asignados, a.tipo_almacen_origen, a.creado_en,
                        l.proveedor, l.fecha_ingreso, l.brix_recepcion, l.acidez, l.ratio,
-                       v.kg_saldo
+                       v.kg_saldo,
+                       (a.creado_en = (
+                           SELECT MAX(a2.creado_en) FROM asignaciones a2
+                           WHERE a2.lote_numero = a.lote_numero
+                       )) AS es_ultima_asignacion
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
                 JOIN v_saldo_lotes v ON v.numero = a.lote_numero
@@ -388,17 +394,22 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
             "lotes_sin_calidad": [],
         }
 
-    # El kg CONFIRMADO en Registrar consumo se llena recién cuando el tanque
-    # que ese lote alimentó ya se midió y salió como producto - o sea, un
-    # lote con kg confirmado ya es historia, no sigue mezclado en el tanque
-    # que está llenándose ahora. Al revés, un lote "pendiente" (kg_asignados
-    # = null) es justo el que está entrando al tanque activo en este
-    # momento. Por eso el cálculo de "qué tienes mezclado ahora mismo" usa
-    # SOLO los pendientes (con una estimación: se asume que cada uno termina
-    # de meterse el saldo completo que le queda) - los confirmados se
-    # muestran aparte, como historial, pero no cuentan (Stephano lo aclaró
-    # explícitamente: contarlos también inflaba la mezcla con tanques que ya
-    # no existen).
+    # La señal de si un lote sigue en el tanque activo NO es si su kg está
+    # confirmado o no en Registrar consumo (Stephano aclaró que a veces
+    # confirma un "avance" del kg mientras el lote sigue metiéndose todavía,
+    # sin que eso signifique que ya terminó) - la señal real es si al lote
+    # le queda saldo Y esta es su asignación más reciente. Lo segundo hace
+    # falta porque el mismo saldo restante puede ya estar pendiente en OTRA
+    # corrida más nueva (Stephano encontró el caso real: un lote con saldo
+    # en la corrida 19 porque ese saldo ya estaba metiéndose en la corrida
+    # 20) - sin este chequeo, ese saldo se contaría dos veces, una vez en
+    # cada corrida. Si no le queda saldo, o si le queda pero ya hay una
+    # asignación más nueva de ese mismo lote en otro lado, ya es historia:
+    # no importa que su kg esté confirmado o no acá, no puede seguir
+    # aportando A ESTA corrida. Si le queda saldo y esta es la asignación
+    # más reciente, sigue siendo parte del tanque activo - se usa el kg
+    # confirmado tal cual si ya lo hay (dato real, no hace falta
+    # estimarlo), o el saldo como estimado si sigue "pendiente".
     kg_acum = brix_pond = acidez_pond = 0.0
     actual = []
     historial = []
@@ -407,8 +418,10 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
         if r["brix_recepcion"] is None or r["acidez"] is None or float(r["acidez"]) <= 0:
             lotes_sin_calidad.append(r["lote_numero"])
             continue
-        if r["kg_asignados"] is not None:
-            kg = float(r["kg_asignados"])
+        saldo = float(r["kg_saldo"]) if r["kg_saldo"] is not None else 0.0
+        sigue_activo = saldo > 0 and bool(r["es_ultima_asignacion"])
+        if not sigue_activo:
+            kg = float(r["kg_asignados"]) if r["kg_asignados"] is not None else 0.0
             if kg <= 0:
                 continue
             historial.append({
@@ -422,13 +435,18 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
                 "kg_usado": round(kg, 2),
             })
             continue
-        kg = float(r["kg_saldo"]) if r["kg_saldo"] is not None else 0.0
+        if r["kg_asignados"] is not None:
+            kg = float(r["kg_asignados"])
+            estimado = False
+        else:
+            kg = saldo
+            estimado = True
         if kg <= 0:
             continue
         kg_acum += kg
         brix_pond += float(r["brix_recepcion"]) * kg
         acidez_pond += float(r["acidez"]) * kg
-        actual.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=True))
+        actual.append(_paso_ya_alimentado(r, kg, kg_acum, brix_pond, acidez_pond, estimado=estimado))
 
     if kg_acum == 0:
         # o no hay ningún lote "pendiente" ahora mismo (todo lo registrado ya

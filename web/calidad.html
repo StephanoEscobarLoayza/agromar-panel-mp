@@ -99,7 +99,7 @@
     </div>
     <div id="resultadoSiguienteBin" style="margin-top:16px"></div>
     <div class="hint-line" style="margin-top:12px">
-      Este cálculo parte solo de los lotes que todavía están "pendientes" en "Registrar consumo" para esta corrida — esos son los que están entrando al tanque que se está llenando ahora mismo (se asume que cada uno termina de meterse su saldo completo). Los que ya tienen kg confirmado son tanques que ya salieron como producto, y se muestran aparte como historial. Sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elijas arriba.
+      Este cálculo parte solo de los lotes de esta corrida que todavía tienen saldo — esos son los que pueden seguir entrando al tanque que se está llenando ahora mismo (se usa el kg confirmado si ya lo registraste, o un estimado con el saldo si sigue pendiente). Los lotes sin saldo ya no pueden aportar más y se muestran aparte como historial. Sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elijas arriba.
     </div>
   </section>
 
@@ -230,8 +230,8 @@ function bloqueHistorial(historial) {
   if (!historial || !historial.length) return "";
   return `
     <div class="panel" style="margin-top:16px">
-      <div class="panel-head"><h3>Historial — lotes con kg ya confirmado</h3></div>
-      <div class="hint-line" style="margin:0 20px 12px">Ya tienen el kg confirmado en "Registrar consumo", así que ya se midieron y salieron como producto — no cuentan para el tanque que se está llenando ahora.</div>
+      <div class="panel-head"><h3>Historial — lotes sin saldo</h3></div>
+      <div class="hint-line" style="margin:0 20px 12px">Ya no les queda saldo, así que no pueden seguir aportando al tanque que se está llenando ahora — se muestran aparte, como referencia.</div>
       ${tablaHistorialHtml(historial)}
     </div>
   `;
@@ -245,7 +245,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   if (r.sin_kg_confirmado) {
     return `
       <div class="panel" style="margin-top:0">
-        <div class="msg warn" style="margin:16px 20px 0">No hay ningún lote alimentando el tanque actual de "${escapeHtml(r.corrida_nombre)}" ahora mismo (todo lo registrado ya tiene kg confirmado, o no hay nada nuevo todavía) — en cuanto registres un lote nuevo en "Registrar consumo" (aunque sea con kg pendiente), aquí se puede calcular.</div>
+        <div class="msg warn" style="margin:16px 20px 0">No hay ningún lote con saldo alimentando "${escapeHtml(r.corrida_nombre)}" ahora mismo — en cuanto registres uno nuevo en "Registrar consumo" (aunque sea con kg pendiente), aquí se puede calcular.</div>
         ${bloqueHistorial(r.historial)}
       </div>
     `;
@@ -291,7 +291,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   return `
     <div class="panel" style="margin-top:0">
       <div class="panel-head"><h3>Tanque actual (estimado) — ${escapeHtml(r.corrida_nombre)}</h3></div>
-      <div class="hint-line" style="margin:0 20px 12px">Lotes todavía "pendientes" en Registrar consumo — se asume que cada uno termina de meterse su saldo completo.</div>
+      <div class="hint-line" style="margin:0 20px 12px">Lotes que todavía tienen saldo — el kg confirmado se usa tal cual si ya lo registraste; si sigue "pendiente", se estima con el saldo que le queda.</div>
       ${resumen}
       ${tablaHtml(r.actual.map((p) => filaHtml(p, false, true)).join(""), true)}
     </div>
