@@ -10,7 +10,7 @@ from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 from reporte_base import (
     FOREST_2, CITRUS, TEXT_2,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
-    fmt_kg, fmt_num, fmt_fecha, Banda, header_footer, kpi_card, encabezado, seccion, tabla, nuevo_doc,
+    fmt_kg, fmt_num, fmt_lote, fmt_fecha, Banda, header_footer, kpi_card, encabezado, seccion, tabla, nuevo_doc,
     ahora_peru,
 )
 
@@ -23,7 +23,7 @@ def _tabla_stock(lotes):
     """Lotes con saldo PARCIAL de verdad - ya se les asignó algo a alguna
     corrida y todavía les queda un resto."""
     filas = [[
-        f"#{l['numero']}",
+        fmt_lote(l["numero"]),
         l.get("proveedor") or "—",
         _tag_almacen(l.get("tipo_almacen")),
         fmt_fecha(l.get("fecha_ingreso")),
@@ -42,7 +42,7 @@ def _tabla_completos(lotes):
     como llegó, no el resto de haber usado algo. No es lo mismo que un
     saldo parcial, por eso van en su propia tabla."""
     filas = [[
-        f"#{l['numero']}",
+        fmt_lote(l["numero"]),
         l.get("proveedor") or "—",
         _tag_almacen(l.get("tipo_almacen")),
         fmt_fecha(l.get("fecha_ingreso")),

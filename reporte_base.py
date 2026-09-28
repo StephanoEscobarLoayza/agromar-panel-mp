@@ -60,6 +60,16 @@ def fmt_num(n, dec=2):
     return f"{n:,.{dec}f}"
 
 
+def fmt_lote(numero):
+    """Un lote "derivado" (el kg que sale disponible de una corrida PRE CC
+    para reusar como MMPP) se guarda con el número real en negativo, para no
+    chocar con el lote de verdad - pero nunca se muestra así: mismo número
+    que el lote real, con "PRE CC" al lado para no confundirlo."""
+    if numero is None:
+        return "—"
+    return f"#{abs(numero)} PRE CC" if numero < 0 else f"#{numero}"
+
+
 MESES_ES = {
     "Jan": "ene", "Feb": "feb", "Mar": "mar", "Apr": "abr", "May": "may", "Jun": "jun",
     "Jul": "jul", "Aug": "ago", "Sep": "set", "Oct": "oct", "Nov": "nov", "Dec": "dic",

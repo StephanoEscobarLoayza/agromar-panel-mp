@@ -149,7 +149,7 @@ async function cargarRecientes() {
     recientesBody.innerHTML = asigs.map(a => `
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
           data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
-        <td class="strong num">${a.lote_numero}</td>
+        <td class="strong num">${Math.abs(a.lote_numero)}${a.lote_numero < 0 ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">PRE CC</span>' : ""}</td>
         <td class="right num" data-celda="kg">${a.kg_asignados === null
           ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)">pendiente</span>'
           : fmtKg(a.kg_asignados)}</td>
@@ -254,7 +254,7 @@ recientesBody.addEventListener("click", async (ev) => {
       alert(e.message);
     }
   } else if (btn.dataset.accion === "marcar-pendiente-asig") {
-    if (!confirm("¿Volver a dejar este lote como \"kg pendiente\"? El kg confirmado se borra hasta que lo vuelvas a registrar.")) return;
+    if (!(await confirmar('¿Volver a dejar este lote como "kg pendiente"? El kg confirmado se borra hasta que lo vuelvas a registrar.'))) return;
     try {
       await apiPost(`/api/asignaciones/${id}`, { kg_asignados: null, bines_consumidos: null });
       cargarRecientes();
@@ -262,7 +262,7 @@ recientesBody.addEventListener("click", async (ev) => {
       alert(e.message);
     }
   } else if (btn.dataset.accion === "eliminar-asig") {
-    if (!confirm("¿Eliminar esta asignación? El saldo del lote se libera de vuelta.")) return;
+    if (!(await confirmar("¿Eliminar esta asignación? El saldo del lote se libera de vuelta."))) return;
     try {
       await apiDelete(`/api/asignaciones/${id}`);
       cargarRecientes();
@@ -366,11 +366,58 @@ function renderCamposOrigen() {
   btnGuardar.disabled = false;
 }
 
+function tarjetaLote(l, activo) {
+  const esDerivado = l.lote_origen_numero != null;
+  const tag = esDerivado ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">PRE CC</span>' : "";
+  return `
+    <button type="button" class="btn-link lote-opcion" data-numero="${l.numero}" style="text-align:left;width:100%;${activo ? "" : "opacity:.55"}">
+      <div class="lookup" style="${activo ? "border-color:var(--citrus)" : ""}">
+        <div class="lookup-row"><span>${escapeHtml(l.proveedor)}${tag}</span><span></span></div>
+        <div class="lookup-row"><span>Procedencia</span><span>${escapeHtml(l.procedencia || "—")}</span></div>
+        <div class="lookup-row saldo"><span>Saldo disponible</span><span class="num">${fmtSaldo(l.kg_saldo)} kg</span></div>
+      </div>
+    </button>
+  `;
+}
+
+// además del lote tal cual, hay que revisar si tiene un derivado "PRE CC"
+// disponible (mismo número, en negativo) - suele pasar justo cuando el
+// lote real ya está en 0 de saldo (se gastó en corridas normales aparte),
+// así que se muestran los dos para elegir, en vez de que parezca que no
+// hay nada para asignar.
+let opcionesLote = [];
+
 async function buscarLote() {
   const n = parseInt(loteInput.value, 10);
-  if (!n) { lote = null; loteInfo.innerHTML = ""; renderCamposPeso(); return; }
+  if (!n) { lote = null; opcionesLote = []; loteInfo.innerHTML = ""; renderCamposPeso(); return; }
   try {
-    lote = await apiGet(`/api/lotes/${n}`);
+    const candidatos = await Promise.allSettled([
+      apiGet(`/api/lotes/${n}`),
+      n > 0 ? apiGet(`/api/lotes/${-n}`) : Promise.reject(),
+    ]);
+    opcionesLote = candidatos.filter(c => c.status === "fulfilled").map(c => c.value);
+    if (opcionesLote.length === 0) {
+      throw new Error(candidatos[0].reason?.message || `El lote ${n} no está en el maestro. Sincronízalo primero.`);
+    }
+    // por defecto, el que tiene saldo real (si el normal ya está en 0 y el
+    // derivado PRE CC sí tiene, se elige ese solo) - si hay que elegir
+    // entre dos con saldo, gana el que se buscó tal cual.
+    lote = opcionesLote.find(l => l.numero === n && Number(l.kg_saldo) > 0)
+      || opcionesLote.find(l => Number(l.kg_saldo) > 0)
+      || opcionesLote[0];
+    renderLoteInfo();
+    renderCamposPeso();
+  } catch (e) {
+    lote = null;
+    opcionesLote = [];
+    loteInfo.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    camposPeso.innerHTML = "";
+    btnGuardar.disabled = true;
+  }
+}
+
+function renderLoteInfo() {
+  if (opcionesLote.length <= 1) {
     loteInfo.innerHTML = `
       <div class="lookup">
         <div class="lookup-row"><span>Proveedor</span><span>${escapeHtml(lote.proveedor)}</span></div>
@@ -378,13 +425,22 @@ async function buscarLote() {
         <div class="lookup-row saldo"><span>Saldo disponible</span><span class="num">${fmtSaldo(lote.kg_saldo)} kg</span></div>
       </div>
     `;
-    renderCamposPeso();
-  } catch (e) {
-    lote = null;
-    loteInfo.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
-    camposPeso.innerHTML = "";
-    btnGuardar.disabled = true;
+    return;
   }
+  // hay lote real Y derivado PRE CC a la vez - se deja elegir cuál usar.
+  loteInfo.innerHTML = `
+    <div class="hint-line" style="margin-bottom:8px">Este lote tiene dos saldos separados — elige cuál vas a usar:</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${opcionesLote.map(l => tarjetaLote(l, l.numero === lote.numero)).join("")}
+    </div>
+  `;
+  loteInfo.querySelectorAll(".lote-opcion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      lote = opcionesLote.find(l => l.numero === Number(btn.dataset.numero));
+      renderLoteInfo();
+      renderCamposPeso();
+    });
+  });
 }
 
 let loteTimer;

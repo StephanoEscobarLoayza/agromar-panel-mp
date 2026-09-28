@@ -1,5 +1,34 @@
 // Helpers compartidos por las 3 páginas.
 
+// Reemplazo de confirm() nativo: en algunos navegadores (sobre todo tablet)
+// el diálogo nativo es fácil de pasar por alto o no se ve bien, y parece que
+// el botón "no hizo nada". Este es propio de la app, siempre visible igual
+// en cualquier dispositivo. Uso: if (!(await confirmar("¿Seguro?"))) return;
+function confirmar(mensaje) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px";
+    overlay.innerHTML = `
+      <div class="panel" style="max-width:420px;width:100%;margin:0">
+        <div class="form-body">
+          <p style="margin:0 0 18px;color:var(--text);font-size:14.5px;line-height:1.45">${escapeHtml(mensaje)}</p>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" class="btn-link" data-accion="cancelar" style="padding:9px 16px">Cancelar</button>
+            <button type="button" class="btn" data-accion="confirmar" style="width:auto;padding:9px 20px">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const cerrar = (valor) => { overlay.remove(); resolve(valor); };
+    overlay.addEventListener("click", (ev) => {
+      if (ev.target === overlay) cerrar(false);
+      const btn = ev.target.closest("button[data-accion]");
+      if (btn) cerrar(btn.dataset.accion === "confirmar");
+    });
+  });
+}
+
 // Si la sesión expiró (o nunca se entró), el backend responde 401 - se manda
 // al login sin dejar que la página siga intentando con datos a medias.
 function _siNoAutenticado(res) {

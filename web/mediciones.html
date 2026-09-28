@@ -316,7 +316,7 @@ lista.addEventListener("click", async (ev) => {
   const fila = btn.closest("tr");
 
   if (btn.dataset.accion === "eliminar") {
-    if (!confirm("¿Eliminar esta medición?")) return;
+    if (!(await confirmar("¿Eliminar esta medición?"))) return;
     try {
       await apiDelete(`/api/mediciones-tanque/${id}`);
       cargarTodo();

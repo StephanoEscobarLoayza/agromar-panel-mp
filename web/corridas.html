@@ -140,6 +140,7 @@ const TIPOS_PROCESO = [
   { value: "JCC TASTE", label: "JCC TASTE" },
   { value: "JSC", label: "JSC" },
   { value: "ICEGEN", label: "ICEGEN" },
+  { value: "PRE CC", label: "PRE CC" },
 ];
 document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option value="${t.value}">${t.label}</option>`).join("");
 
@@ -482,7 +483,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       msg.innerHTML = '<div class="msg bad">Elige la fecha y hora de cierre.</div>';
       return;
     }
-    if (!confirm(`¿Finalizar "${btn.dataset.nombre}" con cierre el ${fecha.replace("T", " ")}?`)) return;
+    if (!(await confirmar(`¿Finalizar "${btn.dataset.nombre}" con cierre el ${fecha.replace("T", " ")}?`))) return;
     try {
       await apiPost(`/api/corridas/${id}/finalizar`, { fecha_final: fecha });
       cargar();
@@ -490,7 +491,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
     }
   } else if (accion === "reabrir") {
-    if (!confirm(`¿Reabrir "${btn.dataset.nombre}"? Vuelve a aparecer como corrida activa en "Registrar consumo" hasta que la finalices de nuevo.`)) return;
+    if (!(await confirmar(`¿Reabrir "${btn.dataset.nombre}"? Vuelve a aparecer como corrida activa en "Registrar consumo" hasta que la finalices de nuevo.`))) return;
     try {
       await apiPost(`/api/corridas/${id}/reabrir`, {});
       cargar();
@@ -498,7 +499,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       alert(e.message);
     }
   } else if (accion === "eliminar-corrida") {
-    if (!confirm(`¿Eliminar la corrida "${btn.dataset.nombre}"? Esto no se puede deshacer.`)) return;
+    if (!(await confirmar(`¿Eliminar la corrida "${btn.dataset.nombre}"? Esto no se puede deshacer.`))) return;
     try {
       await apiDelete(`/api/corridas/${id}`);
       cargar();
@@ -559,7 +560,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     }
   } else if (accion === "eliminar-producto") {
     const corridaId = btn.dataset.corrida;
-    if (!confirm("¿Eliminar este producto de la corrida?")) return;
+    if (!(await confirmar("¿Eliminar este producto de la corrida?"))) return;
     try {
       await apiDelete(`/api/corridas/${corridaId}/productos/${id}`);
       cargarProductosPanel(corridaId);

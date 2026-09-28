@@ -28,11 +28,12 @@ CREATE TABLE lotes (
     ubicacion_manual    TEXT,                 -- override de producción sobre ubicacion; NULL = usar ubicacion
     peso_congelado      BOOLEAN NOT NULL DEFAULT false, -- si es true, la sincronización deja de pisar peso_neto_kg con el valor del Sheet (para un peso corregido a mano)
     materia_prima       TEXT NOT NULL DEFAULT 'NARANJA ORGÁNICA',
+    lote_origen_numero  INTEGER REFERENCES lotes(numero), -- solo en lotes "derivados" (ver abajo): el lote real del que salió
     creado_en           TIMESTAMPTZ NOT NULL DEFAULT now(),
     actualizado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE lotes IS 'Maestro de lotes recibidos, sincronizado desde el Google Sheet de recepción de camiones.';
+COMMENT ON TABLE lotes IS 'Maestro de lotes recibidos, sincronizado desde el Google Sheet de recepción de camiones. También incluye "lotes derivados" (numero negativo, lote_origen_numero apunta al lote real) que representan el resultado de una corrida tipo PRE CC - ese kg se puede volver a asignar a otras corridas como MMPP, con su propio saldo, sin tocar el saldo del lote original (que se gastó aparte, en corridas normales). El número negativo nunca se muestra tal cual - el front-end siempre muestra el valor absoluto con una etiqueta "PRE CC".';
 COMMENT ON COLUMN lotes.brix_recepcion IS 'Brix medido al momento de recepción del camión (distinto del brix medido en línea al procesar).';
 COMMENT ON COLUMN lotes.estado_manual IS 'Override de producción sobre estado_fuente cuando Calidad aún no actualizó el Sheet. NULL = usar el del Sheet.';
 COMMENT ON COLUMN lotes.ubicacion_manual IS 'Override de producción sobre ubicacion cuando Calidad aún no actualizó el Sheet. NULL = usar el del Sheet.';
@@ -190,12 +191,13 @@ SELECT
     l.ubicacion_manual,
     COALESCE(l.estado_manual, l.estado_fuente) AS estado_actual,
     COALESCE(l.ubicacion_manual, l.ubicacion) AS ubicacion_actual,
-    l.peso_congelado
+    l.peso_congelado,
+    l.lote_origen_numero
 FROM lotes l
 LEFT JOIN asignaciones a ON a.lote_numero = l.numero
 GROUP BY l.numero, l.proveedor, l.procedencia, l.tipo_almacen, l.ubicacion, l.estado_fuente, l.fecha_ingreso,
          l.brix_recepcion, l.acidez, l.ratio, l.peso_neto_kg, l.bines_totales, l.estado_manual, l.ubicacion_manual,
-         l.peso_congelado;
+         l.peso_congelado, l.lote_origen_numero;
 
 -- ----------------------------------------------------------------------------
 -- CORRIDA_PRODUCTOS: cuando una corrida produce más de un producto terminado

@@ -831,6 +831,16 @@ def editar_corrida(corrida_id: int, c: EditarCorrida):
         )
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+        # si el tipo de proceso cambia hacia o desde "PRE CC", los lotes
+        # derivados de todo lo ya asignado acá tienen que recalcularse -
+        # ej. una corrida creada con el tipo equivocado y corregida después
+        # (como pasó con "21-Setiembre PreCC", creada como JCC antes de que
+        # existiera la opción PRE CC).
+        lotes_afectados = rows(conn.execute(
+            text("SELECT DISTINCT lote_numero FROM asignaciones WHERE corrida_id = :c"), {"c": corrida_id}
+        ))
+        for l in lotes_afectados:
+            _sync_lote_derivado_pre_cc(conn, l["lote_numero"])
     return {"ok": True}
 
 
@@ -1370,6 +1380,85 @@ def bines_disponibles(conn, lote_numero: int, excluir_asignacion_id: Optional[in
     return (row["bines_totales"], disponibles)
 
 
+def _sync_lote_derivado_pre_cc(conn, lote_numero: int):
+    """Cuando un lote real (numero positivo) alimenta una corrida de tipo
+    "PRE CC", ese kg no se pierde - se puede volver a usar de a poco en
+    otras corridas como MMPP para subir Brix/Ratio (Stephano lo explicó:
+    "se añade con el lote y una cantidad de la corrida del pre cc"). Pero
+    para cuando eso pasa, el lote original ya suele estar en 0 de saldo
+    (se gastó aparte, en corridas normales) - por eso ese kg necesita su
+    propio saldo independiente, sin inventar un número de lote nuevo y
+    confuso: se usa el mismo número en negativo (numero -> -numero) como
+    un "lote derivado". El front-end nunca muestra el número negativo tal
+    cual - siempre el valor absoluto con una etiqueta "PRE CC" al lado.
+
+    Se recalcula desde cero cada vez (no se suma incremental) para que
+    nunca se desincronice si se edita o borra una asignación a PRE CC."""
+    if lote_numero is None or lote_numero <= 0:
+        return  # los lotes derivados (numero negativo) no tienen derivado propio
+    total = conn.execute(
+        text(
+            """
+            SELECT COALESCE(SUM(a.kg_asignados), 0)
+            FROM asignaciones a
+            JOIN corridas c ON c.id = a.corrida_id
+            WHERE a.lote_numero = :n AND c.tipo_proceso = 'PRE CC' AND a.kg_asignados IS NOT NULL
+            """
+        ),
+        {"n": lote_numero},
+    ).scalar()
+    total = float(total or 0)
+    derivado_numero = -lote_numero
+    existe = conn.execute(text("SELECT 1 FROM lotes WHERE numero = :n"), {"n": derivado_numero}).scalar()
+    if total <= 0:
+        if existe:
+            # si ya se usó algo del derivado en otra corrida, no se puede
+            # borrar sin romper esas asignaciones - se deja en 0 (saldo
+            # cerrado) en vez de forzar el borrado.
+            conn.execute(
+                text("DELETE FROM lotes WHERE numero = :n AND NOT EXISTS (SELECT 1 FROM asignaciones WHERE lote_numero = :n)"),
+                {"n": derivado_numero},
+            )
+        return
+    original = conn.execute(
+        text("SELECT proveedor, procedencia, brix_recepcion, acidez, ratio FROM lotes WHERE numero = :n"),
+        {"n": lote_numero},
+    ).mappings().first()
+    if existe:
+        # nunca bajar el peso neto por debajo de lo que el derivado YA
+        # tiene consumido en otras corridas - evitaría que el trigger de
+        # saldo lo deje en negativo si alguien edita la asignación de PRE
+        # CC hacia abajo después de que ya se usó parte del derivado.
+        ya_consumido = conn.execute(
+            text("SELECT COALESCE(SUM(kg_asignados), 0) FROM asignaciones WHERE lote_numero = :n"),
+            {"n": derivado_numero},
+        ).scalar()
+        nuevo_peso = max(total, float(ya_consumido or 0))
+        conn.execute(text("UPDATE lotes SET peso_neto_kg = :p WHERE numero = :n"), {"p": nuevo_peso, "n": derivado_numero})
+    else:
+        conn.execute(
+            text(
+                """
+                INSERT INTO lotes
+                    (numero, proveedor, procedencia, fecha_ingreso, tipo_almacen, peso_neto_kg,
+                     brix_recepcion, acidez, ratio, estado_manual, lote_origen_numero)
+                VALUES
+                    (:n, :prov, :proc, CURRENT_DATE, 'SILO', :peso, :brix, :acidez, :ratio, 'EN ESPERA', :origen)
+                """
+            ),
+            {
+                "n": derivado_numero,
+                "prov": original["proveedor"] if original else "PRE CC",
+                "proc": original["procedencia"] if original else None,
+                "peso": total,
+                "brix": original["brix_recepcion"] if original else None,
+                "acidez": original["acidez"] if original else None,
+                "ratio": original["ratio"] if original else None,
+                "origen": lote_numero,
+            },
+        )
+
+
 def _marcar_estado_por_consumo(conn, lote_numero: int):
     """Se llama SIEMPRE que se crea, corrige o BORRA un consumo. Antes esto
     ponía "EN PROCESO" a ciegas, sin importar si esa misma asignación dejaba
@@ -1484,6 +1573,7 @@ def crear_asignacion(a: NuevaAsignacion):
             # consumo de un lote, se marca su estado a mano - mismo campo
             # que ya se podía tocar desde Lotes, solo que ahora se dispara solo.
             _marcar_estado_por_consumo(conn, a.lote_numero)
+            _sync_lote_derivado_pre_cc(conn, a.lote_numero)
         return {"id": new_id, "ok": True}
     except HTTPException:
         raise
@@ -1536,6 +1626,7 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
             # quedando algo (En proceso) - una edición también puede ser la
             # que complete el "kg pendiente" que lo termina de golpe.
             _marcar_estado_por_consumo(conn, lote_numero)
+            _sync_lote_derivado_pre_cc(conn, lote_numero)
     except HTTPException:
         raise
     except Exception as e:
@@ -1553,6 +1644,7 @@ def eliminar_asignacion(asignacion_id: int):
             raise HTTPException(status_code=404, detail="Asignación no encontrada.")
         conn.execute(text("DELETE FROM asignaciones WHERE id = :id"), {"id": asignacion_id})
         _marcar_estado_por_consumo(conn, lote_numero)
+        _sync_lote_derivado_pre_cc(conn, lote_numero)
     return {"ok": True}
 
 

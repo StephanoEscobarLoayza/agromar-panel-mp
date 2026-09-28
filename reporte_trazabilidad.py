@@ -60,6 +60,16 @@ def _f(v):
         return v
 
 
+def _lote_txt(numero):
+    """Un lote "derivado" (kg que salió de una corrida PRE CC, disponible
+    para reusar como MMPP) se guarda con el número real en negativo, para no
+    chocar con el lote de verdad - pero nunca se muestra así en la hoja:
+    mismo número que el lote real, con "PRE CC" al lado."""
+    if numero is None:
+        return None
+    return f"{abs(numero)} PRE CC" if numero < 0 else numero
+
+
 def _es_pt(producto: dict) -> bool:
     """Si esta fila cuenta como PT real - marca a mano por fila
     (`corrida_productos.cuenta_como_pt`), no se adivina por el nombre. Un
@@ -114,7 +124,7 @@ def _cuadro_stock(ws, fila0, titulo, filas):
     i = 0
     for i, s in enumerate(filas, start=1):
         rr = fila0 + 1 + i
-        _set(ws, ws.cell(row=rr, column=h), s.get("numero"), borde=True)
+        _set(ws, ws.cell(row=rr, column=h), _lote_txt(s.get("numero")), borde=True)
         _set(ws, ws.cell(row=rr, column=h + 1), _f(s.get("peso_neto_kg")), fmt=_FMT_KG, borde=True)
         _set(ws, ws.cell(row=rr, column=h + 2), _f(s.get("kg_consumidos")), fmt=_FMT_KG, borde=True)
         _set(ws, ws.cell(row=rr, column=h + 3), f"=I{rr}-J{rr}", fmt=_FMT_KG, borde=True)
@@ -239,7 +249,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
         kdto = f'=IF(OR({cPN}{r}="",{cPDTO}{r}=""),"",{cPDTO}{r}*{cPN}{r})'
         fila = [
             proceso,
-            lo.get("lote_numero"),
+            _lote_txt(lo.get("lote_numero")),
             None,                              # GRP
             lo.get("guia"),                    # N° Guía
             _f(lo.get("fecha_ingreso")),

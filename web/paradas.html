@@ -284,7 +284,7 @@ lista.addEventListener("click", async (ev) => {
     try { await apiPost(`/api/paradas/${id}/cerrar`, { hora_fin: ahoraLocal() }); await cargarParadas(); }
     catch (e) { alert(e.message); }
   } else if (accion === "eliminar") {
-    if (!confirm("¿Eliminar esta parada?")) return;
+    if (!(await confirmar("¿Eliminar esta parada?"))) return;
     try { await apiDelete(`/api/paradas/${id}`); await cargarParadas(); }
     catch (e) { alert(e.message); }
   } else if (accion === "editar") {

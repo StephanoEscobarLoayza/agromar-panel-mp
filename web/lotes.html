@@ -186,9 +186,19 @@ function fila(l) {
   const esBines = l.tipo_almacen !== "SILO" && l.bines_totales != null;
   const binesTotalesSub = esBines ? `<div class="num-sub">${fmtInt(l.bines_totales)} bines</div>` : "";
   const binesSaldoSub = esBines ? `<div class="num-sub">${fmtInt(l.bines_saldo ?? 0)} bines</div>` : "";
+  // lote "derivado": lo que quedó disponible de una corrida PRE CC para
+  // reusar como MMPP - se guarda con el numero en negativo (para no
+  // chocar con el lote real, que sigue existiendo aparte con su propio
+  // saldo) pero nunca se muestra así: mismo número que el lote real, con
+  // una etiqueta al lado para no confundirlo.
+  const esDerivado = l.lote_origen_numero != null;
+  const numeroMostrado = esDerivado ? Math.abs(l.numero) : l.numero;
+  const preCcTag = esDerivado
+    ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Kg que salió de una corrida PRE CC, disponible para usar como MMPP en otra corrida">PRE CC</span>'
+    : "";
   return `
     <tr>
-      <td class="strong num"><a class="lote-link" href="trazabilidad.html?lote=${l.numero}" title="Ver trazabilidad de este lote">${l.numero}</a></td>
+      <td class="strong num"><a class="lote-link" href="trazabilidad.html?lote=${l.numero}" title="Ver trazabilidad de este lote">${numeroMostrado}</a>${preCcTag}</td>
       <td>${escapeHtml(l.proveedor)}</td>
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
