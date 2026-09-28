@@ -199,7 +199,7 @@ function fila(l) {
     : "";
   return `
     <tr>
-      <td class="strong num"><div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px"><a class="lote-link" href="trazabilidad.html?lote=${l.numero}" title="Ver trazabilidad de este lote">${numeroMostrado}</a>${preCcTag}</div></td>
+      <td class="strong num"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><a class="lote-link" href="trazabilidad.html?lote=${l.numero}" title="Ver trazabilidad de este lote">${numeroMostrado}</a>${preCcTag}</div></td>
       <td>${escapeHtml(l.proveedor)}</td>
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
