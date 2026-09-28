@@ -56,7 +56,6 @@
           <button type="button" class="chip-filter" data-estado="EN PROCESO">En proceso</button>
           <button type="button" class="chip-filter" data-estado="EN ESPERA">En espera</button>
           <button type="button" class="chip-filter" data-estado="PROCESADO">Procesado</button>
-          <button type="button" class="chip-filter" data-estado="PRE_CC">PRE CC</button>
         </div>
         <a class="btn-link" href="/api/lotes/reporte-stock.pdf" target="_blank" rel="noopener" style="text-decoration:none;margin-left:auto"
            onclick="this.href='/api/lotes/reporte-stock.pdf?t='+Date.now()">Reporte de stock (PDF)</a>
@@ -78,6 +77,25 @@
       <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--ok)"></span>Queda bastante saldo</div>
       <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--warn)"></span>Queda poco</div>
       <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--text-muted)"></span>Sin saldo</div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:22px">
+    <div class="panel-body">
+      <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PreCC</h2>
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">Producto que salió de una corrida PRE CC — no es materia prima nueva, es lo que queda por agregar después a otra corrida.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Lote</th><th>Proveedor</th><th>Procedencia</th><th>Almacén</th><th>Fecha</th><th>Ubicación</th><th>Estado</th>
+            <th class="right">Peso neto</th><th class="right">Saldo</th>
+            <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
+          </tr>
+        </thead>
+        <tbody id="filasPreCC"><tr><td colspan="12" class="empty">Cargando…</td></tr></tbody>
+      </table>
     </div>
   </div>
 
@@ -222,26 +240,39 @@ function render(lista) {
     : '<tr><td colspan="12" class="empty">Sin resultados</td></tr>';
 }
 
+function renderPreCC(lista) {
+  const cont = document.getElementById("filasPreCC");
+  cont.innerHTML = lista.length
+    ? lista.map(fila).join("")
+    : '<tr><td colspan="12" class="empty">No hay lotes de PreCC por ahora.</td></tr>';
+}
+
 let filtroActual = "todos";
 
+// los lotes "derivados" (PreCC) son producto que salió de un proceso, no
+// materia prima nueva - van en su propia tabla, nunca mezclados con los
+// lotes normales (ver comentario en fila() sobre qué es un lote derivado).
 function aplicarFiltros() {
   const q = document.getElementById("buscar").value.toLowerCase();
 
-  let lista = todos.filter(l =>
+  const base = todos.filter(l =>
     String(l.numero).includes(q) ||
     (l.proveedor || "").toLowerCase().includes(q) ||
     (l.procedencia || "").toLowerCase().includes(q)
   );
 
-  if (filtroActual === "PRE_CC") {
-    lista = lista.filter(l => l.lote_origen_numero != null);
-  } else if (filtroActual !== "todos") {
-    lista = lista.filter(l => normEstado(l.estado_actual) === filtroActual);
+  let regulares = base.filter(l => l.lote_origen_numero == null);
+  const derivados = base.filter(l => l.lote_origen_numero != null);
+
+  if (filtroActual !== "todos") {
+    regulares = regulares.filter(l => normEstado(l.estado_actual) === filtroActual);
   }
 
-  lista = lista.slice().sort((a, b) => Math.abs(b.numero) - Math.abs(a.numero));
+  regulares = regulares.slice().sort((a, b) => b.numero - a.numero);
+  derivados.sort((a, b) => Math.abs(b.numero) - Math.abs(a.numero));
 
-  render(lista);
+  render(regulares);
+  renderPreCC(derivados);
 }
 
 async function cargar() {
@@ -263,6 +294,7 @@ document.getElementById("chipsEstado").addEventListener("click", (ev) => {
 });
 
 const filasBody = document.getElementById("filas");
+const filasPreCCBody = document.getElementById("filasPreCC");
 
 // ---------- dropdown propio (reemplaza el <select> nativo, imposible de
 // personalizar del todo entre navegadores) - una sola lista compartida,
@@ -367,7 +399,7 @@ document.addEventListener("click", (ev) => {
 document.addEventListener("scroll", () => { if (cselContext) cerrarCsel(); }, true);
 window.addEventListener("resize", () => { if (cselContext) cerrarCsel(); });
 
-filasBody.addEventListener("click", async (ev) => {
+async function onFilasClick(ev) {
   const cselBtn = ev.target.closest(".csel-btn");
   if (cselBtn) {
     const mismoAbierto = cselContext && cselContext.numero === cselBtn.dataset.lote && cselContext.kind === cselBtn.dataset.kind;
@@ -392,7 +424,9 @@ filasBody.addEventListener("click", async (ev) => {
   } catch (e) {
     alert(e.message);
   }
-});
+}
+filasBody.addEventListener("click", onFilasClick);
+filasPreCCBody.addEventListener("click", onFilasClick);
 
 cargar();
 </script>
