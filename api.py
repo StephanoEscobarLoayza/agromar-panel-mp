@@ -771,6 +771,7 @@ def _sql_stock_total_asof(fecha_param: str) -> str:
                 UPPER(TRIM(COALESCE(l.estado_manual, l.estado_fuente))) AS estado_actual
             FROM lotes l
             WHERE l.fecha_ingreso <= CAST(:{fecha_param} AS timestamp)
+              AND l.numero >= 0  -- un lote derivado (PreCC) es producto, no MP: no cuenta acá
         ) t
         WHERE t.asof_saldo > 0.01
           AND (t.asof_saldo IS DISTINCT FROM t.live_saldo OR t.estado_actual IN ('EN PROCESO', 'EN ESPERA')))

@@ -61,6 +61,12 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     buf = BytesIO()
     doc = nuevo_doc(buf, "Stock de materia prima")
 
+    # un lote "derivado" (numero negativo) es producto que salió de una
+    # corrida PRE CC, no materia prima nueva - no cuenta para el stock de MP
+    # ni se mezcla en sus tablas, va aparte (mismo criterio que en Lotes).
+    derivados = [l for l in lotes if l["numero"] < 0]
+    lotes = [l for l in lotes if l["numero"] >= 0]
+
     kg_silo = sum(float(l["kg_saldo"]) for l in lotes if l.get("tipo_almacen") == "SILO")
     kg_bines = sum(float(l["kg_saldo"]) for l in lotes if l.get("tipo_almacen") == "BINES")
     kg_total = kg_silo + kg_bines
@@ -126,6 +132,17 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     story.append(Spacer(1, 8 * mm))
     story.extend(seccion(f"Lotes completos, todavía sin tocar ({len(lotes_completos)})"))
     story.append(_tabla_completos(lotes_completos) if lotes_completos else Paragraph("Ninguno en este momento.", style_footnote))
+
+    if derivados:
+        kg_pre_cc = sum(float(l["kg_saldo"]) for l in derivados)
+        story.append(Spacer(1, 8 * mm))
+        story.extend(seccion(f"Producto de PreCC disponible para agregar como MMPP ({len(derivados)})"))
+        story.append(Paragraph(
+            f"No es materia prima nueva - es producto ya procesado, {fmt_kg(kg_pre_cc)} kg en total.",
+            style_footnote,
+        ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(_tabla_stock(derivados))
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
