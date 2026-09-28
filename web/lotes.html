@@ -195,11 +195,11 @@ function fila(l) {
   const esDerivado = l.lote_origen_numero != null;
   const numeroMostrado = esDerivado ? Math.abs(l.numero) : l.numero;
   const preCcTag = esDerivado
-    ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Kg que salió de una corrida PRE CC, disponible para usar como MMPP en otra corrida">PRE CC</span>'
+    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Kg que salió de una corrida PRE CC, disponible para usar como MMPP en otra corrida">PRE CC</span>'
     : "";
   return `
     <tr>
-      <td class="strong num"><a class="lote-link" href="trazabilidad.html?lote=${l.numero}" title="Ver trazabilidad de este lote">${numeroMostrado}</a>${preCcTag}</td>
+      <td class="strong num"><div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px"><a class="lote-link" href="trazabilidad.html?lote=${l.numero}" title="Ver trazabilidad de este lote">${numeroMostrado}</a>${preCcTag}</div></td>
       <td>${escapeHtml(l.proveedor)}</td>
       <td>${escapeHtml(l.procedencia || "—")}</td>
       <td><span class="tag">${tagLabel}</span></td>
@@ -238,6 +238,8 @@ function aplicarFiltros() {
   } else if (filtroActual !== "todos") {
     lista = lista.filter(l => normEstado(l.estado_actual) === filtroActual);
   }
+
+  lista = lista.slice().sort((a, b) => Math.abs(b.numero) - Math.abs(a.numero));
 
   render(lista);
 }
