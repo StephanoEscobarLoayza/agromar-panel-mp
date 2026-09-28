@@ -195,7 +195,7 @@ function fila(l) {
   const esDerivado = l.lote_origen_numero != null;
   const numeroMostrado = esDerivado ? Math.abs(l.numero) : l.numero;
   const preCcTag = esDerivado
-    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)" title="Kg que salió de una corrida PRE CC, disponible para usar como MMPP en otra corrida">PRE CC</span>'
+    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap" title="Kg que salió de una corrida PRE CC, disponible para usar como MMPP en otra corrida">PRE CC</span>'
     : "";
   return `
     <tr>
