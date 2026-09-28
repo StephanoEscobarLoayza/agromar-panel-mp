@@ -305,9 +305,14 @@ function renderPorProveedor(lotes) {
 
 async function cargar() {
   try {
-    const [corridas, lotes] = await Promise.all([
+    const [corridas, lotesTodos] = await Promise.all([
       apiGet("/api/corridas"), apiGet("/api/lotes"),
     ]);
+    // un lote derivado (numero negativo) es producto que salió de una
+    // corrida PRE CC, no materia prima nueva - no cuenta para "cuántos
+    // lotes hay" ni "cuánto entregó cada proveedor" (mismo criterio que en
+    // Lotes y los reportes).
+    const lotes = lotesTodos.filter(l => l.numero >= 0);
 
     const mpProcesada = corridas.reduce((suma, c) => suma + mpDeCorrida(c), 0);
     const conValor = corridas.filter(c => mpDeCorrida(c) > 0);

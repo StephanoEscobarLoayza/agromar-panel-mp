@@ -1132,6 +1132,7 @@ def reporte_periodo_pdf(desde: str, hasta: str):
             JOIN corridas c ON c.id = a.corrida_id
             JOIN lotes l ON l.numero = a.lote_numero
             WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h AND a.kg_asignados IS NOT NULL
+              AND a.lote_numero >= 0  -- "MP entregada": un lote derivado (PreCC) es el mismo kg reprocesado, no una entrega nueva
             GROUP BY l.proveedor ORDER BY kg DESC LIMIT 12
             """
         ), p))
