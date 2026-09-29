@@ -56,6 +56,7 @@
           <button type="button" class="chip-filter" data-estado="EN PROCESO">En proceso</button>
           <button type="button" class="chip-filter" data-estado="EN ESPERA">En espera</button>
           <button type="button" class="chip-filter" data-estado="PROCESADO">Procesado</button>
+          <button type="button" class="chip-filter" data-estado="PRE_CC">PRE CC</button>
         </div>
         <a class="btn-link" href="/api/lotes/reporte-stock.pdf" target="_blank" rel="noopener" style="text-decoration:none;margin-left:auto"
            onclick="this.href='/api/lotes/reporte-stock.pdf?t='+Date.now()">Reporte de stock (PDF)</a>
@@ -80,7 +81,7 @@
     </div>
   </div>
 
-  <div class="panel" style="margin-top:22px">
+  <div class="panel" style="margin-top:22px" id="panelPreCC">
     <div class="panel-body">
       <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PreCC</h2>
       <p style="margin:0;font-size:13px;color:var(--text-muted)">Producto que salió de una corrida PRE CC — no es materia prima nueva, es lo que queda por agregar después a otra corrida.</p>
@@ -288,6 +289,13 @@ document.getElementById("buscar").addEventListener("input", aplicarFiltros);
 document.getElementById("chipsEstado").addEventListener("click", (ev) => {
   const btn = ev.target.closest(".chip-filter");
   if (!btn) return;
+  // "PRE CC" no es un filtro de estado - es un atajo para saltar directo a
+  // la tabla de "Lotes de PreCC" (que ya vive aparte, más abajo). No toca
+  // filtroActual ni el resto de los chips.
+  if (btn.dataset.estado === "PRE_CC") {
+    document.getElementById("panelPreCC").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
   filtroActual = btn.dataset.estado;
   document.querySelectorAll("#chipsEstado .chip-filter").forEach(b => b.classList.toggle("active", b === btn));
   aplicarFiltros();
