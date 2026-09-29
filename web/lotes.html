@@ -62,26 +62,28 @@
            onclick="this.href='/api/lotes/reporte-stock.pdf?t='+Date.now()">Reporte de stock (PDF)</a>
       </div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Lote</th><th>Proveedor</th><th>Procedencia</th><th>Almacén</th><th>Fecha</th><th>Ubicación</th><th>Estado</th>
-            <th class="right">Peso neto</th><th class="right">Saldo</th>
-            <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
-          </tr>
-        </thead>
-        <tbody id="filas"><tr><td colspan="12" class="empty">Cargando…</td></tr></tbody>
-      </table>
-    </div>
-    <div class="viz-legend bordered">
-      <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--ok)"></span>Queda bastante saldo</div>
-      <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--warn)"></span>Queda poco</div>
-      <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--text-muted)"></span>Sin saldo</div>
+    <div id="vistaPrincipal">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Lote</th><th>Proveedor</th><th>Procedencia</th><th>Almacén</th><th>Fecha</th><th>Ubicación</th><th>Estado</th>
+              <th class="right">Peso neto</th><th class="right">Saldo</th>
+              <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
+            </tr>
+          </thead>
+          <tbody id="filas"><tr><td colspan="12" class="empty">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="viz-legend bordered">
+        <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--ok)"></span>Queda bastante saldo</div>
+        <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--warn)"></span>Queda poco</div>
+        <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--text-muted)"></span>Sin saldo</div>
+      </div>
     </div>
   </div>
 
-  <div class="panel" style="margin-top:22px" id="panelPreCC">
+  <div class="panel" style="margin-top:22px" id="panelPreCC" hidden>
     <div class="panel-body">
       <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PreCC</h2>
       <p style="margin:0;font-size:13px;color:var(--text-muted)">Producto que salió de una corrida PRE CC — no es materia prima nueva, es lo que queda por agregar después a otra corrida.</p>
@@ -289,15 +291,16 @@ document.getElementById("buscar").addEventListener("input", aplicarFiltros);
 document.getElementById("chipsEstado").addEventListener("click", (ev) => {
   const btn = ev.target.closest(".chip-filter");
   if (!btn) return;
-  // "PRE CC" no es un filtro de estado - es un atajo para saltar directo a
-  // la tabla de "Lotes de PreCC" (que ya vive aparte, más abajo). No toca
-  // filtroActual ni el resto de los chips.
-  if (btn.dataset.estado === "PRE_CC") {
-    document.getElementById("panelPreCC").scrollIntoView({ behavior: "smooth", block: "start" });
-    return;
-  }
-  filtroActual = btn.dataset.estado;
   document.querySelectorAll("#chipsEstado .chip-filter").forEach(b => b.classList.toggle("active", b === btn));
+  // "PRE CC" filtra igual que los demás chips, solo que en vez de mostrar
+  // otro conjunto de filas de la misma tabla, muestra la tabla de PreCC
+  // (que vive aparte porque es producto, no materia prima) en el mismo
+  // lugar donde estaba la tabla normal.
+  const esPreCC = btn.dataset.estado === "PRE_CC";
+  document.getElementById("vistaPrincipal").hidden = esPreCC;
+  document.getElementById("panelPreCC").hidden = !esPreCC;
+  if (esPreCC) return;
+  filtroActual = btn.dataset.estado;
   aplicarFiltros();
 });
 
