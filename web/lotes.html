@@ -86,7 +86,7 @@
   <div class="panel" style="margin-top:22px" id="panelPreCC" hidden>
     <div class="panel-body">
       <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PreCC</h2>
-      <p style="margin:0;font-size:13px;color:var(--text-muted)">Producto que salió de una corrida PRE CC — no es materia prima nueva, es lo que queda por agregar después a otra corrida.</p>
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">Producto derivado de un proceso PRE CC, pendiente de incorporarse como materia prima en otra corrida.</p>
     </div>
     <div class="table-wrap">
       <table>
@@ -216,7 +216,7 @@ function fila(l) {
   const esDerivado = l.lote_origen_numero != null;
   const numeroMostrado = esDerivado ? Math.abs(l.numero) : l.numero;
   const preCcTag = esDerivado
-    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap;font-family:\'Public Sans\',system-ui,sans-serif;font-variant-numeric:normal" title="Kg que salió de una corrida PRE CC, disponible para usar como MMPP en otra corrida">PRE CC</span>'
+    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap;font-family:\'Public Sans\',system-ui,sans-serif;font-variant-numeric:normal" title="Producto derivado de un proceso PRE CC, disponible como materia prima para otra corrida">PRE CC</span>'
     : "";
   return `
     <tr>

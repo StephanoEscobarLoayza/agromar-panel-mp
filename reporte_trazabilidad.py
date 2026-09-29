@@ -401,7 +401,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos)
     fin3 = fin2
     if pre_cc:
-        fin3 = _cuadro_stock(ws, fin2 + 3, "Producto de PreCC disponible (no es materia prima)", pre_cc)
+        fin3 = _cuadro_stock(ws, fin2 + 3, "Producto derivado de PRE CC disponible para MMPP", pre_cc)
     if productos_entrada:
         _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
 

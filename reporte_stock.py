@@ -138,7 +138,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Producto de PreCC disponible para agregar como MMPP ({len(derivados)})"))
         story.append(Paragraph(
-            f"No es materia prima nueva - es producto ya procesado, {fmt_kg(kg_pre_cc)} kg en total.",
+            f"Total disponible: {fmt_kg(kg_pre_cc)} kg.",
             style_footnote,
         ))
         story.append(Spacer(1, 2 * mm))
