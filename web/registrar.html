@@ -146,7 +146,8 @@ async function cargarRecientes() {
   if (asigs.length === 0) {
     recientesBody.innerHTML = '<tr><td colspan="5" class="empty">Sin asignaciones todavía</td></tr>';
   } else {
-    recientesBody.innerHTML = asigs.map(a => `
+    const ordenadas = asigs.slice().sort((a, b) => Math.abs(b.lote_numero) - Math.abs(a.lote_numero));
+    recientesBody.innerHTML = ordenadas.map(a => `
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
           data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
         <td class="strong num">${Math.abs(a.lote_numero)}${a.lote_numero < 0 ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">PRE CC</span>' : ""}</td>
