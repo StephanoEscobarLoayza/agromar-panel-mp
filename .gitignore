@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# scripts locales con claves
+*.vbs
+python
+set
