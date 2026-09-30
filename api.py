@@ -169,13 +169,17 @@ def reporte_stock_pdf():
     no es un conteo físico, es exactamente lo que ya muestra v_saldo_lotes.
     Solo cuenta lotes "EN PROCESO" o "EN ESPERA" (mismo criterio que el
     Sugeridor de mezcla) - un lote "PROCESADO" con algo de saldo casi
-    siempre es ruido de medición de Trazabilidad, no MP real disponible."""
+    siempre es ruido de medición de Trazabilidad, no MP real disponible.
+    Un lote derivado (numero negativo, producto de PRE CC) se incluye
+    siempre, aunque ya esté en saldo 0 - si desaparece de la lista en
+    cuanto se agota, no queda claro si fue consumido o si nunca existió."""
     with engine.connect() as conn:
         lotes = rows(conn.execute(text(
             """
-            SELECT numero, proveedor, tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, bines_saldo, peso_neto_kg
+            SELECT numero, proveedor, tipo_almacen, fecha_ingreso, estado_actual, kg_saldo, kg_consumidos, bines_saldo, peso_neto_kg
             FROM v_saldo_lotes
-            WHERE kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')
+            WHERE (kg_saldo > 0 AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA'))
+               OR numero < 0
             ORDER BY tipo_almacen, fecha_ingreso ASC, numero ASC
             """
         )))
@@ -1209,13 +1213,17 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
         # todo el stock de MP con saldo disponible (mismo criterio que el
         # reporte de stock) - el módulo lo parte en dos: lo que dejó ESTA
         # corrida (saldo parcial) y los demás lotes completos que siguen en piso.
+        # Un lote derivado (numero negativo, producto de PRE CC) se incluye
+        # siempre, aunque ya esté en saldo 0 - si desaparece de la lista en
+        # cuanto se agota, no queda claro si fue consumido o si nunca existió.
         stock = rows(conn.execute(text(
             """
             SELECT numero, proveedor, procedencia, fecha_ingreso, peso_neto_kg,
                    kg_consumidos, kg_saldo, bines_saldo, bines_totales, estado_actual
             FROM v_saldo_lotes
-            WHERE kg_saldo > 0.01
-              AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')
+            WHERE (kg_saldo > 0.01
+              AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA'))
+               OR numero < 0
             ORDER BY numero
             """
         )))

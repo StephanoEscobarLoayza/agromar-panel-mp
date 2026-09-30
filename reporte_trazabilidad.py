@@ -36,6 +36,7 @@ _CENTRO = Alignment(horizontal="center", vertical="center", wrap_text=True)
 _FMT_KG = "#,##0"  # sin decimales (pedido de Stephano) - es solo formato de vista, las formulas siguen usando el valor real de la celda
 _FMT_BRIX = "0.00"
 _FMT_PCT = "0.0%"
+_FMT_PCT2 = "0.00%"  # Volumen/Rendimiento/Rendimiento de Jugo Simple - pedido de Stephano, a 2 decimales
 _FMT_FECHA = "DD/MM/YYYY"
 _FMT_FECHAHORA = "DD/MM/YYYY HH:MM"
 
@@ -364,18 +365,18 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     val(rHR, "HR pulpeado", HR_PULPEADO, "0")
     val(rMPh, "MP kg/hr", f'=IF(D{rHR}=0,"",D{rMP}/D{rHR})', _FMT_KG)
     val(rVol, "Volumen  litros", round(volumen, 2) if volumen else None, _FMT_KG)
-    _set(ws, ws.cell(row=rVol, column=5), f'=IF(OR(D{rVol}="",D{rMP}=0),"",D{rVol}/D{rMP})', fmt=_FMT_PCT)
+    _set(ws, ws.cell(row=rVol, column=5), f'=IF(OR(D{rVol}="",D{rMP}=0),"",D{rVol}/D{rMP})', fmt=_FMT_PCT2)
     val(rTam, "Tambores  und", tambores, "0")
     val(rPesoTam, "Peso Neto del tambor  kg", peso_tambor, _FMT_KG)
     val(rPT, "PT  kg",
         (f"=D{rTam}*D{rPesoTam}" if (tambores and peso_tambor) else (round(pt_kg, 2) if pt_kg else None)),
         _FMT_KG)
     val(rEntrada, "Insumos de entrada  kg", round(entrada_kg, 2) if entrada_kg else None, _FMT_KG)
-    val(rRend, "Rendimiento", f'=IF(OR(D{rPT}="",D{rMP}=0),"",D{rPT}/D{rMP})', _FMT_PCT)
+    val(rRend, "Rendimiento", f'=IF(OR(D{rPT}="",D{rMP}=0),"",D{rPT}/D{rMP})', _FMT_PCT2)
     val(rBrix, "Brix Promedio TK", round(brix_tk, 2) if brix_tk is not None else None, _FMT_BRIX)
     val(rDens, "Densidad Aparente  kg/l", DENSIDAD_APARENTE, "0.00000")
     val(rMasa, "Masa del Jugo Simple  kg", f'=IF(D{rVol}="","",D{rVol}*D{rDens})', _FMT_KG)
-    val(rRJS, "Rendimiento de Jugo Simple Tanques", f'=IF(OR(D{rMasa}="",D{rMP}=0),"",D{rMasa}/D{rMP})', _FMT_PCT)
+    val(rRJS, "Rendimiento de Jugo Simple Tanques", f'=IF(OR(D{rMasa}="",D{rMP}=0),"",D{rMasa}/D{rMP})', _FMT_PCT2)
     val(rSem, "Semilla", None, _FMT_KG)
     val(rCas, "Cáscara", None, _FMT_KG)
     val(rCS, "Cáscara / Semilla", f'=IF(OR(D{rCas}="",D{rSem}="",D{rSem}=0),"",D{rCas}/D{rSem})', _FMT_KG)
@@ -389,7 +390,13 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     vistos, parciales = set(), []
     for lo in lotes:
         n = lo.get("lote_numero")
-        if n in vistos or (_f(lo.get("kg_saldo")) or 0) <= 0.01:
+        if n in vistos:
+            continue
+        # un lote regular sin saldo no aporta nada al siguiente proceso, así
+        # que se omite - pero un lote derivado (PRE CC) se incluye siempre,
+        # aunque ya esté en 0, para no dejar dudas sobre si se consumió del
+        # todo o simplemente nunca se registró (ver _cuadro_stock más abajo).
+        if (n or 0) >= 0 and (_f(lo.get("kg_saldo")) or 0) <= 0.01:
             continue
         vistos.add(n)
         parciales.append({
@@ -413,8 +420,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     fin3 = fin2
     if pre_cc:
         fin3 = _cuadro_stock(
-            ws, fin2 + 3, "Producto derivado de PRE CC disponible para MMPP", pre_cc,
-            nota="Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
+            ws, fin2 + 3, "Producto derivado de PRE CC", pre_cc,
+            nota="Incluye todos los lotes derivados, aun con saldo en cero. Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
         )
     if productos_entrada:
         _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)

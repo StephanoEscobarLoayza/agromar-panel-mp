@@ -37,6 +37,26 @@ def _tabla_stock(lotes):
     )
 
 
+def _tabla_pre_cc(lotes):
+    """Producto derivado de PRE CC - a diferencia de las otras tablas,
+    incluye lotes ya en saldo cero: si un lote consumido del todo
+    desaparece de la lista en cuanto se agota, no queda claro si se usó por
+    completo o si nunca se registró. Por eso siempre se muestra Procesado
+    junto con Saldo, no solo el saldo."""
+    filas = [[
+        fmt_lote(l["numero"]),
+        l.get("proveedor") or "—",
+        (l.get("estado_actual") or "—").title(),
+        fmt_kg(l.get("peso_neto_kg")),
+        fmt_kg(l.get("kg_consumidos")),
+        fmt_kg(l.get("kg_saldo")),
+    ] for l in lotes]
+    return tabla(
+        ["Lote", "Proveedor", "Estado", "Peso neto", "Procesado", "Saldo"], filas,
+        [22 * mm, 46 * mm, 22 * mm, 26 * mm, 26 * mm, 26 * mm], align_derecha_desde=3,
+    )
+
+
 def _tabla_completos(lotes):
     """Lotes SIN TOCAR todavía - el "saldo" acá es el peso completo tal
     como llegó, no el resto de haber usado algo. No es lo mismo que un
@@ -134,15 +154,18 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     story.append(_tabla_completos(lotes_completos) if lotes_completos else Paragraph("Ninguno en este momento.", style_footnote))
 
     if derivados:
-        kg_pre_cc = sum(float(l["kg_saldo"]) for l in derivados)
+        kg_neto_pre_cc = sum(float(l["peso_neto_kg"]) for l in derivados)
+        kg_proc_pre_cc = sum(float(l["kg_consumidos"] or 0) for l in derivados)
+        kg_saldo_pre_cc = sum(float(l["kg_saldo"]) for l in derivados)
         story.append(Spacer(1, 8 * mm))
-        story.extend(seccion(f"Producto de PreCC disponible para agregar como MMPP ({len(derivados)})"))
+        story.extend(seccion(f"Producto derivado de PRE CC ({len(derivados)})"))
         story.append(Paragraph(
-            f"Total disponible: {fmt_kg(kg_pre_cc)} kg.",
+            f"Peso neto: {fmt_kg(kg_neto_pre_cc)} kg · Procesado: {fmt_kg(kg_proc_pre_cc)} kg · "
+            f"Saldo disponible: {fmt_kg(kg_saldo_pre_cc)} kg.",
             style_footnote,
         ))
         story.append(Spacer(1, 2 * mm))
-        story.append(_tabla_stock(derivados))
+        story.append(_tabla_pre_cc(derivados))
 
     story.append(Spacer(1, 10 * mm))
     story.append(Paragraph(
