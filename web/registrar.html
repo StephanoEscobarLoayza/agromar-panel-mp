@@ -150,7 +150,7 @@ async function cargarRecientes() {
     recientesBody.innerHTML = ordenadas.map(a => `
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
           data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
-        <td class="strong num">${Math.abs(a.lote_numero)}${a.lote_numero < 0 ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">PRE CC</span>' : ""}</td>
+        <td class="strong num"><div style="display:flex;flex-direction:column;align-items:center;gap:4px">${Math.abs(a.lote_numero)}${a.lote_numero < 0 ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap;font-family:\'Public Sans\',system-ui,sans-serif;font-variant-numeric:normal">PRE CC</span>' : ""}</div></td>
         <td class="right num" data-celda="kg">${a.kg_asignados === null
           ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)">pendiente</span>'
           : fmtKg(a.kg_asignados)}</td>
@@ -369,7 +369,7 @@ function renderCamposOrigen() {
 
 function tarjetaLote(l, activo) {
   const esDerivado = l.lote_origen_numero != null;
-  const tag = esDerivado ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">PRE CC</span>' : "";
+  const tag = esDerivado ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap">PRE CC</span>' : "";
   return `
     <button type="button" class="btn-link lote-opcion" data-numero="${l.numero}" style="text-align:left;width:100%;${activo ? "" : "opacity:.55"}">
       <div class="lookup" style="${activo ? "border-color:var(--citrus)" : ""}">
