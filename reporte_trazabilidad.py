@@ -29,6 +29,7 @@ _TOTAL_FILL = PatternFill("solid", fgColor="EFEFEF")
 _SEC_FILL = PatternFill("solid", fgColor="DCE6F1")
 _BOLD = Font(bold=True)
 _HEAD_FONT = Font(bold=True, size=9)
+_NOTA_FONT = Font(italic=True, size=9, color="6B6B6B")
 _THIN = Side("thin", color="9BB08C")
 _BORDE = Border(_THIN, _THIN, _THIN, _THIN)
 _CENTRO = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -106,16 +107,26 @@ def _set(ws, celda, valor, *, fmt=None, bold=False, fill=None, borde=False, cent
     return c
 
 
-def _cuadro_stock(ws, fila0, titulo, filas):
+def _cuadro_stock(ws, fila0, titulo, filas, nota=None):
     """Dibuja un cuadrito de stock por lote (Lote / Peso Neto / Peso procesado /
     Peso saldo / Bines saldo / Bines totales + TOTAL) empezando en la col H.
-    Devuelve la última fila usada. `filas` = lista de dicts de v_saldo_lotes."""
+    Devuelve la última fila usada. `filas` = lista de dicts de v_saldo_lotes.
+    `nota`, si se pasa, va en una fila aparte entre el título y el encabezado
+    (ej. aclarar que Peso Neto/Procesado acá es acumulado de todas las
+    corridas, no solo de esta - a diferencia de la tabla de insumos de
+    arriba, donde esos mismos nombres de columna son solo de esta corrida)."""
     h = 8  # col H
     _set(ws, ws.cell(row=fila0, column=h), titulo, bold=True, fill=_SEC_FILL)
+    fila_hdr = fila0 + 1
+    if nota:
+        c = _set(ws, ws.cell(row=fila_hdr, column=h), nota)
+        c.font = _NOTA_FONT
+        fila_hdr += 1
     hdr = ["Lote", "Peso Neto", "Peso procesado", "Peso saldo", "Bines saldo", "Bines totales"]
     for k, nom in enumerate(hdr):
-        c = _set(ws, ws.cell(row=fila0 + 1, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
+        c = _set(ws, ws.cell(row=fila_hdr, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
         c.font = _HEAD_FONT
+    fila0 = fila_hdr - 1
     if not filas:
         _set(ws, ws.cell(row=fila0 + 2, column=h), "Sin lotes.", borde=True)
         for k in range(1, 6):
@@ -401,7 +412,10 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos)
     fin3 = fin2
     if pre_cc:
-        fin3 = _cuadro_stock(ws, fin2 + 3, "Producto derivado de PRE CC disponible para MMPP", pre_cc)
+        fin3 = _cuadro_stock(
+            ws, fin2 + 3, "Producto derivado de PRE CC disponible para MMPP", pre_cc,
+            nota="Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
+        )
     if productos_entrada:
         _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
 
