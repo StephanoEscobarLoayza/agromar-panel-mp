@@ -60,6 +60,16 @@ def fmt_num(n, dec=2):
     return f"{n:,.{dec}f}"
 
 
+def fmt_tambores(n):
+    """Tambores/cilindros: normalmente es un número entero, pero a veces
+    queda un tambor a medio llenar (ej. 3.5) - se muestra el .5 solo cuando
+    de verdad hay medio tambor, nunca un ".0" de más en el caso normal."""
+    if n is None:
+        return "—"
+    n = float(n)
+    return f"{n:,.0f}" if n == int(n) else f"{n:,.1f}"
+
+
 def fmt_lote(numero):
     """Un lote "derivado" (el kg que sale disponible de una corrida PRE CC
     para reusar como MMPP) se guarda con el número real en negativo, para no

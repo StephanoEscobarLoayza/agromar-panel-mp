@@ -216,7 +216,7 @@ CREATE TABLE corrida_productos (
     corrida_id           INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
     producto             TEXT NOT NULL,             -- "Concentrado", "Aséptico", "Jugo Simple"...
     tipo                 TEXT NOT NULL DEFAULT 'salida' CHECK (tipo IN ('salida', 'entrada')), -- salida = lo que produjo esta corrida (Productos de salida); entrada = insumo que se metió a la corrida desde afuera, ej. reposición para subir Brix (Insumos de entrada) - nunca cuenta como PT
-    tambores             INTEGER,
+    tambores             NUMERIC(6,1),               -- normalmente entero, pero a veces queda un tambor a medio llenar (ej. 3.5)
     peso_neto_tambor_kg  NUMERIC(8,2),
     pt_kg                NUMERIC(12,2),              -- producto terminado en kg (tambores × peso, o cargado directo)
     volumen_litros       NUMERIC(12,2),              -- litros de producto terminado, cargados directo (no se calcula con un factor aproximado)

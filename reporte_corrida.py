@@ -8,7 +8,7 @@ from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 from reporte_base import (
     FOREST_2, CITRUS, OK, BAD, TEXT,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
-    fmt_kg, fmt_num, fmt_lote, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
+    fmt_kg, fmt_num, fmt_tambores, fmt_lote, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
     encabezado, seccion, tabla, nuevo_doc,
 )
 
@@ -93,7 +93,7 @@ def _aplica_descuento(producto: dict) -> bool:
 def _tabla_productos(productos):
     filas = [[
         p.get("producto") or "—",
-        fmt_num(p.get("tambores"), 0),
+        fmt_tambores(p.get("tambores")),
         fmt_kg(p.get("peso_neto_tambor_kg")),
         fmt_kg(p.get("pt_kg")),
         fmt_kg(p.get("volumen_litros")),
@@ -107,7 +107,7 @@ def _tabla_productos(productos):
 def _tabla_insumos_entrada(insumos):
     filas = [[
         p.get("producto") or "—",
-        fmt_num(p.get("tambores"), 0),
+        fmt_tambores(p.get("tambores")),
         fmt_kg(p.get("peso_neto_tambor_kg")),
         fmt_kg(p.get("pt_kg")),
         (p.get("observaciones") or "—") if _aplica_descuento(p) else "(no resta del total) " + (p.get("observaciones") or ""),
@@ -230,8 +230,8 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # por fila, en la tabla de "Productos de salida"), así que alguien que
     # sumara tambores a ojo se quedaba con el número de Calidad sin descontar
     # los cilindros de entrada - Stephano reportó justo esta confusión.
-    tambores_bruto_total = sum(int(p["tambores"]) for p in productos_pt if p.get("tambores") is not None)
-    entrada_tambores_total = sum(int(p["tambores"]) for p in productos_entrada_desc if p.get("tambores") is not None)
+    tambores_bruto_total = sum(float(p["tambores"]) for p in productos_pt if p.get("tambores") is not None)
+    entrada_tambores_total = sum(float(p["tambores"]) for p in productos_entrada_desc if p.get("tambores") is not None)
     tambores_total = tambores_bruto_total - entrada_tambores_total
 
     paradas_cerradas = [p for p in paradas if p.get("duracion_minutos") is not None]
@@ -277,7 +277,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     if pt_total:
         kpis.append(("Producto terminado", f"{fmt_kg(pt_total)} kg", TEXT))
     if tambores_total:
-        kpis.append(("Tambores", fmt_num(tambores_total, 0), TEXT))
+        kpis.append(("Tambores", fmt_tambores(tambores_total), TEXT))
     if litros_total:
         kpis.append(("Volumen", f"{fmt_kg(litros_total)} L", TEXT))
     kpis.append((
@@ -308,9 +308,9 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     if entrada_kg_total > 0 or entrada_tambores_total > 0:
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
-            f"El producto terminado ya descuenta {fmt_kg(entrada_kg_total)} kg y {entrada_tambores_total} "
+            f"El producto terminado ya descuenta {fmt_kg(entrada_kg_total)} kg y {fmt_tambores(entrada_tambores_total)} "
             f"tambor(es) correspondientes a insumos de entrada (ver \"Insumos de entrada\" más abajo). "
-            f"Calidad reporta {fmt_kg(pt_bruto_total)} kg y {tambores_bruto_total} tambor(es) brutos al "
+            f"Calidad reporta {fmt_kg(pt_bruto_total)} kg y {fmt_tambores(tambores_bruto_total)} tambor(es) brutos al "
             f"pesar, antes de este descuento.",
             style_footnote,
         ))

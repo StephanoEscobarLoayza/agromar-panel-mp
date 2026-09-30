@@ -234,7 +234,7 @@ function corridaCard(c) {
             <input type="text" id="prod-nombre-${c.id}" placeholder="Nombre (ej. Concentrado, o Reposición 2026)">
           </div>
           <div class="two-col" style="margin-top:8px">
-            <input type="number" id="prod-tambores-${c.id}" min="0" step="1" placeholder="Tambores">
+            <input type="number" id="prod-tambores-${c.id}" min="0" step="0.5" placeholder="Tambores">
             <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
           </div>
           <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
@@ -281,7 +281,7 @@ function productoFilaEdicion(p, corridaId) {
         <input type="text" class="ed-prod-nombre" value="${escapeHtml(p.producto)}" placeholder="Nombre">
       </div>
       <div class="two-col">
-        <input type="number" class="ed-prod-tambores" min="0" step="1" value="${p.tambores ?? ""}" placeholder="Tambores">
+        <input type="number" class="ed-prod-tambores" min="0" step="0.5" value="${p.tambores ?? ""}" placeholder="Tambores">
         <input type="number" class="ed-prod-peso" min="0" step="0.01" value="${p.peso_neto_tambor_kg ?? ""}" placeholder="Peso neto del tambor (kg)">
       </div>
       <div class="two-col">

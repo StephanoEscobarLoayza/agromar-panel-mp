@@ -367,7 +367,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     val(rMPh, "MP kg/hr", f'=IF(D{rHR}=0,"",D{rMP}/D{rHR})', _FMT_KG)
     val(rVol, "Volumen  litros", round(volumen, 2) if volumen else None, _FMT_KG)
     _set(ws, ws.cell(row=rVol, column=5), f'=IF(OR(D{rVol}="",D{rMP}=0),"",D{rVol}/D{rMP})', fmt=_FMT_PCT2)
-    val(rTam, "Tambores  und", tambores, "0")
+    val(rTam, "Tambores  und", tambores, "0.#")  # muestra el .5 solo si hay medio tambor
     val(rPesoTam, "Peso Neto del tambor  kg", peso_tambor, _FMT_KG)
     val(rPT, "PT  kg",
         (f"=D{rTam}*D{rPesoTam}" if (tambores and peso_tambor) else (round(pt_kg, 2) if pt_kg else None)),

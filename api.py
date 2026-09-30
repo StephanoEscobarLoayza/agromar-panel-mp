@@ -1242,7 +1242,7 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
 class NuevoProductoCorrida(BaseModel):
     producto: str
     tipo: str = "salida"  # "salida" = lo que produjo esta corrida; "entrada" = insumo metido desde afuera (ej. reposición para subir Brix)
-    tambores: Optional[int] = None
+    tambores: Optional[float] = None  # normalmente entero, pero a veces queda un tambor a medio llenar (ej. 3.5)
     peso_neto_tambor_kg: Optional[float] = None
     pt_kg: Optional[float] = None
     volumen_litros: Optional[float] = None  # se carga directo (medido/conocido), no se calcula con un factor
