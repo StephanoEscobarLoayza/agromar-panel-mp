@@ -421,7 +421,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     if pre_cc:
         fin3 = _cuadro_stock(
             ws, fin2 + 3, "Producto derivado de PRE CC", pre_cc,
-            nota="Incluye todos los lotes derivados, aun con saldo en cero. Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
+            nota="Incluye los lotes derivados con saldo disponible y los que esta corrida dejó en cero. Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
         )
     if productos_entrada:
         _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
