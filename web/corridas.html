@@ -144,6 +144,12 @@ const TIPOS_PROCESO = [
 ];
 document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option value="${t.value}">${t.label}</option>`).join("");
 
+// peso neto del tambor "de siempre" según el tipo de proceso de la corrida -
+// solo para no tener que acordarse cada vez (Stephano lo pidió: se le
+// olvida seguido); el campo sigue siendo editable, esto solo precarga el
+// valor más común de cada tipo.
+const PESO_TAMBOR_POR_TIPO = { "JCC": 265, "JSA": 220, "ICEGEN": 200 };
+
 function nowLocalDatetime() {
   const d = new Date();
   const pad = n => String(n).padStart(2, "0");
@@ -235,7 +241,7 @@ function corridaCard(c) {
           </div>
           <div class="two-col" style="margin-top:8px">
             <input type="number" id="prod-tambores-${c.id}" min="0" step="0.5" placeholder="Tambores">
-            <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)">
+            <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)" value="${PESO_TAMBOR_POR_TIPO[c.tipo_proceso] ?? ""}">
           </div>
           <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
           <div class="two-col" style="margin-top:8px">
