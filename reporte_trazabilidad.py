@@ -180,7 +180,8 @@ def _cuadro_insumos_entrada(ws, fila0, insumos):
         detalle = p.get("observaciones") or "—"
         if not _aplica_descuento(p):
             detalle = "(no resta del total) " + (p.get("observaciones") or "")
-        _set(ws, ws.cell(row=rr, column=h + 4), detalle, borde=True)
+        c = _set(ws, ws.cell(row=rr, column=h + 4), detalle, borde=True)
+        c.alignment = Alignment(wrap_text=True, vertical="center")
     tr = fila0 + 2 + i
     _set(ws, ws.cell(row=tr, column=h + 2), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
     _set(ws, ws.cell(row=tr, column=h + 3), f"=SUM(K{fila0 + 2}:K{tr - 1})",
@@ -427,8 +428,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
         _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
 
     # ---------- anchos de columna ----------
-    anchos = {1: 3, 2: 12, 3: 8, 4: 18, 5: 18, 6: 13, 7: 13, 8: 26, 9: 34, 10: 14,
-              11: 12, 12: 15, 13: 12, 14: 12, 15: 14, 16: 11, 17: 13}
+    anchos = {1: 3, 2: 12, 3: 15, 4: 18, 5: 18, 6: 13, 7: 13, 8: 26, 9: 34, 10: 14,
+              11: 12, 12: 24, 13: 12, 14: 12, 15: 14, 16: 11, 17: 13}
     for i, w in anchos.items():
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.freeze_panes = "B8"
