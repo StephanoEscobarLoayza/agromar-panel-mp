@@ -22,6 +22,8 @@ def _tabla_lotes(lotes):
         # estimado) - se muestra al lado, no reemplazando el kg.
         if es_bines and l.get("bines_consumidos") is not None:
             kg_txt += f" ({fmt_num(l['bines_consumidos'], 0)} bines)"
+        if l.get("porcentaje_descuento") is not None:
+            kg_txt += f" (-{fmt_num(l['porcentaje_descuento'], 1)}% brix)"
         filas.append([
             fmt_lote(l["lote_numero"]),
             l.get("proveedor") or "—",

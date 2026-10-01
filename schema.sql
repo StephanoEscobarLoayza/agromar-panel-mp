@@ -84,6 +84,7 @@ CREATE TABLE asignaciones (
                                                        -- se completa después con editar_asignacion
     bines_consumidos    INTEGER,
     brix_produccion     NUMERIC(5,2),                  -- brix medido EN LÍNEA al procesar (puede diferir del de recepción)
+    porcentaje_descuento NUMERIC(5,2),                  -- % descuento a brix 10.5°B de ESTE lote en ESTA corrida (ej. 3 = 3%) - solo informativo, no resta del saldo del lote; llena la columna del mismo nombre en el Excel de Trazabilidad
     observaciones       TEXT,
     usuario             TEXT,
     creado_en           TIMESTAMPTZ NOT NULL DEFAULT now(),

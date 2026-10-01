@@ -149,11 +149,12 @@ async function cargarRecientes() {
     const ordenadas = asigs.slice().sort((a, b) => Math.abs(b.lote_numero) - Math.abs(a.lote_numero));
     recientesBody.innerHTML = ordenadas.map(a => `
       <tr data-asig-id="${a.id}" data-tipo-origen="${a.tipo_almacen_origen || ""}" data-bines="${a.bines_consumidos ?? ""}"
-          data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}">
+          data-peso-neto="${a.peso_neto_kg}" data-bines-totales="${a.bines_totales ?? ""}" data-bines-saldo="${a.bines_saldo ?? ""}"
+          data-descuento="${a.porcentaje_descuento ?? ""}">
         <td class="strong num"><div style="display:flex;flex-direction:column;align-items:center;gap:4px">${Math.abs(a.lote_numero)}${a.lote_numero < 0 ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap;font-family:\'Public Sans\',system-ui,sans-serif;font-variant-numeric:normal">PRE CC</span>' : ""}</div></td>
         <td class="right num" data-celda="kg">${a.kg_asignados === null
           ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn)">pendiente</span>'
-          : fmtKg(a.kg_asignados)}</td>
+          : fmtKg(a.kg_asignados)}${a.porcentaje_descuento != null ? `<div class="num-sub">-${Number(a.porcentaje_descuento)}% brix</div>` : ""}</td>
         <td>${a.turno || ""}</td>
         <td class="right num" title="de ${fmtKg(a.peso_neto_kg)} kg netos">${fmtSaldo(a.saldo_actual_lote)}</td>
         <td class="right" data-celda="acciones" style="white-space:nowrap">
@@ -191,6 +192,10 @@ recientesBody.addEventListener("click", async (ev) => {
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
           <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" style="width:64px;text-align:right;flex-shrink:0" title="Bines que quedan de este lote (contando todas las corridas)">
           <span style="font-size:11px;color:var(--text-muted)">bines quedan</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap;margin-top:4px">
+          <input type="number" min="0" max="100" step="0.1" value="${fila.dataset.descuento || ""}" class="edit-descuento-input" placeholder="0" style="width:50px;text-align:right;flex-shrink:0" title="% Descuento a brix 10.5°B (opcional)">
+          <span style="font-size:11px;color:var(--text-muted)">% desc.</span>
         </div>`;
       const hint = (quedan) => {
         const consumidos = maxBines - quedan;
@@ -215,8 +220,12 @@ recientesBody.addEventListener("click", async (ev) => {
       });
       return;
     }
-    fila.querySelector('[data-celda="kg"]').innerHTML =
-      `<input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">`;
+    fila.querySelector('[data-celda="kg"]').innerHTML = `
+      <input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap;margin-top:4px">
+        <input type="number" min="0" max="100" step="0.1" value="${fila.dataset.descuento || ""}" class="edit-descuento-input" placeholder="0" style="width:50px;text-align:right;flex-shrink:0" title="% Descuento a brix 10.5°B (opcional)">
+        <span style="font-size:11px;color:var(--text-muted)">% desc.</span>
+      </div>`;
     fila.querySelector('[data-celda="acciones"]').innerHTML = `
       <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
       <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -248,8 +257,10 @@ recientesBody.addEventListener("click", async (ev) => {
         return;
       }
     }
+    const descuentoInput = fila.querySelector(".edit-descuento-input");
+    const descuento = descuentoInput && descuentoInput.value !== "" ? Number(descuentoInput.value) : null;
     try {
-      await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg, bines_consumidos: bines });
+      await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg, bines_consumidos: bines, porcentaje_descuento: descuento });
       cargarRecientes();
     } catch (e) {
       alert(e.message);
@@ -341,6 +352,7 @@ function renderCamposOrigen() {
       <div class="field"><label>Bines que quedan (cuenta los que ves, después de este consumo)</label><input type="number" id="binesQuedan" min="0" max="${binesSaldo ?? 9999}" step="1" placeholder="ej. 42"></div>
       <div class="suggested" style="margin:8px 0"><b>Consumo calculado:</b> <span id="binesConsumidosCalc">—</span> bines · <span id="pesoSugerido" class="num">—</span> kg</div>
       <div class="field"><label>Kg a registrar (ajusta si difiere del sugerido)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
+      <div class="field"><label>% Descuento a brix 10.5°B (opcional)</label><input type="number" id="descuento" min="0" max="100" step="0.1" placeholder="ej. 3"></div>
       <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
     `;
     const binesQuedanInput = document.getElementById("binesQuedan");
@@ -361,6 +373,7 @@ function renderCamposOrigen() {
   } else {
     cont.innerHTML = `
       <div class="field"><label>Kg a asignar (estimado)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
+      <div class="field"><label>% Descuento a brix 10.5°B (opcional)</label><input type="number" id="descuento" min="0" max="100" step="0.1" placeholder="ej. 3"></div>
       <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
     `;
   }
@@ -455,6 +468,8 @@ btnGuardar.addEventListener("click", async () => {
   const origen = document.getElementById("origen").value;
   const pendiente = document.getElementById("kgPendiente")?.checked;
   const obs = document.getElementById("obs")?.value || "";
+  const descuentoVal = document.getElementById("descuento")?.value;
+  const descuento = descuentoVal ? Number(descuentoVal) : null;
   let bines = null;
   let kg = null;
 
@@ -492,6 +507,7 @@ btnGuardar.addEventListener("click", async () => {
       tipo_almacen_origen: origen,
       kg_asignados: kg,
       bines_consumidos: bines || null,
+      porcentaje_descuento: descuento,
       observaciones: obs,
     });
     mensaje.innerHTML = pendiente

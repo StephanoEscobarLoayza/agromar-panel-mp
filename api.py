@@ -925,7 +925,7 @@ def listar_asignaciones(corrida_id: int):
             text(
                 """
                 SELECT a.id, a.lote_numero, l.proveedor, a.turno, a.kg_asignados,
-                       a.bines_consumidos, a.tipo_almacen_origen, a.observaciones, a.creado_en,
+                       a.bines_consumidos, a.tipo_almacen_origen, a.porcentaje_descuento, a.observaciones, a.creado_en,
                        v.peso_neto_kg, v.kg_saldo AS saldo_actual_lote, v.bines_totales, v.bines_saldo
                 FROM asignaciones a
                 JOIN lotes l ON l.numero = a.lote_numero
@@ -1040,7 +1040,7 @@ def reporte_corrida_pdf(corrida_id: int):
             text(
                 f"""
                 SELECT a.lote_numero, l.proveedor, a.tipo_almacen_origen, a.kg_asignados,
-                       a.bines_consumidos, l.brix_recepcion, l.acidez, l.ratio,
+                       a.bines_consumidos, a.porcentaje_descuento, l.brix_recepcion, l.acidez, l.ratio,
                        ({_SQL_KG_SALDO_AL_CIERRE}) AS kg_saldo,
                        ({_SQL_BINES_SALDO_AL_CIERRE}) AS bines_saldo
                 FROM asignaciones a
@@ -1187,7 +1187,7 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
         # mismo lote (ver _SQL_..._AL_CIERRE más arriba).
         lotes = rows(conn.execute(text(
             f"""
-            SELECT a.lote_numero, a.kg_asignados, a.bines_consumidos, a.brix_produccion,
+            SELECT a.lote_numero, a.kg_asignados, a.bines_consumidos, a.brix_produccion, a.porcentaje_descuento,
                    a.tipo_almacen_origen, a.fecha_proceso,
                    l.proveedor, l.procedencia, l.guia, l.fecha_ingreso, l.brix_recepcion,
                    l.peso_neto_kg, l.bines_totales,
@@ -1509,6 +1509,7 @@ class NuevaAsignacion(BaseModel):
     tipo_almacen_origen: str
     kg_asignados: Optional[float] = None  # None = "kg pendiente" (ver comentario en schema.sql)
     bines_consumidos: Optional[int] = None
+    porcentaje_descuento: Optional[float] = None  # % descuento a brix 10.5°B de este lote - solo informativo, no resta del saldo
     observaciones: Optional[str] = ""
 
 
@@ -1554,9 +1555,9 @@ def crear_asignacion(a: NuevaAsignacion):
                 text(
                     """
                     INSERT INTO asignaciones
-                        (lote_numero, corrida_id, fecha_proceso, turno, tipo_almacen_origen, kg_asignados, bines_consumidos, observaciones)
+                        (lote_numero, corrida_id, fecha_proceso, turno, tipo_almacen_origen, kg_asignados, bines_consumidos, porcentaje_descuento, observaciones)
                     VALUES
-                        (:lote_numero, :corrida_id, now(), :turno, :origen, :kg, :bines, :obs)
+                        (:lote_numero, :corrida_id, now(), :turno, :origen, :kg, :bines, :desc, :obs)
                     RETURNING id
                     """
                 ),
@@ -1567,6 +1568,7 @@ def crear_asignacion(a: NuevaAsignacion):
                     "origen": a.tipo_almacen_origen,
                     "kg": a.kg_asignados,
                     "bines": a.bines_consumidos,
+                    "desc": a.porcentaje_descuento,
                     "obs": a.observaciones,
                 },
             )
@@ -1595,6 +1597,7 @@ def crear_asignacion(a: NuevaAsignacion):
 class EditarAsignacion(BaseModel):
     kg_asignados: Optional[float] = None  # None = volver a dejarla en "kg pendiente"
     bines_consumidos: Optional[int] = None  # solo aplica si el lote es de bines - el front recalcula el kg a partir de esto
+    porcentaje_descuento: Optional[float] = None
 
 
 @app.post("/api/asignaciones/{asignacion_id}")
@@ -1623,10 +1626,10 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
                     )
             result = conn.execute(
                 text(
-                    "UPDATE asignaciones SET kg_asignados = :kg, bines_consumidos = :bines "
+                    "UPDATE asignaciones SET kg_asignados = :kg, bines_consumidos = :bines, porcentaje_descuento = :desc "
                     "WHERE id = :id RETURNING id"
                 ),
-                {"id": asignacion_id, "kg": a.kg_asignados, "bines": a.bines_consumidos},
+                {"id": asignacion_id, "kg": a.kg_asignados, "bines": a.bines_consumidos, "desc": a.porcentaje_descuento},
             )
             if result.scalar() is None:
                 raise HTTPException(status_code=404, detail="Asignación no encontrada.")

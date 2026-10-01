@@ -260,6 +260,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
         # kg descuento       = % descuento * Peso Neto                 [ = O*J ]
         pcd = f'=IF({cPN}{r}="","",{cPN}{r}-({cPDTO}{r}*{cPN}{r}))'
         kdto = f'=IF(OR({cPN}{r}="",{cPDTO}{r}=""),"",{cPDTO}{r}*{cPN}{r})'
+        pct_dto = lo.get("porcentaje_descuento")
+        pct_dto = (float(pct_dto) / 100) if pct_dto is not None else None
         fila = [
             proceso,
             _lote_txt(lo.get("lote_numero")),
@@ -274,7 +276,7 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
             pcd,                               # Peso con descuento (fórmula)
             brix,                              # Brix Calidad recepción
             _f(lo.get("brix_produccion")),     # Brix Producción línea
-            None,                              # % Descuento a brix (a mano)
+            pct_dto,                           # % Descuento a brix 10.5°B (registrado al asignar, o en blanco para llenar a mano)
             None,                              # Descuento
             kdto,                              # kg descuento (fórmula)
         ]
