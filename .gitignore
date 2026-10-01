@@ -8,3 +8,6 @@ venv/
 *.vbs
 python
 set
+
+# respaldos locales de la base
+respaldos/
