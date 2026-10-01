@@ -213,3 +213,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("scroll", cerrarTodos, true);
   window.addEventListener("resize", cerrarTodos);
 });
+
+// ---------- tablas anchas (Lotes, Registrar, etc.): la rueda del mouse las
+// mueve de lado a lado mientras el cursor está encima, en vez de tener que
+// bajar hasta el final de una tabla larga para encontrar la barra de scroll
+// horizontal - en una PC sin trackpad no hay gesto de swipe lateral, era la
+// única forma de moverse (Stephano lo notó). Si el gesto ya es horizontal
+// (trackpad/mouse con rueda lateral) se deja pasar tal cual. ----------
+document.addEventListener("wheel", (ev) => {
+  const wrap = ev.target.closest(".table-wrap");
+  if (!wrap || wrap.scrollWidth <= wrap.clientWidth) return;
+  if (Math.abs(ev.deltaY) <= Math.abs(ev.deltaX)) return;
+  wrap.scrollLeft += ev.deltaY;
+  ev.preventDefault();
+}, { passive: false });
