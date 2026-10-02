@@ -92,7 +92,10 @@ nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
 .hero-title em{font-style:italic;font-weight:500;color:var(--citrus-light)}
 .hero-sub{font-size:15px;color:#CBDCD1;margin-top:12px;max-width:480px;line-height:1.6}
 .wave{position:absolute;left:0;right:0;bottom:-2px;line-height:0}
-.wave svg{width:100%;height:auto;display:block}
+/* altura acotada (antes height:auto: crecía con el ancho de la pantalla y en
+   monitores anchos llegaba a ~110px, más que el padding-bottom del .hero, y
+   la curva tapaba la última línea del subtítulo) */
+.wave svg{width:100%;height:clamp(36px,5vw,60px);display:block}
 
 /* ---------- kpis ---------- */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:-36px;position:relative;z-index:2}
