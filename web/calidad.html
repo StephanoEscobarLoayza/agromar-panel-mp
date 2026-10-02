@@ -307,7 +307,7 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
 async function calcularSiguienteBin() {
   const corridaId = corridaSelect.value;
   if (!corridaId) {
-    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Elige una corrida.</div></div>';
+    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px;text-align:center">Elige una corrida.</div></div>';
     return;
   }
   const brixMin = Number(document.getElementById("brixMin").value);
