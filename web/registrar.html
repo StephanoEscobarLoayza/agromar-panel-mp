@@ -82,7 +82,7 @@
     <div class="panel">
       <div class="panel-head"><h3>Asignaciones de esta corrida</h3></div>
       <div class="table-wrap">
-        <table>
+        <table class="tabla-compacta">
           <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th><th class="right">Saldo restante</th><th></th></tr></thead>
           <tbody id="recientes"><tr><td colspan="5" class="empty">Elige una corrida</td></tr></tbody>
         </table>
@@ -189,13 +189,13 @@ recientesBody.addEventListener("click", async (ev) => {
       // repartido en dos corridas (el 2393): escribía el número sin contar
       // lo que la otra corrida ya tenía, y esa fila quedaba mal.
       fila.querySelector('[data-celda="kg"]').innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap">
-          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" style="width:64px;text-align:right;flex-shrink:0" title="Bines que quedan de este lote (contando todas las corridas)">
-          <span style="font-size:11px;color:var(--text-muted)">bines quedan</span>
+        <div class="edit-fila ancho">
+          <input type="number" min="0" max="${maxBines}" step="1" value="${quedanActual}" class="edit-bines-input edit-mini-input" data-max-bines="${maxBines}" data-kg-por-bin="${kgPorBin}" style="width:64px" title="Bines que quedan de este lote (contando todas las corridas)">
+          <span>bines quedan</span>
         </div>
-        <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap;margin-top:4px">
-          <input type="number" min="0" max="100" step="0.1" value="${fila.dataset.descuento || ""}" class="edit-descuento-input" placeholder="0" style="width:50px;text-align:right;flex-shrink:0" title="% Descuento a brix 10.5°B (opcional)">
-          <span style="font-size:11px;color:var(--text-muted)">% desc.</span>
+        <div class="edit-fila ancho">
+          <input type="number" min="0" max="100" step="0.1" value="${fila.dataset.descuento || ""}" class="edit-descuento-input edit-mini-input" placeholder="0" style="width:64px" title="% Descuento a brix 10.5°B (opcional)">
+          <span>% desc.</span>
         </div>`;
       const hint = (quedan) => {
         const consumidos = maxBines - quedan;
@@ -205,8 +205,8 @@ recientesBody.addEventListener("click", async (ev) => {
       };
       fila.querySelector('[data-celda="acciones"]').innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:nowrap">${hint(quedanActual)}</span>
-          <div style="white-space:nowrap">
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:normal;max-width:150px;text-align:right">${hint(quedanActual)}</span>
+          <div class="edit-acciones">
             <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
             <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
             <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)" title="Volver a pendiente">↺</button>
@@ -221,15 +221,20 @@ recientesBody.addEventListener("click", async (ev) => {
       return;
     }
     fila.querySelector('[data-celda="kg"]').innerHTML = `
-      <input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input" style="width:90px;text-align:right">
-      <div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap;margin-top:4px">
-        <input type="number" min="0" max="100" step="0.1" value="${fila.dataset.descuento || ""}" class="edit-descuento-input" placeholder="0" style="width:50px;text-align:right;flex-shrink:0" title="% Descuento a brix 10.5°B (opcional)">
-        <span style="font-size:11px;color:var(--text-muted)">% desc.</span>
+      <div class="edit-fila">
+        <input type="number" min="0.01" step="0.01" value="${btn.dataset.kg}" class="edit-kg-input edit-mini-input" placeholder="0" style="width:88px">
+        <span>kg</span>
+      </div>
+      <div class="edit-fila">
+        <input type="number" min="0" max="100" step="0.1" value="${fila.dataset.descuento || ""}" class="edit-descuento-input edit-mini-input" placeholder="0" style="width:88px" title="% Descuento a brix 10.5°B (opcional)">
+        <span>% desc.</span>
       </div>`;
     fila.querySelector('[data-celda="acciones"]').innerHTML = `
-      <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
-      <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
-      <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)" title="Volver a pendiente">↺</button>
+      <div class="edit-acciones">
+        <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
+        <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
+        <button class="btn-link" data-accion="marcar-pendiente-asig" data-id="${id}" style="color:var(--warn)" title="Volver a pendiente">↺</button>
+      </div>
     `;
   } else if (btn.dataset.accion === "cancelar-asig") {
     cargarRecientes();
