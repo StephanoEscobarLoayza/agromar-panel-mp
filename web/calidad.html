@@ -111,9 +111,9 @@
     <div class="panel" style="margin-top:0">
       <div class="form-body">
         <ol style="margin:0 0 12px;padding-left:20px;font-size:13px;line-height:1.6;color:var(--text-2)">
-          <li>Agregue los lotes que desea mezclar (silos y bines).</li>
-          <li>Indique cuántos kg (silos) o cuántos bines (bines) tomará de cada uno; la tabla le muestra si la mezcla cumple los parámetros.</li>
-          <li>Si no sabe qué cantidades usar, pulse «Calcular cantidades»: el sistema determina cuánto tomar de cada lote para cumplir los parámetros.</li>
+          <li>Agregue los lotes disponibles que desea considerar (silos y bines).</li>
+          <li>Para evaluar una mezcla puntual, indique en la tabla cuántos kg (silos) o cuántos bines tomará de cada lote; el sistema verifica si cumple los parámetros.</li>
+          <li>Para planificar varios tanques, indique los kg de materia prima que entran en cada tanque y pulse «Calcular plan por tanques»: el sistema reparte los lotes agregados en tanques que cumplen los parámetros de forma individual (máximo 4 lotes por tanque).</li>
         </ol>
         <div class="hint-line" id="mezObjetivo" style="margin-bottom:12px"></div>
         <div class="two-col">
@@ -123,24 +123,24 @@
             <datalist id="mezLotesLista"></datalist>
           </div>
           <div class="field">
-            <label for="mezKgTotal">Cantidad que desea preparar, en kg (opcional)</label>
+            <label for="mezKgTotal">Kg de materia prima por tanque</label>
             <input type="number" id="mezKgTotal" min="0" step="100" placeholder="Ej. 30000">
-            <div class="hint-line" style="margin-top:4px">Solo se usa al calcular cantidades. Si lo deja vacío, se calcula la mayor cantidad posible.</div>
+            <div class="hint-line" style="margin-top:4px">Solo se utiliza al calcular el plan por tanques.</div>
           </div>
         </div>
         <div id="mezMensaje"></div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;align-items:center">
-          <button class="btn" id="btnMezSugerir" style="width:auto;padding:11px 22px">Calcular cantidades</button>
+          <button class="btn" id="btnMezSugerir" style="width:auto;padding:11px 22px">Calcular plan por tanques</button>
           <button class="btn-link strong" id="btnMezAgregar">+ Agregar lote</button>
           <button class="btn-link" id="btnMezLimpiar">Limpiar mezcla</button>
         </div>
-        <div id="mezSugerencia"></div>
       </div>
       <div id="mezTabla"></div>
       <div id="mezResumen"></div>
     </div>
+    <div id="mezPlan"></div>
     <div class="hint-line" style="margin-top:12px">
-      Se consideran los lotes en proceso o en espera que tienen saldo y cuentan con Brix y acidez de recepción registrados. Los silos se cargan por kg y los bines por unidades completas. El producto PRE CC no se incluye, porque su Brix real no está registrado. Los parámetros requeridos son los mismos de la sección anterior.
+      Se consideran los lotes en proceso o en espera que tienen saldo y cuentan con Brix y acidez de recepción registrados. Los silos se cargan por kg y los bines por unidades completas. El producto PRE CC no se incluye, porque su Brix real no está registrado. El plan por tanques utiliza el saldo completo de los lotes agregados y asegura que cada tanque cumpla por separado los parámetros requeridos, que son los mismos de la sección anterior.
     </div>
   </section>
 
@@ -385,11 +385,11 @@ cargarCorridasAbiertas();
 const mezLote = document.getElementById("mezLote");
 const mezKgTotal = document.getElementById("mezKgTotal");
 const mezMensaje = document.getElementById("mezMensaje");
-const mezSugerencia = document.getElementById("mezSugerencia");
 const mezTabla = document.getElementById("mezTabla");
 const mezResumen = document.getElementById("mezResumen");
 
-const MEZ_MAX_SUGERIR = 8; // la búsqueda de proporciones crece rápido con cada lote extra
+const MEZ_MAX_SUGERIR = 8;     // el plan por tanques prueba todas las combinaciones de lotes, que crecen rápido
+const MEZ_MAX_POR_TANQUE = 4;  // lotes distintos que pueden entrar en un mismo tanque
 let mezCandidatos = []; // lotes que se pueden mezclar
 let mezcla = [];        // [{ l: lote, cant }] - cant = kg (silo) o bines (bines)
 
@@ -484,6 +484,7 @@ function mezRenderTabla() {
         <td><span class="tag">${tagAlmacen(l.tipo_almacen)}</span></td>
         <td class="right num">${Number(l.brix_recepcion).toFixed(2)}</td>
         <td class="right num">${Number(l.acidez).toFixed(2)}</td>
+        <td class="right num">${(Number(l.brix_recepcion) / Number(l.acidez)).toFixed(2)}</td>
         <td class="right num">${fmtKg(mezSaldoKg(l))}${bines ? `<div class="num-sub">${fmtInt(mezMaxCant(l))} bines</div>` : ""}</td>
         <td class="right" style="white-space:nowrap">${entrada}</td>
         <td class="right num mez-kg">${fmtKg(mezKgDe(it))}</td>
@@ -497,7 +498,7 @@ function mezRenderTabla() {
         <thead>
           <tr>
             <th>Lote</th><th>Proveedor</th><th>Almacén</th>
-            <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Saldo</th>
+            <th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th><th class="right">Saldo</th>
             <th class="right">Cantidad</th><th class="right">Kg</th><th class="right">% mezcla</th><th></th>
           </tr>
         </thead>
@@ -557,12 +558,14 @@ function mezActualizarResumen() {
     ${banner}${aviso}`;
 }
 
-// ---- búsqueda de proporciones ----
-// Los tres parámetros son lineales en los kg de cada lote, así que "la mayor
-// mezcla que cumple" es un programa lineal chico: maximizar los kg totales
-// sujeto a  Brix >= mín,  Brix - Ratio_mín * Acidez >= 0,  Acidez <= máx,
-// 0 <= kg_i <= saldo_i  (y kg totales <= lo pedido, si se indicó). Con pocos
-// lotes alcanza con probar los vértices del conjunto factible.
+// ---- plan por tanques ----
+// Brix, acidez y ratio son lineales en los kg de cada lote, así que armar un
+// tanque que cumpla es un programa lineal chico: se prueban los vértices del
+// conjunto factible. El plan llena los tanques uno tras otro; en cada uno
+// prueba todas las combinaciones de hasta MEZ_MAX_POR_TANQUE lotes y se queda
+// con la que cumple gastando lo menos valioso (así los mejores lotes quedan
+// para los tanques siguientes). Se hace con dos criterios (gastar primero lo
+// menos valioso / lo más valioso) y se conserva el plan que llena más tanques.
 function mezResolverSistema(M, v) {
   const n = v.length;
   const A = M.map((fila, i) => fila.concat(v[i]));
@@ -585,9 +588,10 @@ function mezResolverSistema(M, v) {
   return x;
 }
 
-function mezMaximizar(n, filas, rhs, hi) {
-  // maximiza la suma de x (x en toneladas) sujeto a  filas·x >= rhs  y  0 <= x <= hi
+function mezMaximizar(n, filas, rhs, hi, c) {
+  // maximiza c·x (x en toneladas) sujeto a  filas·x >= rhs  y  0 <= x <= hi
   if (n === 0) return [];
+  const pesos = c || new Array(n).fill(1);
   const todas = filas.map((f, i) => ({ a: f, b: rhs[i] }));
   for (let i = 0; i < n; i++) {
     const e = new Array(n).fill(0);
@@ -596,13 +600,13 @@ function mezMaximizar(n, filas, rhs, hi) {
     todas.push({ a: e.map((v) => -v), b: -hi[i] });
   }
   const TOL = 1e-7;
-  let mejor = null, mejorVal = -1;
+  let mejor = null, mejorVal = -Infinity;
   const idx = Array.from({ length: n }, (_, i) => i);
   const m = todas.length;
   while (true) {
     const x = mezResolverSistema(idx.map((i) => todas[i].a), idx.map((i) => todas[i].b));
-    if (x && todas.every((r) => r.a.reduce((s, c, j) => s + c * x[j], 0) >= r.b - TOL)) {
-      const val = x.reduce((s, v) => s + v, 0);
+    if (x && todas.every((r) => r.a.reduce((s, cf, j) => s + cf * x[j], 0) >= r.b - TOL)) {
+      const val = x.reduce((s, v, j) => s + pesos[j] * v, 0);
       if (val > mejorVal) { mejorVal = val; mejor = x; }
     }
     let i = n - 1;
@@ -614,123 +618,291 @@ function mezMaximizar(n, filas, rhs, hi) {
   return mejor ? mejor.map((v) => Math.max(v, 0)) : null;
 }
 
-function mezOptimizar(lotes, obj, kgPedidos) {
-  // pequeños márgenes para que, al redondear los kg, la mezcla siga cumpliendo
+function mezSubconjuntos(n, maxK) {
+  const res = [];
+  const rec = (inicio, actual) => {
+    if (actual.length) res.push(actual.slice());
+    if (actual.length === maxK) return;
+    for (let i = inicio; i < n; i++) { actual.push(i); rec(i + 1, actual); actual.pop(); }
+  };
+  rec(0, []);
+  return res;
+}
+
+// Devuelve { tanques: [kg por lote], parcial: kg por lote | null, sobrante: kg por lote }
+// o null si no hay lotes. T = kg de materia prima de un tanque.
+function mezPlanTanques(lotes, obj, T) {
+  const n = lotes.length;
   const B = obj.brixMin + 0.001, R = obj.ratioMin + 0.001, A = obj.acidezMax - 0.0001;
   const brix = lotes.map((l) => Number(l.brix_recepcion));
   const acid = lotes.map((l) => Number(l.acidez));
-  const n = lotes.length;
   const specs = [
     brix.map((b) => b - B),
     brix.map((b, i) => b - R * acid[i]),
     acid.map((a) => A - a),
   ];
-  const hiT = lotes.map((l) => mezSaldoKg(l) / 1000);
-  const capT = kgPedidos ? kgPedidos / 1000 : null;
+  // "valor" de un lote = cuánto aporta a cumplir los tres parámetros
+  // (cada uno normalizado), para decidir qué conviene guardar
+  const escala = specs.map((s) => Math.max(...s.map(Math.abs), 1e-9));
+  const valor = lotes.map((_, i) => specs.reduce((acc, s, k) => acc + s[i] / escala[k], 0));
+  const Tt = T / 1000;
+  const tolBines = 0.03 * Tt; // un tanque solo de bines puede quedar un poco arriba o abajo de T
+  const paso = lotes.map((l) => (mezEsBines(l) ? mezKgPorBin(l) / 1000 : 0));
+  const tonIni = lotes.map((l, i) => (paso[i] > 0 ? mezMaxCant(l) * paso[i] : mezSaldoKg(l) / 1000));
+  const subs = mezSubconjuntos(n, MEZ_MAX_POR_TANQUE);
+  const suma = (r) => Object.values(r).reduce((a, v) => a + v, 0);
+  const valorDe = (r) => Object.keys(r).reduce((a, j) => a + valor[j] * r[j], 0);
 
-  // resuelve solo los lotes "libres"; los demás quedan fijos (toneladas)
-  const resolver = (libres, fijosT) => {
+  // los lotes "libres" se resuelven por programación lineal; los "fijos" (bines
+  // ya redondeados a unidades completas) entran como constantes
+  const resolver = (libres, fijos, rem, modo, signo) => {
+    if (!libres.length) return { ...fijos };
+    const fijoSum = suma(fijos);
     const filas = [], rhs = [];
     specs.forEach((s) => {
       filas.push(libres.map((i) => s[i]));
-      rhs.push(-Object.keys(fijosT).reduce((acc, j) => acc + s[j] * fijosT[j], 0));
+      rhs.push(-Object.keys(fijos).reduce((a, j) => a + s[j] * fijos[j], 0));
     });
-    if (capT !== null) {
-      filas.push(libres.map(() => -1));
-      rhs.push(-(capT - Object.values(fijosT).reduce((a, v) => a + v, 0)));
-    }
-    const x = mezMaximizar(libres.length, filas, rhs, libres.map((i) => hiT[i]));
+    filas.push(libres.map(() => -1)); rhs.push(-(Tt - fijoSum));          // suma <= Tt
+    if (modo === "lleno") { filas.push(libres.map(() => 1)); rhs.push(Tt - fijoSum); } // suma >= Tt
+    const c = modo === "lleno" ? libres.map((i) => -signo * valor[i]) : libres.map(() => 1);
+    const x = mezMaximizar(libres.length, filas, rhs, libres.map((i) => rem[i]), c);
     if (!x) return null;
-    const r = { ...fijosT };
+    const r = { ...fijos };
     libres.forEach((i, k) => { r[i] = x[k]; });
     return r;
   };
-  const cumple = (r) => {
-    const tot = Object.values(r).reduce((a, v) => a + v, 0);
-    if (capT !== null && tot > capT + 1e-7) return false;
-    return specs.every((s) => Object.keys(r).reduce((acc, j) => acc + s[j] * r[j], 0) >= -1e-7);
+  const cumple = (r, modo, soloBines) => {
+    const tot = suma(r);
+    if (!specs.every((s) => Object.keys(r).reduce((a, j) => a + s[j] * r[j], 0) >= -1e-7)) return false;
+    if (modo === "lleno") return soloBines ? Math.abs(tot - Tt) <= tolBines : Math.abs(tot - Tt) <= 1e-6;
+    return tot <= Tt + 1e-7 && tot > 1e-9;
   };
 
-  const todos = lotes.map((_, i) => i);
-  const base = resolver(todos, {});
-  if (!base || Object.values(base).reduce((a, v) => a + v, 0) < 1e-6) return { ok: false, motivo: "imposible" };
+  const tanqueDe = (S, rem, modo, signo) => {
+    const iB = S.filter((i) => paso[i] > 0), iS = S.filter((i) => paso[i] === 0);
+    const candidatos = [];
+    if (!iB.length) {
+      const r = resolver(iS, {}, rem, modo, signo);
+      if (r && cumple(r, modo, false)) candidatos.push(r);
+    } else {
+      const cont = resolver(S, {}, rem, modo, signo); // relajación continua
+      if (!cont) return null;
+      const opciones = iB.map((i) => {
+        const topeBines = Math.floor(rem[i] / paso[i] + 1e-9);
+        const q = cont[i] / paso[i];
+        const f = Math.min(Math.floor(q + 1e-9), topeBines);
+        return (Math.abs(q - f) > 1e-6 && f + 1 <= topeBines) ? [f, f + 1] : [f];
+      });
+      const total = opciones.reduce((a, o) => a * o.length, 1);
+      for (let c = 0; c < total; c++) {
+        let resto = c;
+        const fijos = {};
+        iB.forEach((i, k) => { const o = opciones[k]; fijos[i] = o[resto % o.length] * paso[i]; resto = Math.floor(resto / o.length); });
+        const r = iS.length ? resolver(iS, fijos, rem, modo, signo) : fijos;
+        if (r && cumple(r, modo, !iS.length)) candidatos.push(r);
+      }
+    }
+    if (!candidatos.length) return null;
+    candidatos.sort(modo === "lleno"
+      ? (a, b) => signo * valorDe(a) - signo * valorDe(b)
+      : (a, b) => suma(b) - suma(a));
+    const r = candidatos[0];
+    // los silos se redondean al kg; la diferencia que deja el redondeo se
+    // devuelve a un silo con saldo para que el tanque cierre en cifras exactas
+    const silos = Object.keys(r).filter((i) => paso[i] === 0);
+    silos.forEach((i) => { r[i] = Math.floor(r[i] * 1000 + 1e-6) / 1000; });
+    if (modo === "lleno" && silos.length) {
+      const falta = Math.round(Tt * 1000) - Math.round(suma(r) * 1000);
+      const j = silos.find((i) => Math.round((rem[i] - r[i]) * 1000) >= falta);
+      if (falta > 0 && falta <= silos.length + 1 && j !== undefined) r[j] += falta / 1000;
+    }
+    return r;
+  };
 
-  const iBines = todos.filter((i) => mezEsBines(lotes[i]));
-  if (!iBines.length) {
-    return { ok: true, kg: lotes.map((_, i) => Math.floor(base[i] * 1000)), redondeado: false };
-  }
+  const planear = (signo) => {
+    const rem = tonIni.slice();
+    const tanques = [];
+    const gastar = (r) => Object.keys(r).forEach((i) => { rem[i] = Math.max(rem[i] - r[i], 0); if (rem[i] < 1e-9) rem[i] = 0; });
+    const candidatos = () => subs.filter((S) => S.every((i) => rem[i] > 1e-9));
+    for (let k = 0; k < 40; k++) {
+      let mejor = null;
+      for (const S of candidatos()) {
+        if (S.reduce((a, i) => a + rem[i], 0) < Tt - tolBines) continue;
+        const r = tanqueDe(S, rem, "lleno", signo);
+        if (r && (!mejor || signo * valorDe(r) < signo * valorDe(mejor) - 1e-9)) mejor = r;
+      }
+      if (!mejor) break;
+      tanques.push(mejor);
+      gastar(mejor);
+    }
+    let parcial = null;
+    for (const S of candidatos()) {
+      const r = tanqueDe(S, rem, "max", 1);
+      if (r && (!parcial || suma(r) > suma(parcial))) parcial = r;
+    }
+    if (parcial && suma(parcial) < Math.max(0.1 * Tt, 0.5)) parcial = null;
+    if (parcial) gastar(parcial);
+    return { tanques, parcial, rem };
+  };
 
-  // los bines se usan completos: se prueba redondear cada uno hacia abajo o
-  // hacia arriba y se queda con la combinación que cumple y suma más kg
-  const iSilos = todos.filter((i) => !mezEsBines(lotes[i]));
-  const opciones = iBines.map((i) => {
-    const paso = mezKgPorBin(lotes[i]) / 1000;
-    const maxB = mezMaxCant(lotes[i]);
-    const f = Math.min(Math.floor(base[i] / paso + 1e-9), maxB);
-    return (f + 1 <= maxB && Math.abs(base[i] / paso - f) > 1e-6) ? [f, f + 1] : [f];
-  });
-  let mejor = null, mejorTot = -1;
-  const total =opciones.reduce((a, o) => a * o.length, 1);
-  for (let c = 0; c < Math.min(total, 512); c++) {
-    let resto = c;
-    const fijos = {};
-    iBines.forEach((i, k) => {
-      const o = opciones[k];
-      fijos[i] = o[resto % o.length] * (mezKgPorBin(lotes[i]) / 1000);
-      resto = Math.floor(resto / o.length);
-    });
-    const r = iSilos.length ? resolver(iSilos, fijos) : fijos;
-    if (!r || !cumple(r)) continue;
-    const tot = Object.values(r).reduce((a, v) => a + v, 0);
-    if (tot > mejorTot) { mejorTot = tot; mejor = r; }
-  }
-  if (!mejor) return { ok: false, motivo: "bines" };
+  const puntaje = (p) => p.tanques.length * 1e6 + p.tanques.reduce((a, t) => a + suma(t), 0) + (p.parcial ? suma(p.parcial) : 0);
+  const p1 = planear(1), p2 = planear(-1);
+  const plan = puntaje(p2) > puntaje(p1) ? p2 : p1;
+  const aKg = (r) => lotes.map((_, i) => Math.round((r[i] || 0) * 1000));
   return {
-    ok: true,
-    redondeado: true,
-    kg: lotes.map((l, i) => (mezEsBines(l) ? Math.round(mejor[i] * 1000 / mezKgPorBin(l)) * mezKgPorBin(l) : Math.floor(mejor[i] * 1000))),
+    tanques: plan.tanques.map(aKg),
+    parcial: plan.parcial ? aKg(plan.parcial) : null,
+    sobrante: plan.rem.map((v) => Math.round(v * 1000)),
   };
 }
 
-function mezSugerir() {
+let mezPlanActual = null; // { lotes, tanques, parcial, sobrante, T }
+
+function mezMetricasHtml(items, obj) {
+  const m = mezCalcular(items);
+  if (!m) return "";
+  const EPS = 1e-9;
+  const marca = (ok) => `<span style="color:var(${ok ? "--ok" : "--bad"});font-weight:600">${ok ? "✓" : "✕"}</span>`;
+  const okB = m.brix + EPS >= obj.brixMin, okR = m.ratio !== null && m.ratio + EPS >= obj.ratioMin, okA = m.acidez - EPS <= obj.acidezMax;
+  return `Brix ${m.brix.toFixed(2)} ${marca(okB)} · Ratio ${m.ratio !== null ? m.ratio.toFixed(2) : "—"} ${marca(okR)} · Acidez ${m.acidez.toFixed(3)} ${marca(okA)}`;
+}
+
+function mezTanqueHtml(titulo, kgs, lotes, obj, indice) {
+  const items = lotes.map((l, i) => ({ l, cant: mezEsBines(l) ? Math.round(kgs[i] / mezKgPorBin(l)) : kgs[i] })).filter((it) => it.cant > 0);
+  const total = items.reduce((a, it) => a + mezKgDe(it), 0);
+  const filas = items.map((it) => {
+    const bines = mezEsBines(it.l);
+    return `
+      <tr>
+        <td class="strong num">#${it.l.numero}</td>
+        <td>${escapeHtml(it.l.proveedor)}</td>
+        <td><span class="tag">${tagAlmacen(it.l.tipo_almacen)}</span></td>
+        <td class="right num">${bines ? `${fmtInt(it.cant)} bines` : `${fmtKg(it.cant)} kg`}</td>
+        <td class="right num">${fmtKg(mezKgDe(it))}</td>
+        <td class="right num">${(mezKgDe(it) / total * 100).toFixed(1)} %</td>
+      </tr>`;
+  }).join("");
+  return `
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head">
+        <h3>${escapeHtml(titulo)} — ${fmtKg(total)} kg</h3>
+        <button class="btn-link strong" data-accion="cargar-tanque" data-i="${indice}">Cargar en la tabla de arriba</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">Cantidad</th><th class="right">Kg</th><th class="right">% del tanque</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <div class="hint-line" style="margin:12px 20px 16px">${mezMetricasHtml(items, obj)}</div>
+    </div>`;
+}
+
+function mezRenderPlan() {
+  const p = mezPlanActual;
+  const cont = document.getElementById("mezPlan");
+  if (!p) { cont.innerHTML = ""; return; }
+  const obj = mezObjetivo();
+  const n = p.tanques.length;
+  const suma = (kgs) => kgs.reduce((a, v) => a + v, 0);
+  const usado = p.tanques.reduce((a, t) => a + suma(t), 0) + (p.parcial ? suma(p.parcial) : 0);
+  const disponible = usado + suma(p.sobrante);
+  let texto, tipo = "ok";
+  if (n === 0 && !p.parcial) {
+    tipo = "bad";
+    texto = `Con los lotes elegidos no es posible llenar un tanque de ${fmtKg(p.T)} kg cumpliendo los parámetros, con un máximo de ${MEZ_MAX_POR_TANQUE} lotes por tanque.`;
+  } else if (n === 0) {
+    tipo = "warn";
+    texto = `Los lotes elegidos no alcanzan para un tanque completo de ${fmtKg(p.T)} kg que cumpla los parámetros; con lo disponible se puede preparar un tanque parcial de ${fmtKg(suma(p.parcial))} kg.`;
+  } else {
+    texto = `Con los lotes elegidos se pueden llenar ${n} ${n === 1 ? "tanque" : "tanques"} de ${fmtKg(p.T)} kg que cumplen los parámetros${p.parcial ? `, más un tanque parcial de ${fmtKg(suma(p.parcial))} kg` : ""}. Se utilizan ${fmtKg(usado)} kg de los ${fmtKg(disponible)} kg disponibles.`;
+  }
+  let html = `<div class="msg ${tipo}" style="text-align:center">${escapeHtml(texto)}</div>`;
+  p.tanques.forEach((t, i) => { html += mezTanqueHtml(`Tanque ${i + 1}`, t, p.lotes, obj, i); });
+  if (p.parcial) html += mezTanqueHtml(`Tanque ${n + 1} (parcial)`, p.parcial, p.lotes, obj, n);
+  const sobrantes = p.lotes.map((l, i) => ({ l, kg: p.sobrante[i] })).filter((s) => s.kg > 0);
+  if (sobrantes.length) {
+    html += `
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-head"><h3>Saldo que no se utiliza en el plan</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">Sobrante</th></tr></thead>
+            <tbody>${sobrantes.map((s) => `
+              <tr>
+                <td class="strong num">#${s.l.numero}</td>
+                <td>${escapeHtml(s.l.proveedor)}</td>
+                <td><span class="tag">${tagAlmacen(s.l.tipo_almacen)}</span></td>
+                <td class="right num">${fmtKg(s.kg)} kg${mezEsBines(s.l) ? `<div class="num-sub">${fmtInt(Math.round(s.kg / mezKgPorBin(s.l)))} bines</div>` : ""}</td>
+              </tr>`).join("")}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+  cont.innerHTML = html;
+}
+
+function mezLimpiarPlan() {
+  mezPlanActual = null;
+  document.getElementById("mezPlan").innerHTML = "";
+}
+
+function mezCargarTanque(indice) {
+  const p = mezPlanActual;
+  if (!p) return;
+  const kgs = indice < p.tanques.length ? p.tanques[indice] : p.parcial;
+  if (!kgs) return;
+  mezcla.forEach((it) => {
+    const j = p.lotes.findIndex((l) => l.numero === it.l.numero);
+    const kg = j >= 0 ? kgs[j] : 0;
+    it.cant = mezEsBines(it.l) ? Math.round(kg / mezKgPorBin(it.l)) : kg;
+  });
+  mezRenderTabla();
+  mezTabla.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function mezCalcularPlan() {
   mezAviso("");
-  mezSugerencia.innerHTML = "";
   const o = mezObjetivo();
   if (!(o.brixMin > 0 && o.ratioMin > 0 && o.acidezMax > 0)) {
     mezAviso("Ingrese el Brix mínimo, el Ratio mínimo y la acidez máxima en la sección anterior.");
     return;
   }
-  if (!mezcla.length) { mezAviso("Agregue al menos un lote para calcular las cantidades."); return; }
-  if (mezcla.length > MEZ_MAX_SUGERIR) { mezAviso(`Para calcular cantidades elija como máximo ${MEZ_MAX_SUGERIR} lotes.`); return; }
-  const pedidos = Number(mezKgTotal.value) > 0 ? Number(mezKgTotal.value) : null;
+  if (!mezcla.length) { mezAviso("Agregue al menos un lote para calcular el plan."); return; }
+  if (mezcla.length > MEZ_MAX_SUGERIR) { mezAviso(`Para calcular el plan elija como máximo ${MEZ_MAX_SUGERIR} lotes.`); return; }
+  const T = Number(mezKgTotal.value);
+  if (!(T > 0)) { mezAviso("Indique cuántos kg de materia prima entran en un tanque."); return; }
 
-  const r = mezOptimizar(mezcla.map((it) => it.l), o, pedidos);
-  if (!r.ok) {
-    mezSugerencia.innerHTML = `<div class="msg bad" style="margin-top:12px;text-align:center">${r.motivo === "bines"
-      ? "Con bines completos no se logra cumplir los parámetros. Ajuste las cantidades manualmente o agregue otros lotes."
-      : "Con los lotes elegidos no es posible cumplir los parámetros en ninguna proporción. Agregue lotes con mayor Brix o menor acidez."}</div>`;
-    return;
-  }
-  mezcla.forEach((it, i) => {
-    it.cant = mezEsBines(it.l) ? Math.round(r.kg[i] / mezKgPorBin(it.l)) : r.kg[i];
-  });
-  mezRenderTabla();
-  const m = mezCalcular(mezcla);
-  let texto;
-  if (pedidos && m.kg >= pedidos - 1) texto = `Es posible preparar los ${fmtKg(pedidos)} kg indicados dentro de los parámetros.`;
-  else if (pedidos) texto = `Con los lotes elegidos solo es posible preparar ${fmtKg(m.kg)} kg dentro de los parámetros (usted indicó ${fmtKg(pedidos)} kg).`;
-  else texto = `Con los lotes elegidos se pueden preparar como máximo ${fmtKg(m.kg)} kg cumpliendo los parámetros.`;
-  texto += " Las cantidades calculadas se aplicaron a la tabla y pueden ajustarse manualmente.";
-  if (r.redondeado) texto += " Los bines se ajustaron a unidades completas.";
-  mezSugerencia.innerHTML = `<div class="msg ok" style="margin-top:12px;text-align:center">${escapeHtml(texto)}</div>`;
+  const btn = document.getElementById("btnMezSugerir");
+  btn.disabled = true;
+  document.getElementById("mezPlan").innerHTML = '<div class="empty" style="padding:20px;text-align:center">Calculando…</div>';
+  // se cede el hilo un instante para que se pinte el "Calculando…"
+  setTimeout(() => {
+    try {
+      const lotes = mezcla.map((it) => it.l);
+      const plan = mezPlanTanques(lotes, o, T);
+      mezPlanActual = { lotes, ...plan, T };
+      mezRenderPlan();
+    } catch (e) {
+      document.getElementById("mezPlan").innerHTML = "";
+      mezAviso(`No se pudo calcular el plan: ${e.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  }, 30);
 }
 
 document.getElementById("btnMezAgregar").addEventListener("click", mezAgregar);
-document.getElementById("btnMezSugerir").addEventListener("click", mezSugerir);
+document.getElementById("btnMezSugerir").addEventListener("click", mezCalcularPlan);
+document.getElementById("mezPlan").addEventListener("click", (ev) => {
+  const btn = ev.target.closest('button[data-accion="cargar-tanque"]');
+  if (btn) mezCargarTanque(Number(btn.dataset.i));
+});
 document.getElementById("btnMezLimpiar").addEventListener("click", () => {
   mezcla = [];
   mezAviso("");
-  mezSugerencia.innerHTML = "";
+  mezLimpiarPlan();
   mezRenderTabla();
 });
 // al elegir una opción de la lista desplegable se agrega sola; al tipear a
@@ -745,18 +917,17 @@ mezTabla.addEventListener("input", (ev) => {
   const it = mezcla[Number(inp.dataset.i)];
   if (!it) return;
   it.cant = Math.max(Number(inp.value) || 0, 0);
-  mezSugerencia.innerHTML = "";
   mezActualizarResumen();
 });
 mezTabla.addEventListener("click", (ev) => {
   const btn = ev.target.closest('button[data-accion="quitar"]');
   if (!btn) return;
   mezcla.splice(Number(btn.dataset.i), 1);
-  mezSugerencia.innerHTML = "";
+  mezLimpiarPlan();
   mezRenderTabla();
 });
 ["brixMin", "ratioMin", "acidezMax"].forEach((id) => {
-  document.getElementById(id).addEventListener("input", () => { mezTextoObjetivo(); mezActualizarResumen(); });
+  document.getElementById(id).addEventListener("input", () => { mezTextoObjetivo(); mezActualizarResumen(); mezLimpiarPlan(); });
 });
 mezTextoObjetivo();
 mezRenderTabla();
