@@ -106,10 +106,15 @@
   <section style="margin-top:40px">
     <div class="section-head">
       <h2>Mezcla de lotes — silos y bines</h2>
-      <span class="hint">evalúa si una combinación alcanza el Brix, el Ratio y la acidez requeridos</span>
+      <span class="hint">compruebe si una combinación de lotes cumple el Brix, el Ratio y la acidez requeridos</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="form-body">
+        <ol style="margin:0 0 12px;padding-left:20px;font-size:13px;line-height:1.6;color:var(--text-2)">
+          <li>Agregue los lotes que desea mezclar (silos y bines).</li>
+          <li>Indique cuántos kg (silos) o cuántos bines (bines) tomará de cada uno; la tabla le muestra si la mezcla cumple los parámetros.</li>
+          <li>Si no sabe qué cantidades usar, pulse «Calcular cantidades»: el sistema determina cuánto tomar de cada lote para cumplir los parámetros.</li>
+        </ol>
         <div class="hint-line" id="mezObjetivo" style="margin-bottom:12px"></div>
         <div class="two-col">
           <div class="field">
@@ -118,13 +123,14 @@
             <datalist id="mezLotesLista"></datalist>
           </div>
           <div class="field">
-            <label for="mezKgTotal">Kg totales de la mezcla (opcional)</label>
-            <input type="number" id="mezKgTotal" min="0" step="100" placeholder="Para sugerir proporciones">
+            <label for="mezKgTotal">Cantidad que desea preparar, en kg (opcional)</label>
+            <input type="number" id="mezKgTotal" min="0" step="100" placeholder="Ej. 30000">
+            <div class="hint-line" style="margin-top:4px">Solo se usa al calcular cantidades. Si lo deja vacío, se calcula la mayor cantidad posible.</div>
           </div>
         </div>
         <div id="mezMensaje"></div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;align-items:center">
-          <button class="btn" id="btnMezSugerir" style="width:auto;padding:11px 22px">Sugerir proporciones</button>
+          <button class="btn" id="btnMezSugerir" style="width:auto;padding:11px 22px">Calcular cantidades</button>
           <button class="btn-link strong" id="btnMezAgregar">+ Agregar lote</button>
           <button class="btn-link" id="btnMezLimpiar">Limpiar mezcla</button>
         </div>
@@ -694,8 +700,8 @@ function mezSugerir() {
     mezAviso("Ingrese el Brix mínimo, el Ratio mínimo y la acidez máxima en la sección anterior.");
     return;
   }
-  if (!mezcla.length) { mezAviso("Agregue al menos un lote para sugerir proporciones."); return; }
-  if (mezcla.length > MEZ_MAX_SUGERIR) { mezAviso(`Para sugerir proporciones elija como máximo ${MEZ_MAX_SUGERIR} lotes.`); return; }
+  if (!mezcla.length) { mezAviso("Agregue al menos un lote para calcular las cantidades."); return; }
+  if (mezcla.length > MEZ_MAX_SUGERIR) { mezAviso(`Para calcular cantidades elija como máximo ${MEZ_MAX_SUGERIR} lotes.`); return; }
   const pedidos = Number(mezKgTotal.value) > 0 ? Number(mezKgTotal.value) : null;
 
   const r = mezOptimizar(mezcla.map((it) => it.l), o, pedidos);
@@ -711,10 +717,10 @@ function mezSugerir() {
   mezRenderTabla();
   const m = mezCalcular(mezcla);
   let texto;
-  if (pedidos && m.kg >= pedidos - 1) texto = `Es posible preparar los ${fmtKg(pedidos)} kg solicitados dentro de los parámetros.`;
-  else if (pedidos) texto = `Con los lotes elegidos solo es posible preparar ${fmtKg(m.kg)} kg dentro de los parámetros (se solicitaron ${fmtKg(pedidos)} kg).`;
-  else texto = `La mayor cantidad que cumple los parámetros con los lotes elegidos es de ${fmtKg(m.kg)} kg.`;
-  texto += " Las cantidades sugeridas se aplicaron a la tabla y pueden ajustarse manualmente.";
+  if (pedidos && m.kg >= pedidos - 1) texto = `Es posible preparar los ${fmtKg(pedidos)} kg indicados dentro de los parámetros.`;
+  else if (pedidos) texto = `Con los lotes elegidos solo es posible preparar ${fmtKg(m.kg)} kg dentro de los parámetros (usted indicó ${fmtKg(pedidos)} kg).`;
+  else texto = `Con los lotes elegidos se pueden preparar como máximo ${fmtKg(m.kg)} kg cumpliendo los parámetros.`;
+  texto += " Las cantidades calculadas se aplicaron a la tabla y pueden ajustarse manualmente.";
   if (r.redondeado) texto += " Los bines se ajustaron a unidades completas.";
   mezSugerencia.innerHTML = `<div class="msg ok" style="margin-top:12px;text-align:center">${escapeHtml(texto)}</div>`;
 }
