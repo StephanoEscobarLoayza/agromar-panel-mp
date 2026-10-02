@@ -239,13 +239,13 @@ function bloqueHistorial(historial) {
 
 function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   if (!r.tiene_registros) {
-    return `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Todavía no hay consumo registrado para "${escapeHtml(r.corrida_nombre)}" — registra lo que ya se metió en "Registrar consumo" antes de calcular el siguiente bin.</div></div>`;
+    return `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px;text-align:center">Todavía no hay consumo registrado para "${escapeHtml(r.corrida_nombre)}" — registra lo que ya se metió en "Registrar consumo" antes de calcular el siguiente bin.</div></div>`;
   }
 
   if (r.sin_kg_confirmado) {
     return `
       <div class="panel" style="margin-top:0">
-        <div class="msg warn" style="margin:16px 20px 0">No hay ningún lote con saldo alimentando "${escapeHtml(r.corrida_nombre)}" ahora mismo — en cuanto registres uno nuevo en "Registrar consumo" (aunque sea con kg pendiente), aquí se puede calcular.</div>
+        <div class="msg warn" style="margin:16px 20px;text-align:center">No hay ningún lote con saldo alimentando "${escapeHtml(r.corrida_nombre)}" ahora mismo — en cuanto registres uno nuevo en "Registrar consumo" (aunque sea con kg pendiente), aquí se puede calcular.</div>
         ${bloqueHistorial(r.historial)}
       </div>
     `;
@@ -270,22 +270,22 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   const metaTexto = `Brix ≥ ${brixMin}, Ratio ≥ ${ratioMin} y Acidez ≤ ${acidezMax}`;
   if (r.cumplido_ya) {
     if (n === 0) {
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Se cumple ${metaTexto} con el tanque actual — no hay bines en espera disponibles para reponer.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Se cumple ${metaTexto} con el tanque actual — no hay bines en espera disponibles para reponer.</div>`;
     } else if (r.cumplido) {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Ya se cumple ${metaTexto}. Al reponer ${refBin}, la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo pedido.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Ya se cumple ${metaTexto}. Al reponer ${refBin}, la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo pedido.</div>`;
     } else {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px 0">⚠ Se cumple ${metaTexto} ahora, pero al reponer ${refBin} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo pedido${porCalidad ? " — ni eligiendo el mejor disponible se mantiene" : ""}.</div>`;
+      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px;text-align:center">⚠ Se cumple ${metaTexto} ahora, pero al reponer ${refBin} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo pedido${porCalidad ? " — ni eligiendo el mejor disponible se mantiene" : ""}.</div>`;
     }
   } else if (r.cumplido) {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px 0">✓ Agregando ${refBin} se alcanza ${metaTexto} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
+    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Agregando ${refBin} se alcanza ${metaTexto} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   } else if (n === 0) {
-    mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px 0">No hay lotes de bines en espera disponibles para reponer.</div>';
+    mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px;text-align:center">No hay lotes de bines en espera disponibles para reponer.</div>';
   } else {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px 0">✕ No se alcanza ${metaTexto} ni agregando ${refBin} — lo más cerca posible es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
+    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px;text-align:center">✕ No se alcanza ${metaTexto} ni agregando ${refBin} — lo más cerca posible es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   }
 
   return `
@@ -314,7 +314,7 @@ async function calcularSiguienteBin() {
   const ratioMin = Number(document.getElementById("ratioMin").value);
   const acidezMax = Number(document.getElementById("acidezMax").value);
   if (!brixMin || !ratioMin || !acidezMax) {
-    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">Ingresa un Brix mínimo, Ratio mínimo y Acidez máximo mayores a 0 arriba.</div></div>';
+    resultadoSiguienteBin.innerHTML = '<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px;text-align:center">Ingresa un Brix mínimo, Ratio mínimo y Acidez máximo mayores a 0 arriba.</div></div>';
     return;
   }
 
@@ -327,7 +327,7 @@ async function calcularSiguienteBin() {
     const r = await apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=${brixMin}&ratio_min=${ratioMin}&acidez_max=${acidezMax}&modo=${modo}&n_bines=${nBines}`);
     resultadoSiguienteBin.innerHTML = bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax);
   } catch (e) {
-    resultadoSiguienteBin.innerHTML = `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px 0">${escapeHtml(e.message)}</div></div>`;
+    resultadoSiguienteBin.innerHTML = `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px;text-align:center">${escapeHtml(e.message)}</div></div>`;
   } finally {
     btnSiguienteBin.disabled = false;
   }
