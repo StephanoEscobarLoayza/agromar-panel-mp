@@ -45,6 +45,15 @@
   .lista-check .check-fila.deshab:hover{background:none}
   .lista-check .check-fila .nom{font-weight:600;flex:1;min-width:0}
   .lista-check .check-fila .meta{font-size:12px;color:var(--text-muted);white-space:nowrap}
+  .pill-btn{border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;text-align:left;line-height:1.3;white-space:normal;width:max-content;max-width:196px;border-radius:12px;padding:5px 11px}
+  .pill-btn:hover{box-shadow:0 0 0 1px var(--citrus)}
+  .pill-btn .caret{font-size:9px;opacity:.65}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1000;max-width:min(92vw,520px);box-shadow:var(--shadow-lg);display:none;text-align:center}
+  .opcion-motivo{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:var(--text)}
+  .opcion-motivo:hover{border-color:var(--citrus)}
+  .opcion-motivo.activa{border-color:var(--forest-2);background:var(--forest-tint)}
+  .opcion-motivo strong{display:block;font-size:14px}
+  .opcion-motivo span{display:block;font-size:12.5px;color:var(--text-2);margin-top:2px;line-height:1.4}
   @media (max-width:760px){ .flow{grid-template-columns:1fr} }
 </style>
 </head>
@@ -305,7 +314,25 @@ let barriles = [], precamara = [], corridasDisp = [], transformaciones = [];
 let ultimoCilindro = 0;
 let cilFiltro = "", cilLimite = 100, barFiltro = "", barLimite = 60;
 
+let _temporizadorAviso = null;
+function toast(texto, tipo) {
+  let el = document.getElementById("toast");
+  if (!el) { el = document.createElement("div"); el.id = "toast"; document.body.appendChild(el); }
+  el.className = "msg " + (tipo || "bad");
+  el.textContent = texto;
+  el.style.display = "block";
+  clearTimeout(_temporizadorAviso);
+  _temporizadorAviso = setTimeout(() => { el.style.display = "none"; }, tipo === "ok" ? 3500 : 8000);
+}
+// si el servidor que responde aún tiene la versión anterior, el error crudo («Method Not Allowed») no se entiende
+function textoError(e) {
+  const m = String((e && e.message) || e);
+  return /Method Not Allowed|Not Found/i.test(m)
+    ? "El servidor que respondió todavía no tiene esta función. Actualice el servidor (git pull) y reinícielo."
+    : m;
+}
 function aviso(id, texto, tipo) {
+  if (id === "mensajeGlobal") { if (texto) toast(texto, tipo); return; }
   document.getElementById(id).innerHTML = texto ? `<div class="msg ${tipo || "bad"}">${escapeHtml(texto)}</div>` : "";
 }
 
@@ -375,6 +402,44 @@ function renderGrafico() {
   wrap.onmouseleave = () => { tip.style.opacity = 0; };
 }
 
+// ---------- motivo de una diferencia de MP ----------
+// Devuelve "descuento", "precc", "" (quitar la marca) o null (cancelar).
+function elegirMotivo(r) {
+  return new Promise((resolve) => {
+    const dif = Math.abs(r.diferencia_kg);
+    const actual = r.diferencia_motivo ? r.diferencia_motivo.toLowerCase() : null;     // resalta el motivo vigente (manual o detectado)
+    const opcion = (valor, titulo, detalle) =>
+      `<button type="button" class="opcion-motivo${actual === valor || (valor === "" && !r.diferencia_motivo) ? " activa" : ""}" data-v="${valor}"><strong>${titulo}</strong><span>${detalle}</span></button>`;
+    const auto = r.diferencia_motivo && !r.motivo_manual
+      ? `<p style="margin:0 0 12px;font-size:12.5px;color:var(--text-2)">Este motivo se detectó automáticamente (${r.diferencia_motivo === "PRECC" ? "coincide con el PRE CC aplicado" : "los consumos llevan % de descuento"}).</p>` : "";
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px";
+    overlay.innerHTML = `
+      <div class="panel" style="max-width:440px;width:100%;margin:0">
+        <div class="form-body">
+          <div>
+            <div style="font-weight:600;font-size:15px">Diferencia del ${fmtF(r.fecha)}</div>
+            <p style="margin:6px 0 0;font-size:13px;color:var(--text-2);line-height:1.5">El Excel de emulsión declara ${fmtKg(r.mp_manual_kg)} kg y las corridas suman ${fmtKg(r.mp_corridas_kg)} kg: ${fmtKg(dif)} kg de diferencia. ¿A qué se debe?</p>
+          </div>
+          ${auto}
+          <div>
+            ${opcion("descuento", "Descuento", "Se aplicó un porcentaje de descuento por Brix a algún lote.")}
+            ${opcion("precc", "PRE CC", `Se aplicó PRE CC como MP; es producto y no pasa por extracción.${r.precc_kg > 0 ? ` En estas corridas: ${fmtKg(r.precc_kg)} kg.` : ""}`)}
+            ${opcion("", "Sin motivo", "Quitar la marca; la diferencia queda sin explicar.")}
+          </div>
+          <div style="text-align:right"><button type="button" class="btn-link" data-v="__cancelar" style="padding:6px 4px">Cancelar</button></div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cerrar = (v) => { overlay.remove(); resolve(v); };
+    overlay.addEventListener("click", (ev) => {
+      if (ev.target === overlay) return cerrar(null);
+      const b = ev.target.closest("[data-v]");
+      if (b) cerrar(b.dataset.v === "__cancelar" ? null : b.dataset.v);
+    });
+  });
+}
+
 // ---------- resumen por corrida ----------
 const ESTADO_REG = { PRECAMARA: pill("warn", "Precámara"), PARCIAL: pill("warn", "Parcial"), TRANSFORMADO: pill("ok", "Transformado") };
 function renderResumen() {
@@ -388,17 +453,15 @@ function renderResumen() {
     let cuadre;
     if (dif === null) cuadre = r.corridas.length ? pill("ok", "Vinculado") : '<span class="hint-line">—</span>';
     else if (Math.abs(dif) <= 5) cuadre = pill("ok", "✓ Cuadra");
-    else if (r.diferencia_motivo) {
-      const porPrecc = r.diferencia_motivo === "PRECC";
-      cuadre = `<span class="pill neutral" title="${porPrecc ? "El PRE CC es producto: se aplica como MP en el panel pero no pasa por extracción, por eso no genera emulsión" : "El Excel y el panel difieren porque se aplicó un descuento"}">Diferencia de ${fmtKg(Math.abs(dif))} kg por ${porPrecc ? "PRE CC" : "descuento"}</span>`
-        + (r.motivo_manual ? `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="">Quitar marca</button></div>` : "");
-    } else {
-      cuadre = pill("warn", `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`)
-        + `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="descuento">Marcar por descuento</button>`
-        + (r.precc_kg > 0 ? ` <button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="precc">Marcar por PRE CC</button>` : "") + `</div>`;
+    else {
+      const motivo = r.diferencia_motivo;
+      const etiqueta = motivo
+        ? `Diferencia de ${fmtKg(Math.abs(dif))} kg por ${motivo === "PRECC" ? "PRE CC" : "descuento"}`
+        : `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`;
+      cuadre = `<button type="button" class="pill ${motivo ? "neutral" : "warn"} pill-btn" data-accion="motivo" data-id="${r.id}" title="Pulse para indicar o cambiar el motivo de la diferencia">${etiqueta}<span class="caret">▾</span></button>`;
     }
     const mpSub = dif !== null && Math.abs(dif) > 5 ? `<div class="num-sub">corridas: ${fmtKg(r.mp_corridas_kg)}</div>` : "";
-    const aceiteSub = r.conversion !== null ? `<div class="num-sub">${(r.conversion * 100).toFixed(1)} % de conversión</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">parcial</div>' : "");
+    const aceiteSub = r.conversion !== null ? `<div class="num-sub" title="Aceite obtenido sobre la emulsión transformada">${(r.conversion * 100).toFixed(1)} % conv.</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">parcial</div>' : "");
     const eliminar = r.estado === "PRECAMARA"
       ? `<button class="btn-link btn-link-bad" data-accion="eliminar-registro" data-id="${r.id}" title="Eliminar este registro de emulsión">✕</button>` : "";
     return `<tr>
@@ -416,15 +479,27 @@ function renderResumen() {
 document.getElementById("tbResumen").addEventListener("click", async (ev) => {
   const m = ev.target.closest('[data-accion="motivo"]');
   if (m) {
-    try { await apiPost(`/api/emulsion/registros/${m.dataset.id}`, { diferencia_motivo: m.dataset.motivo }); await recargar(); }
-    catch (e) { aviso("mensajeGlobal", e.message); }
+    const r = datos.registros.find((x) => x.id === Number(m.dataset.id));
+    if (!r) return;
+    const eleccion = await elegirMotivo(r);
+    if (eleccion === null) return;
+    m.disabled = true; m.style.opacity = ".55";
+    try {
+      await apiPost(`/api/emulsion/registros/${r.id}`, { diferencia_motivo: eleccion });
+      // se actualiza la fila al instante, sin volver a pedir todos los datos
+      r.motivo_manual = eleccion !== "";
+      r.diferencia_motivo = eleccion ? eleccion.toUpperCase()
+        : (r.descuento_kg > 0 ? "DESCUENTO" : (r.precc_kg > 0 && Math.abs(r.diferencia_kg - r.precc_kg) <= 5 ? "PRECC" : null));
+      renderResumen();
+      toast("El motivo de la diferencia fue guardado.", "ok");
+    } catch (e) { m.disabled = false; m.style.opacity = ""; toast(textoError(e)); }
     return;
   }
   const b = ev.target.closest('[data-accion="eliminar-registro"]');
   if (!b) return;
   if (!(await confirmar("¿Eliminar este registro de emulsión y todos sus cilindros? Esta acción no se puede deshacer."))) return;
   try { await apiDelete(`/api/emulsion/registros/${b.dataset.id}`); await recargar(); aviso("mensajeGlobal", "El registro de emulsión fue eliminado.", "ok"); }
-  catch (e) { aviso("mensajeGlobal", e.message); }
+  catch (e) { toast(textoError(e)); }
 });
 
 // ---------- cilindros de emulsión ----------
@@ -652,7 +727,7 @@ document.getElementById("tbTransformaciones").addEventListener("click", async (e
   if (!b) return;
   if (!(await confirmar("¿Deshacer la última transformación? Sus cilindros volverán a precámara y se quitará el aceite de los barriles."))) return;
   try { await apiDelete(`/api/aceite/transformaciones/${b.dataset.id}`); await recargar(); aviso("mensajeGlobal", "La transformación fue deshecha.", "ok"); }
-  catch (e) { aviso("mensajeGlobal", e.message); }
+  catch (e) { toast(textoError(e)); }
 });
 
 // ---------- carga general ----------
