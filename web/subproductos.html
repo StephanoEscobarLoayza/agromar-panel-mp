@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Subproductos · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="style.css">
+<style>
+  .vista input[type="checkbox"]{width:16px;height:16px;padding:0;accent-color:var(--forest-2);cursor:pointer;flex-shrink:0}
+  .tabs-vista{display:flex;gap:8px;flex-wrap:wrap;margin:28px 0 22px}
+  .vista{display:none}
+  .vista.activa{display:block}
+  .sub-note{font-size:12.5px;color:var(--text-muted);margin-top:12px;line-height:1.55}
+  .chips-mini{display:flex;gap:4px;flex-wrap:wrap}
+  .table-wrap .tag{white-space:nowrap}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .toolbar .chips{margin:0}
+  .btn-ghost{display:inline-block;background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none}
+  .btn-ghost:hover{border-color:var(--citrus);color:var(--citrus)}
+  select.sel-ubic{width:auto;padding:5px 8px;font-size:12.5px}
+  .origen-linea{font-size:12.5px;white-space:nowrap}
+  .origen-linea .num-sub{display:inline}
+  /* gráfico de rendimiento */
+  .chart-wrap{position:relative;padding:8px 20px 18px}
+  .chart-wrap svg{display:block;width:100%;height:auto;overflow:visible}
+  .chart-wrap .gridline{stroke:var(--border);stroke-width:1}
+  .chart-wrap .axis-label{fill:var(--text-muted);font-size:11px;font-family:'Public Sans',sans-serif}
+  .chart-wrap .bar{fill:var(--forest-2);opacity:.85;transition:opacity .12s}
+  .chart-wrap .bar:hover{opacity:1;fill:var(--citrus)}
+  .chart-wrap .avg{stroke:var(--text-2);stroke-width:1.5;stroke-dasharray:5 4}
+  .chart-wrap .avg-label{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round;fill:var(--text-2);font-size:11.5px;font-weight:600;font-family:'Public Sans',sans-serif}
+  .tip{position:absolute;pointer-events:none;background:var(--forest);color:#F4EFE0;font-size:12px;padding:7px 10px;border-radius:8px;box-shadow:var(--shadow-lg);white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5}
+  .tip b{color:var(--citrus-light)}
+  /* formularios de registro */
+  .flow{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  .lista-check{border:1px solid var(--border);border-radius:10px;max-height:230px;overflow:auto;background:var(--surface)}
+  .lista-check .check-fila{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)}
+  .lista-check .check-fila:last-child{border-bottom:none}
+  .lista-check .check-fila:hover{background:var(--forest-tint)}
+  .lista-check .check-fila.deshab{cursor:default;color:var(--text-muted)}
+  .lista-check .check-fila.deshab:hover{background:none}
+  .lista-check .check-fila .nom{font-weight:600;flex:1;min-width:0}
+  .lista-check .check-fila .meta{font-size:12px;color:var(--text-muted);white-space:nowrap}
+  @media (max-width:760px){ .flow{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <button type="button" class="nav-dropdown-btn" data-menu="menuRegistro">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2.3" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="2.3" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Registro
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuCalidad">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Calidad
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn active" data-menu="menuSubproductos">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.2c2.6 3.1 4.4 5.4 4.4 7.7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.8-4.6 4.4-7.7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Subproductos
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuParadas">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Paradas
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Subproductos</h1>
+    <p class="hero-sub">Seguimiento de la emulsión y del aceite de naranja orgánica, desde la corrida de origen hasta el barril almacenado.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="kpis" id="kpis"><div class="empty">Cargando…</div></div>
+
+  <div class="tabs-vista chips" id="tabsVista">
+    <button type="button" class="chip-filter active" data-vista="resumen">Resumen por corrida</button>
+    <button type="button" class="chip-filter" data-vista="emulsion">Cilindros de emulsión</button>
+    <button type="button" class="chip-filter" data-vista="aceite">Barriles de aceite</button>
+    <button type="button" class="chip-filter" data-vista="registrar">Registrar</button>
+  </div>
+
+  <div id="mensajeGlobal"></div>
+
+  <!-- ============ RESUMEN POR CORRIDA ============ -->
+  <section class="vista activa" id="vista-resumen">
+    <div class="section-head">
+      <h2>Rendimiento de aceite</h2>
+      <span class="hint">kg de aceite por tonelada de materia prima procesada</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="chart-wrap" id="chartWrap"><div class="tip" id="tip"></div></div>
+    </div>
+    <div class="sub-note">Cada barra corresponde a una corrida con todos sus cilindros transformados. La línea punteada indica el promedio de la campaña.</div>
+
+    <div class="section-head" style="margin-top:36px">
+      <h2>Producción por corrida</h2>
+      <span class="hint">las corridas y la materia prima se toman de «Registrar consumo»</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="table-wrap">
+        <table class="tabla-compacta">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Corridas de origen</th><th class="right">MP procesada</th><th>Cuadre</th>
+              <th class="right">Emulsión (kg)</th><th class="right">Aceite (kg)</th>
+              <th class="right">Aceite / t MP</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbResumen"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="sub-note">La MP procesada se obtiene de las corridas vinculadas. La columna «Cuadre» compara esa suma con la MP declarada por la planta y señala cualquier diferencia. Cuando una corrida deja aceite pendiente de completar un barril, ese saldo se asigna a la corrida siguiente.</div>
+  </section>
+
+  <!-- ============ CILINDROS DE EMULSION ============ -->
+  <section class="vista" id="vista-emulsion">
+    <div class="section-head">
+      <h2>Cilindros de emulsión</h2>
+      <span class="hint">código correlativo EORG-2026-N</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="toolbar">
+        <div class="chips" id="chipsEmu">
+          <button type="button" class="chip-filter active" data-f="">Todos</button>
+          <button type="button" class="chip-filter" data-f="PRECAMARA">En precámara</button>
+          <button type="button" class="chip-filter" data-f="PROCESADO">Procesado</button>
+        </div>
+        <span class="hint-line" id="notaEmu"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="tabla-compacta">
+          <thead>
+            <tr><th>Código</th><th>Fecha de emulsión</th><th>Corridas de origen</th><th class="right">Peso neto (kg)</th><th>Estado</th><th>Transformado a aceite</th></tr>
+          </thead>
+          <tbody id="tbEmulsion"></tbody>
+        </table>
+      </div>
+      <div id="masEmulsion" style="padding:12px 20px;text-align:center"></div>
+    </div>
+    <div class="sub-note">Un cilindro pasa de «Precámara» a «Procesado» cuando se incluye en una transformación a aceite; allí queda registrada la fecha de la transformación.</div>
+  </section>
+
+  <!-- ============ BARRILES DE ACEITE ============ -->
+  <section class="vista" id="vista-aceite">
+    <div class="section-head">
+      <h2>Barriles de aceite</h2>
+      <span class="hint">seguimiento por número de cilindro, con su origen y ubicación</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="toolbar">
+        <div class="chips" id="chipsUbic"></div>
+        <a class="btn-ghost" href="/api/subproductos/export.xlsx" download>Descargar Excel</a>
+      </div>
+      <div class="table-wrap">
+        <table class="tabla-compacta">
+          <thead>
+            <tr>
+              <th>N.º</th><th>Código</th><th class="right">Aceite (kg)</th><th>Origen del aceite</th>
+              <th>Trazabilidad</th><th>Ubicación</th><th>Nisira</th>
+            </tr>
+          </thead>
+          <tbody id="tbBarriles"></tbody>
+        </table>
+      </div>
+      <div id="masBarriles" style="padding:12px 20px;text-align:center"></div>
+    </div>
+    <div class="sub-note">Los barriles se llenan en orden hasta 183 kg. Cuando una transformación deja un saldo, el barril queda abierto y la siguiente lo completa; el sistema conserva cuántos kg aportó cada corrida y marca el barril como mezcla cuando su aceite proviene de más de una.</div>
+  </section>
+
+  <!-- ============ REGISTRAR ============ -->
+  <section class="vista" id="vista-registrar">
+    <div class="section-head">
+      <h2>Registrar producción</h2>
+      <span class="hint">emulsión y transformación a aceite</span>
+    </div>
+    <div class="flow">
+      <div class="panel" style="margin-top:0">
+        <div class="panel-head"><h3>1. Emulsión</h3></div>
+        <div class="form-body">
+          <div class="field">
+            <label for="emuFecha">Fecha de emulsión</label>
+            <input type="date" id="emuFecha">
+          </div>
+          <div class="field">
+            <label>Corridas de origen</label>
+            <div class="lista-check" id="emuCorridas"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
+          </div>
+          <div class="field">
+            <label for="emuMpManual">MP procesada (kg) <span class="hint-line">— solo si no hay corridas del panel</span></label>
+            <input type="number" id="emuMpManual" min="0" step="1" inputmode="decimal" placeholder="Ej. 132550">
+          </div>
+          <div class="two-col">
+            <div class="field"><label for="emuN">N.º de cilindros</label><input type="number" id="emuN" min="1" max="60" step="1" inputmode="numeric"></div>
+            <div class="field"><label for="emuPeso">Peso neto total (kg)</label><input type="number" id="emuPeso" min="0" step="0.01" inputmode="decimal"></div>
+          </div>
+          <div class="lookup" id="emuResumen"></div>
+          <div id="emuMensaje"></div>
+          <button class="btn" id="btnEmulsion" style="width:auto;padding:11px 22px;align-self:flex-start">Registrar emulsión</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:0">
+        <div class="panel-head"><h3>2. Transformación a aceite</h3></div>
+        <div class="form-body">
+          <div class="two-col">
+            <div class="field"><label for="trFecha">Fecha de transformación</label><input type="date" id="trFecha"></div>
+            <div class="field"><label for="trAceite">Aceite obtenido (kg)</label><input type="number" id="trAceite" min="0" step="0.01" inputmode="decimal"></div>
+          </div>
+          <div class="field">
+            <label>Cilindros de emulsión que se transforman
+              <button type="button" class="btn-link" id="trTodos" style="margin-left:8px">Seleccionar todos</button>
+              <button type="button" class="btn-link" id="trNinguno" style="margin-left:6px">Ninguno</button>
+            </label>
+            <div class="lista-check" id="trCilindros"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
+          </div>
+          <div class="lookup" id="trResumen"></div>
+          <div id="trMensaje"></div>
+          <button class="btn" id="btnTransformacion" style="width:auto;padding:11px 22px;align-self:flex-start">Registrar aceite</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:36px">
+      <h2>Últimas transformaciones</h2>
+      <span class="hint">solo se puede deshacer la más reciente</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="table-wrap">
+        <table class="tabla-compacta">
+          <thead><tr><th>Fecha</th><th class="right">Cilindros</th><th class="right">Emulsión (kg)</th><th class="right">Aceite (kg)</th><th class="right">Conversión</th><th></th></tr></thead>
+          <tbody id="tbTransformaciones"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<div class="nav-dropdown-menu" id="menuRegistro" hidden>
+  <a href="tablero.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 15.5h5M9 12.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tablero</a>
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+  <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+  <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+  <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+  <a href="trazabilidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="7.8" cy="7.8" r="4.8" stroke="currentColor" stroke-width="1.5"/><path d="M11.5 11.5L15.5 15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Trazabilidad de lote</a>
+  <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
+</div>
+<div class="nav-dropdown-menu" id="menuCalidad" hidden>
+  <a href="calidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Siguiente bin</a>
+  <a href="mediciones.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.5v4M6 3.2l1 3.6M12 3.2l-1 3.6M6 6.5h6l1.3 8a1.5 1.5 0 0 1-1.5 1.8H6.2A1.5 1.5 0 0 1 4.7 14.5Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Medición de tanques</a>
+</div>
+<div class="nav-dropdown-menu" id="menuSubproductos" hidden>
+  <a href="subproductos.html" class="active"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.2c2.6 3.1 4.4 5.4 4.4 7.7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.8-4.6 4.4-7.7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Emulsión y aceite</a>
+</div>
+<div class="nav-dropdown-menu" id="menuParadas" hidden>
+  <a href="paradas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Registrar paradas</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+const UBICACIONES = ["Extracción", "Precámara", "Reefer 2"];
+const PREFIJO = "EORG-2026-";
+
+const fmt2 = (n) => (n === null || n === undefined ? "—" : Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+function fmtF(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = String(iso).slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+const fmtDM = (iso) => fmtF(iso).slice(0, 5);
+const pill = (tipo, texto) => `<span class="pill ${tipo}">${texto}</span>`;
+const hoy = () => ahoraLocal().slice(0, 10);
+
+let datos = { kpis: null, registros: [] };
+let barriles = [], precamara = [], corridasDisp = [], transformaciones = [];
+let ultimoCilindro = 0;
+let cilFiltro = "", cilLimite = 100, barFiltro = "", barLimite = 60;
+
+function aviso(id, texto, tipo) {
+  document.getElementById(id).innerHTML = texto ? `<div class="msg ${tipo || "bad"}">${escapeHtml(texto)}</div>` : "";
+}
+
+// ---------- pestañas ----------
+function abrirVista(nombre) {
+  document.querySelectorAll("#tabsVista .chip-filter").forEach((x) => x.classList.toggle("active", x.dataset.vista === nombre));
+  document.querySelectorAll(".vista").forEach((s) => s.classList.toggle("activa", s.id === "vista-" + nombre));
+  try { history.replaceState(null, "", "#" + nombre); } catch (e) {}
+}
+document.getElementById("tabsVista").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-vista]");
+  if (b) abrirVista(b.dataset.vista);
+});
+
+// ---------- indicadores ----------
+function renderKpis() {
+  const k = datos.kpis;
+  const el = document.getElementById("kpis");
+  el.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Emulsión producida</div><div class="kpi-value num citrus">${fmtKg(k.emulsion_kg)} kg</div><div class="kpi-note">${fmtInt(k.n_cilindros)} cilindros · ${fmtInt(k.n_registros)} registros</div></div>
+    <div class="kpi"><div class="kpi-label">Aceite obtenido</div><div class="kpi-value num">${fmtKg(k.aceite_kg)} kg</div><div class="kpi-note">${fmtInt(k.n_barriles)} barriles</div></div>
+    <div class="kpi"><div class="kpi-label">Aceite por tonelada de MP</div><div class="kpi-value num">${k.aceite_por_t_mp === null ? "—" : fmt2(k.aceite_por_t_mp) + " kg"}</div><div class="kpi-note">promedio de las corridas transformadas</div></div>
+    <div class="kpi"><div class="kpi-label">Por transformar a aceite</div><div class="kpi-value num">${fmtKg(k.pendiente_kg)} kg</div><div class="kpi-note">${fmtInt(k.pendiente_cilindros)} cilindros en precámara</div></div>`;
+  ajustarKpiValues(el);
+}
+
+// ---------- gráfico de rendimiento ----------
+function renderGrafico() {
+  const wrap = document.getElementById("chartWrap");
+  wrap.querySelectorAll("svg").forEach((s) => s.remove());
+  const serie = datos.registros
+    .filter((r) => r.aceite_por_t_mp !== null)
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.id - b.id));
+  if (!serie.length) { wrap.insertAdjacentHTML("afterbegin", '<div class="empty" style="padding:20px">Aún no hay corridas con aceite para graficar.</div>'); return; }
+  const prom = datos.kpis.aceite_por_t_mp;
+  const W = 1000, H = 250, L = 34, R = 8, T = 14, B = 28;
+  let max = Math.ceil(Math.max(...serie.map((r) => r.aceite_por_t_mp), prom || 0)) + 1;
+  if (max % 2) max += 1;
+  const n = serie.length, paso = (W - L - R) / n, ancho = Math.max(paso * 0.62, 3);
+  const y = (v) => T + (H - T - B) * (1 - v / max);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kilos de aceite por tonelada de materia prima, por corrida">`;
+  for (let t = 0; t <= max; t += 2) {
+    s += `<line class="gridline" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis-label" x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`;
+  }
+  const cada = Math.max(1, Math.round(n / 9));
+  serie.forEach((r, i) => {
+    const x = L + paso * i + (paso - ancho) / 2, top = y(r.aceite_por_t_mp), rad = Math.min(4, ancho / 2);
+    s += `<path class="bar" data-i="${i}" d="M${x},${y(0)} V${top + rad} Q${x},${top} ${x + rad},${top} H${x + ancho - rad} Q${x + ancho},${top} ${x + ancho},${top + rad} V${y(0)} Z"/>`;
+    if (i % cada === 0) s += `<text class="axis-label" x="${x + ancho / 2}" y="${H - 8}" text-anchor="middle">${fmtDM(r.fecha)}</text>`;
+  });
+  if (prom) {
+    s += `<line class="avg" x1="${L}" x2="${W - R}" y1="${y(prom)}" y2="${y(prom)}"/>`;
+    s += `<text class="avg-label" x="${W - R}" y="${y(prom) - 6}" text-anchor="end">Promedio ${fmt2(prom)}</text>`;
+  }
+  wrap.insertAdjacentHTML("afterbegin", s + "</svg>");
+  const tip = document.getElementById("tip");
+  wrap.onmousemove = (ev) => {
+    const bar = ev.target.closest(".bar");
+    if (!bar) { tip.style.opacity = 0; return; }
+    const r = serie[Number(bar.dataset.i)];
+    const rect = wrap.getBoundingClientRect();
+    tip.innerHTML = `Corrida del ${fmtF(r.fecha)}<br><b>${fmt2(r.aceite_por_t_mp)} kg</b> de aceite por t de MP`;
+    tip.style.left = Math.min(ev.clientX - rect.left + 12, rect.width - 200) + "px";
+    tip.style.top = (ev.clientY - rect.top - 48) + "px";
+    tip.style.opacity = 1;
+  };
+  wrap.onmouseleave = () => { tip.style.opacity = 0; };
+}
+
+// ---------- resumen por corrida ----------
+const ESTADO_REG = { PRECAMARA: pill("warn", "Precámara"), PARCIAL: pill("warn", "Parcial"), TRANSFORMADO: pill("ok", "Transformado") };
+function renderResumen() {
+  const tb = document.getElementById("tbResumen");
+  if (!datos.registros.length) { tb.innerHTML = '<tr><td colspan="8" class="empty" style="text-align:center">Aún no hay registros de emulsión.</td></tr>'; return; }
+  tb.innerHTML = datos.registros.map((r) => {
+    const corr = r.corridas.length
+      ? `<div class="chips-mini">${r.corridas.map((c) => `<span class="tag">${escapeHtml(c.nombre)}</span>`).join("")}</div>`
+      : pill("neutral", "Sin vincular");
+    const dif = r.diferencia_kg;
+    let cuadre;
+    if (dif === null) cuadre = r.corridas.length ? pill("ok", "Vinculado") : '<span class="hint-line">—</span>';
+    else if (Math.abs(dif) <= 5) cuadre = pill("ok", "✓ Cuadra");
+    else cuadre = pill("warn", `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`);
+    const mpSub = dif !== null && Math.abs(dif) > 5 ? `<div class="num-sub">corridas: ${fmtKg(r.mp_corridas_kg)}</div>` : "";
+    const aceiteSub = r.conversion !== null ? `<div class="num-sub">${(r.conversion * 100).toFixed(1)} % de conversión</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">parcial</div>' : "");
+    const eliminar = r.estado === "PRECAMARA"
+      ? `<button class="btn-link btn-link-bad" data-accion="eliminar-registro" data-id="${r.id}" title="Eliminar este registro de emulsión">✕</button>` : "";
+    return `<tr>
+      <td class="strong num">${fmtF(r.fecha)}</td>
+      <td>${corr}</td>
+      <td class="right num">${r.mp_kg === null ? "—" : fmtKg(r.mp_kg)}${mpSub}</td>
+      <td>${cuadre}</td>
+      <td class="right num">${fmt2(r.emulsion_kg)}<div class="num-sub">${r.n_cilindros} cilindros</div></td>
+      <td class="right num">${r.aceite_kg === null ? "—" : fmt2(r.aceite_kg)}${aceiteSub}</td>
+      <td class="right num">${r.aceite_por_t_mp === null ? "—" : fmt2(r.aceite_por_t_mp)}</td>
+      <td style="white-space:nowrap">${ESTADO_REG[r.estado]} ${eliminar}</td>
+    </tr>`;
+  }).join("");
+}
+document.getElementById("tbResumen").addEventListener("click", async (ev) => {
+  const b = ev.target.closest('[data-accion="eliminar-registro"]');
+  if (!b) return;
+  if (!(await confirmar("¿Eliminar este registro de emulsión y todos sus cilindros? Esta acción no se puede deshacer."))) return;
+  try { await apiDelete(`/api/emulsion/registros/${b.dataset.id}`); await recargar(); aviso("mensajeGlobal", "El registro de emulsión fue eliminado.", "ok"); }
+  catch (e) { aviso("mensajeGlobal", e.message); }
+});
+
+// ---------- cilindros de emulsión ----------
+async function cargarCilindros(lista) {
+  if (!lista) lista = await apiGet(`/api/emulsion/cilindros?estado=${cilFiltro}&limite=${cilLimite}`);
+  const k = datos.kpis;
+  const total = cilFiltro === "PRECAMARA" ? k.pendiente_cilindros : cilFiltro === "PROCESADO" ? k.n_cilindros - k.pendiente_cilindros : k.n_cilindros;
+  document.getElementById("tbEmulsion").innerHTML = lista.length ? lista.map((c) => `<tr>
+      <td class="strong num">${c.codigo}</td>
+      <td class="num">${fmtF(c.fecha)}</td>
+      <td>${c.corridas.length ? `<div class="chips-mini">${c.corridas.map((n) => `<span class="tag">${escapeHtml(n)}</span>`).join("")}</div>` : pill("neutral", "Sin vincular")}</td>
+      <td class="right num">${c.peso_neto_kg === null ? '<span class="hint-line">pendiente</span>' : fmt2(c.peso_neto_kg)}</td>
+      <td>${c.estado === "PRECAMARA" ? pill("warn", "En precámara") : pill("ok", "Procesado")}</td>
+      <td class="num">${c.transformacion_fecha ? fmtF(c.transformacion_fecha) : '<span class="hint-line">—</span>'}</td>
+    </tr>`).join("") : '<tr><td colspan="6" class="empty" style="text-align:center">No hay cilindros en este estado.</td></tr>';
+  document.getElementById("notaEmu").textContent = `Se muestran ${fmtInt(lista.length)} de ${fmtInt(total)} cilindros`;
+  document.getElementById("masEmulsion").innerHTML = lista.length < total ? '<button type="button" class="btn-link strong" id="btnMasEmu">Mostrar más</button>' : "";
+}
+document.getElementById("chipsEmu").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-f]");
+  if (!b) return;
+  document.querySelectorAll("#chipsEmu .chip-filter").forEach((x) => x.classList.toggle("active", x === b));
+  cilFiltro = b.dataset.f; cilLimite = 100;
+  cargarCilindros().catch((e) => aviso("mensajeGlobal", e.message));
+});
+document.getElementById("masEmulsion").addEventListener("click", (ev) => {
+  if (!ev.target.closest("#btnMasEmu")) return;
+  cilLimite += 200;
+  cargarCilindros().catch((e) => aviso("mensajeGlobal", e.message));
+});
+
+// ---------- barriles de aceite ----------
+function renderChipsUbic() {
+  const cuentas = {};
+  barriles.forEach((b) => { const u = b.ubicacion || "Sin ubicación"; cuentas[u] = (cuentas[u] || 0) + 1; });
+  const orden = [...UBICACIONES.filter((u) => cuentas[u]), ...Object.keys(cuentas).filter((u) => !UBICACIONES.includes(u))];
+  document.getElementById("chipsUbic").innerHTML =
+    `<button type="button" class="chip-filter${barFiltro === "" ? " active" : ""}" data-f="">Todos (${barriles.length})</button>` +
+    orden.map((u) => `<button type="button" class="chip-filter${barFiltro === u ? " active" : ""}" data-f="${escapeHtml(u)}">${escapeHtml(u)} (${cuentas[u]})</button>`).join("");
+}
+function renderBarriles() {
+  renderChipsUbic();
+  const lista = barriles.filter((b) => barFiltro === "" || (b.ubicacion || "Sin ubicación") === barFiltro);
+  const vistos = lista.slice(0, barLimite);
+  document.getElementById("tbBarriles").innerHTML = vistos.length ? vistos.map((b) => {
+    const origen = b.aportes.map((a) => `<div class="num origen-linea">${fmtF(a.registro_fecha || a.fecha)} <span class="num-sub">· ${fmt2(a.kg)} kg</span></div>`).join("");
+    const traz = b.mezcla ? pill("warn", `Mezcla de ${b.n_origenes} corridas`) : pill("ok", "Única");
+    let nota = "";
+    if (b.estado === "ABIERTO") nota = `<div class="num-sub">abierto · faltan ${fmt2(b.capacidad_kg - b.kg)}</div>`;
+    else if (b.kg > b.capacidad_kg + 0.005) nota = `<div class="num-sub" style="color:var(--warn)">excede ${fmt2(b.kg - b.capacidad_kg)}</div>`;
+    const opciones = [...UBICACIONES]; if (b.ubicacion && !opciones.includes(b.ubicacion)) opciones.push(b.ubicacion);
+    const sel = `<select class="sel-ubic" data-id="${b.id}"><option value=""${b.ubicacion ? "" : " selected"}>—</option>${opciones.map((u) => `<option${u === b.ubicacion ? " selected" : ""}>${escapeHtml(u)}</option>`).join("")}</select>`;
+    return `<tr>
+      <td class="num">${b.numero}</td><td class="strong num">${b.codigo}</td>
+      <td class="right num">${fmt2(b.kg)}${nota}</td>
+      <td><div class="cell-stack">${origen}</div></td>
+      <td>${traz}</td><td>${sel}</td>
+      <td><input type="checkbox" class="chk-nisira" data-id="${b.id}"${b.nisira ? " checked" : ""} title="Registrado en Nisira"></td>
+    </tr>`;
+  }).join("") : '<tr><td colspan="7" class="empty" style="text-align:center">No hay barriles en esta ubicación.</td></tr>';
+  document.getElementById("masBarriles").innerHTML = lista.length > barLimite
+    ? `<button type="button" class="btn-link strong" id="btnMasBar">Mostrar más (${fmtInt(lista.length - barLimite)} restantes)</button>` : "";
+}
+document.getElementById("chipsUbic").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-f]");
+  if (!b) return;
+  barFiltro = b.dataset.f; barLimite = 60;
+  renderBarriles();
+});
+document.getElementById("masBarriles").addEventListener("click", (ev) => {
+  if (!ev.target.closest("#btnMasBar")) return;
+  barLimite += 120;
+  renderBarriles();
+});
+document.getElementById("tbBarriles").addEventListener("change", async (ev) => {
+  const sel = ev.target.closest(".sel-ubic"), chk = ev.target.closest(".chk-nisira");
+  const el = sel || chk;
+  if (!el) return;
+  const b = barriles.find((x) => x.id === Number(el.dataset.id));
+  const cuerpo = sel ? { ubicacion: sel.value } : { nisira: chk.checked };
+  try {
+    await apiPost(`/api/aceite/barriles/${el.dataset.id}`, cuerpo);
+    if (sel) b.ubicacion = sel.value || null; else b.nisira = chk.checked;
+    if (sel) renderChipsUbic();
+  } catch (e) {
+    aviso("mensajeGlobal", e.message);
+    renderBarriles();
+  }
+});
+
+// ---------- registrar: emulsión ----------
+function corridasMarcadas() {
+  return [...document.querySelectorAll("#emuCorridas input:checked")];
+}
+function renderCorridasDisp() {
+  const el = document.getElementById("emuCorridas");
+  const marcadas = new Set(corridasMarcadas().map((c) => c.value));
+  const visibles = corridasDisp.filter((c) => c.kg > 0);   // una corrida sin MP asignada todavía no puede dar emulsión
+  el.innerHTML = visibles.length ? visibles.map((c) => {
+    const ya = c.registro_id !== null;
+    return `<label class="check-fila${ya ? " deshab" : ""}"><input type="checkbox" value="${c.id}" data-kg="${c.kg}"${ya ? " disabled" : ""}${marcadas.has(String(c.id)) ? " checked" : ""}>
+      <span class="nom">${escapeHtml(c.nombre)}</span><span class="meta">${fmtDM(c.fecha)} · ${fmtKg(c.kg)} kg${ya ? " · ya vinculada" : ""}</span></label>`;
+  }).join("") : '<div class="empty" style="padding:10px 12px">No hay corridas de los últimos 21 días.</div>';
+}
+function resumenEmulsion() {
+  const marc = corridasMarcadas();
+  const mpCorr = marc.reduce((a, c) => a + Number(c.dataset.kg), 0);
+  const manual = Number(document.getElementById("emuMpManual").value) || 0;
+  const mp = manual || mpCorr;
+  const n = Math.floor(Number(document.getElementById("emuN").value)) || 0;
+  const peso = Number(document.getElementById("emuPeso").value) || 0;
+  const filas = [];
+  filas.push(["MP de las corridas seleccionadas", marc.length ? `${fmtKg(mpCorr)} kg` : "—"]);
+  if (n > 0 && peso > 0) {
+    filas.push(["Códigos que se generarán", n === 1 ? `${PREFIJO}${ultimoCilindro + 1}` : `${PREFIJO}${ultimoCilindro + 1} a ${ultimoCilindro + n}`]);
+    filas.push(["Peso por cilindro", `${fmt2(peso / n)} kg`]);
+    if (mp > 0) filas.push(["Emulsión por tonelada de MP", `${fmt2(peso / mp * 1000)} kg`]);
+  }
+  document.getElementById("emuResumen").innerHTML = filas.map(([a, b]) => `<div class="lookup-row"><span>${a}</span><span class="num">${b}</span></div>`).join("");
+}
+["emuCorridas", "emuMpManual", "emuN", "emuPeso"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", resumenEmulsion);
+  document.getElementById(id).addEventListener("change", resumenEmulsion);
+});
+document.getElementById("btnEmulsion").addEventListener("click", async () => {
+  const btn = document.getElementById("btnEmulsion");
+  aviso("emuMensaje", "");
+  const cuerpo = {
+    fecha: document.getElementById("emuFecha").value,
+    corrida_ids: corridasMarcadas().map((c) => Number(c.value)),
+    mp_kg_manual: Number(document.getElementById("emuMpManual").value) || null,
+    n_cilindros: Math.floor(Number(document.getElementById("emuN").value)) || 0,
+    peso_total_kg: Number(document.getElementById("emuPeso").value) || 0,
+  };
+  btn.disabled = true;
+  try {
+    const r = await apiPost("/api/emulsion", cuerpo);
+    ["emuMpManual", "emuN", "emuPeso"].forEach((id) => { document.getElementById(id).value = ""; });
+    await recargar();
+    const cods = r.cilindros;
+    aviso("emuMensaje", `Emulsión registrada: ${cods.length === 1 ? cods[0] : cods[0] + " a " + cods[cods.length - 1].replace(PREFIJO, "")}, de ${fmt2(r.peso_por_cilindro_kg)} kg c/u.`, "ok");
+  } catch (e) { aviso("emuMensaje", e.message); }
+  btn.disabled = false;
+});
+
+// ---------- registrar: transformación a aceite ----------
+function cilindrosMarcados() { return [...document.querySelectorAll("#trCilindros input:checked")]; }
+function renderPrecamara() {
+  const el = document.getElementById("trCilindros");
+  const marcados = new Set(cilindrosMarcados().map((c) => c.value));
+  el.innerHTML = precamara.length ? precamara.map((c) => `<label class="check-fila"><input type="checkbox" value="${c.id}" data-peso="${c.peso_neto_kg || 0}" data-corridas="${escapeHtml(c.corridas.join("|"))}"${marcados.has(String(c.id)) ? " checked" : ""}>
+      <span class="nom num">${c.codigo}</span><span class="meta">${fmtDM(c.fecha)} · ${c.peso_neto_kg === null ? "peso pendiente" : fmt2(c.peso_neto_kg) + " kg"}</span></label>`).join("")
+    : '<div class="empty" style="padding:10px 12px">No hay cilindros en precámara.</div>';
+}
+function planBarriles(aceite) {
+  const ultimo = barriles[0];
+  const cap = ultimo ? ultimo.capacidad_kg : 183;
+  let libre = ultimo ? Math.max(cap - ultimo.kg, 0) : 0;
+  let codigo = ultimo ? Number(ultimo.codigo) : null;
+  const lineas = [];
+  let resto = aceite;
+  if (ultimo && libre > 0.004) { const t = Math.min(libre, resto); lineas.push({ codigo: ultimo.codigo, kg: t, nuevo: false }); resto -= t; libre -= t; }
+  while (resto > 0.004 && codigo !== null) { codigo += 1; const t = Math.min(cap, resto); lineas.push({ codigo: String(codigo), kg: t, nuevo: true }); resto -= t; libre = cap - t; }
+  return { lineas, cap };
+}
+function resumenTransformacion() {
+  const marc = cilindrosMarcados();
+  const emulsion = marc.reduce((a, c) => a + Number(c.dataset.peso), 0);
+  const corridas = [...new Set(marc.flatMap((c) => (c.dataset.corridas ? c.dataset.corridas.split("|") : [])))];
+  const aceite = Number(document.getElementById("trAceite").value) || 0;
+  const filas = [["Cilindros seleccionados", `${marc.length} · ${fmt2(emulsion)} kg de emulsión`]];
+  if (corridas.length) filas.push(["Corridas de origen", escapeHtml(corridas.join(", "))]);
+  if (aceite > 0 && emulsion > 0) filas.push(["Conversión aceite / emulsión", `${(aceite / emulsion * 100).toFixed(1)} %`]);
+  if (aceite > 0 && marc.length) {
+    const { lineas, cap } = planBarriles(aceite);
+    const comp = lineas.find((l) => !l.nuevo), nuevos = lineas.filter((l) => l.nuevo);
+    if (comp) filas.push(["Completa el barril abierto", `${comp.codigo} con ${fmt2(comp.kg)} kg`]);
+    if (nuevos.length) filas.push(["Barriles nuevos", nuevos.map((l) => l.codigo).join(", ")]);
+    const ult = lineas[lineas.length - 1];
+    if (ult) {
+      const usado = ult.nuevo ? ult.kg : (barriles[0].kg + ult.kg);
+      if (usado < cap - 0.005) filas.push(["Queda abierto", `${ult.codigo} · ${fmt2(usado)} de ${fmt2(cap)} kg`]);
+    }
+  }
+  document.getElementById("trResumen").innerHTML = filas.map(([a, b]) => `<div class="lookup-row"><span>${a}</span><span class="num">${b}</span></div>`).join("");
+}
+["trCilindros", "trAceite"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", resumenTransformacion);
+  document.getElementById(id).addEventListener("change", resumenTransformacion);
+});
+document.getElementById("trTodos").addEventListener("click", () => { document.querySelectorAll("#trCilindros input").forEach((c) => { c.checked = true; }); resumenTransformacion(); });
+document.getElementById("trNinguno").addEventListener("click", () => { document.querySelectorAll("#trCilindros input").forEach((c) => { c.checked = false; }); resumenTransformacion(); });
+document.getElementById("btnTransformacion").addEventListener("click", async () => {
+  const btn = document.getElementById("btnTransformacion");
+  aviso("trMensaje", "");
+  const cuerpo = {
+    fecha: document.getElementById("trFecha").value,
+    aceite_kg: Number(document.getElementById("trAceite").value) || 0,
+    cilindro_ids: cilindrosMarcados().map((c) => Number(c.value)),
+  };
+  btn.disabled = true;
+  try {
+    const r = await apiPost("/api/aceite/transformaciones", cuerpo);
+    document.getElementById("trAceite").value = "";
+    await recargar();
+    const det = r.aportes.map((a) => `${a.codigo} (${fmt2(a.kg)} kg${a.nuevo ? ", nuevo" : ""})`).join(", ");
+    aviso("trMensaje", `Aceite registrado: ${det}.`, "ok");
+  } catch (e) { aviso("trMensaje", e.message); }
+  btn.disabled = false;
+});
+
+// ---------- últimas transformaciones ----------
+function renderTransformaciones() {
+  document.getElementById("tbTransformaciones").innerHTML = transformaciones.length ? transformaciones.map((t, i) => `<tr>
+      <td class="strong num">${fmtF(t.fecha)}</td>
+      <td class="right num">${t.n_cilindros}</td>
+      <td class="right num">${fmt2(t.emulsion_kg)}</td>
+      <td class="right num">${fmt2(t.aceite_kg)}</td>
+      <td class="right num">${t.emulsion_kg > 0 ? (t.aceite_kg / t.emulsion_kg * 100).toFixed(1) + " %" : "—"}</td>
+      <td>${i === 0 ? `<button class="btn-link btn-link-bad" data-accion="deshacer" data-id="${t.id}">Deshacer</button>` : ""}</td>
+    </tr>`).join("") : '<tr><td colspan="6" class="empty" style="text-align:center">Aún no hay transformaciones registradas.</td></tr>';
+}
+document.getElementById("tbTransformaciones").addEventListener("click", async (ev) => {
+  const b = ev.target.closest('[data-accion="deshacer"]');
+  if (!b) return;
+  if (!(await confirmar("¿Deshacer la última transformación? Sus cilindros volverán a precámara y se quitará el aceite de los barriles."))) return;
+  try { await apiDelete(`/api/aceite/transformaciones/${b.dataset.id}`); await recargar(); aviso("mensajeGlobal", "La transformación fue deshecha.", "ok"); }
+  catch (e) { aviso("mensajeGlobal", e.message); }
+});
+
+// ---------- carga general ----------
+async function recargar() {
+  const [res, bar, pre, tr, cor, lis] = await Promise.all([
+    apiGet("/api/subproductos/resumen"),
+    apiGet("/api/aceite/barriles"),
+    apiGet("/api/emulsion/cilindros?estado=PRECAMARA"),
+    apiGet("/api/subproductos/transformaciones"),
+    apiGet("/api/subproductos/corridas?dias=21"),
+    apiGet(`/api/emulsion/cilindros?estado=${cilFiltro}&limite=${cilLimite}`),
+  ]);
+  datos = res; barriles = bar; precamara = pre.slice().sort((a, b) => a.numero - b.numero);
+  transformaciones = tr; corridasDisp = cor;
+  ultimoCilindro = Math.max(0, ...datos.registros.map((r) => r.ultimo_cilindro || 0));
+  renderKpis(); renderGrafico(); renderResumen(); renderBarriles();
+  renderCorridasDisp(); renderPrecamara(); renderTransformaciones();
+  resumenEmulsion(); resumenTransformacion();
+  await cargarCilindros(lis);
+}
+
+document.getElementById("emuFecha").value = hoy();
+document.getElementById("trFecha").value = hoy();
+recargar().then(() => {
+  const h = location.hash.slice(1);
+  if (["resumen", "emulsion", "aceite", "registrar"].includes(h)) abrirVista(h);
+}).catch((e) => {
+  document.getElementById("kpis").innerHTML = "";
+  aviso("mensajeGlobal", e.message);
+});
+</script>
+</body>
+</html>

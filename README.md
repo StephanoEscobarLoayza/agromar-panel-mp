@@ -34,6 +34,7 @@ producción.
 | **Calidad → Siguiente bin** | Si se acaba un bin a media corrida, calcula cuál conviene reponer (por fecha o por el que más ayuda a mantener Brix/Ratio) sin pasarse de la Acidez máxima. |
 | **Medición de tanques** | Brix/Acidez/pH medidos de verdad con refractómetro por tanque — manda sobre el estimado de los lotes en los reportes en cuanto hay al menos una medición. |
 | **Paradas** | Registro de paradas de planta durante una corrida (motivo, duración). |
+| **Subproductos** | Seguimiento de la emulsión y del aceite de naranja orgánica: cilindros de emulsión (EORG-2026-N), transformación a aceite, barriles de 183 kg con su origen por corrida, ubicación y registro en Nisira, rendimiento de aceite por tonelada de MP y descarga en Excel. Reemplaza las hojas «Subproductos» del Excel de planta. |
 | **Sincronizar** | Trae los lotes nuevos/actualizados desde el Google Sheet de recepción (además de correr sola cada 20 min), y descarga un respaldo completo en Excel (una hoja por tabla). |
 
 Todas las páginas comparten un login único (usuario/contraseña compartidos
@@ -93,6 +94,12 @@ Todos los kg se muestran redondeados a entero en toda la app y los reportes
 - **mediciones_tanque** — Brix/Acidez/pH/litros medidos de verdad por tanque
   al cerrar una corrida.
 - **paradas** — paradas de planta registradas por corrida.
+- **emulsion_registros / emulsion_registro_corridas / emulsion_cilindros** — cada producción de
+  emulsión (un día, vinculada a una o varias corridas del panel) y sus cilindros.
+- **aceite_transformaciones / aceite_barriles / aceite_barril_aportes** — transformación de
+  cilindros de emulsión a aceite y barriles que se llenan en orden hasta 183 kg; cada aporte
+  conserva de qué corrida viene el aceite. Lógica en `subproductos.py`; el historial se cargó con
+  `importar_subproductos.py` (revisa e informa; con `--aplicar` escribe, con `--reiniciar` recarga).
 
 ## Base de datos
 

@@ -33,6 +33,7 @@ from reporte_periodo import generar_reporte_periodo_pdf
 from reporte_stock import generar_reporte_stock_pdf
 from reporte_trazabilidad import generar_trazabilidad_xlsx
 from reporte_paradas import generar_paradas_periodo_xlsx
+from subproductos import crear_router as crear_router_subproductos
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
@@ -2119,6 +2120,10 @@ def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
             "Cache-Control": "no-store",
         },
     )
+
+
+# subproductos (emulsión y aceite) - endpoints en subproductos.py
+app.include_router(crear_router_subproductos(engine))
 
 
 # ---------------------------------------------------------------------------

@@ -288,6 +288,87 @@ COMMENT ON TABLE mediciones_tanque IS 'Brix/Acidez/pH medido de verdad con el re
 
 CREATE INDEX idx_mediciones_tanque_corrida ON mediciones_tanque(corrida_id);
 
+-- ----------------------------------------------------------------------------
+-- SUBPRODUCTOS (emulsión y aceite de naranja orgánica)
+--
+-- Cadena: lotes -> corrida -> cilindros de emulsión -> transformación a aceite
+-- -> barriles de aceite. Reemplaza las hojas de Excel "Subproductos" (emulsión,
+-- seguimiento por número de cilindro y etiquetas).
+--
+--  * emulsion_registros: una "fila" de emulsión de la hoja (un día de producción
+--    con sus cilindros). Se vincula a una o varias corridas del panel (p. ej. el
+--    22/09 junta una corrida ICEGEN y una PreCC), y de ahí salen los lotes y la
+--    MP procesada. mp_kg_manual guarda la MP tal como la declaró la planta cuando
+--    no hay corridas vinculadas o cuando difiere de su suma.
+--  * emulsion_cilindros: cada cilindro de emulsión (código EORG-2026-<numero>).
+--    Un cilindro sin transformacion_id sigue en precámara.
+--  * aceite_transformaciones: una transformación de emulsión a aceite (una
+--    fecha). Consume los cilindros indicados y produce aceite_kg.
+--  * aceite_barriles / aceite_barril_aportes: los barriles se llenan en orden
+--    hasta su capacidad (183 kg); cada aporte dice cuántos kg puso una
+--    transformación y de qué registro de emulsión (corrida) provienen. Un barril
+--    con aportes de más de una corrida es lo que la hoja llamaba "mezcla con
+--    corrida anterior". El aceite de una corrida es la suma de sus aportes.
+-- No se registra qué cilindro de emulsión quedó en qué barril: el aceite se
+-- mezcla; el vínculo llega hasta la transformación y la corrida.
+-- ----------------------------------------------------------------------------
+CREATE TABLE emulsion_registros (
+    id             SERIAL PRIMARY KEY,
+    fecha          DATE NOT NULL,
+    mp_kg_manual   NUMERIC(12,2),
+    observaciones  TEXT,
+    creado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE emulsion_registro_corridas (
+    registro_id    INTEGER NOT NULL REFERENCES emulsion_registros(id) ON DELETE CASCADE,
+    corrida_id     INTEGER NOT NULL REFERENCES corridas(id) ON DELETE CASCADE,
+    PRIMARY KEY (registro_id, corrida_id)
+);
+
+CREATE TABLE aceite_transformaciones (
+    id             SERIAL PRIMARY KEY,
+    fecha          DATE NOT NULL,
+    aceite_kg      NUMERIC(10,2) NOT NULL CHECK (aceite_kg > 0),
+    observaciones  TEXT,
+    creado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE emulsion_cilindros (
+    id                 SERIAL PRIMARY KEY,
+    numero             INTEGER NOT NULL UNIQUE,   -- correlativo de la campaña: EORG-2026-<numero>
+    registro_id        INTEGER NOT NULL REFERENCES emulsion_registros(id) ON DELETE CASCADE,
+    fecha              DATE NOT NULL,             -- fecha de emulsión
+    peso_neto_kg       NUMERIC(10,2) CHECK (peso_neto_kg > 0),   -- NULL = cilindro registrado con el peso pendiente
+    transformacion_id  INTEGER REFERENCES aceite_transformaciones(id) ON DELETE SET NULL,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_emulsion_cilindros_registro ON emulsion_cilindros(registro_id);
+CREATE INDEX idx_emulsion_cilindros_transformacion ON emulsion_cilindros(transformacion_id);
+
+CREATE TABLE aceite_barriles (
+    id             SERIAL PRIMARY KEY,
+    numero         INTEGER NOT NULL UNIQUE,       -- N.º de barril de la campaña (1, 2, 3...)
+    codigo         TEXT NOT NULL UNIQUE,          -- código del cilindro de aceite (210476...)
+    capacidad_kg   NUMERIC(8,2) NOT NULL DEFAULT 183 CHECK (capacidad_kg > 0),
+    ubicacion      TEXT,                          -- Extracción / Precámara / Reefer 2...
+    nisira         BOOLEAN NOT NULL DEFAULT FALSE, -- ya registrado en Nisira
+    creado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE aceite_barril_aportes (
+    id                 SERIAL PRIMARY KEY,
+    barril_id          INTEGER NOT NULL REFERENCES aceite_barriles(id) ON DELETE CASCADE,
+    transformacion_id  INTEGER NOT NULL REFERENCES aceite_transformaciones(id) ON DELETE CASCADE,
+    registro_id        INTEGER REFERENCES emulsion_registros(id) ON DELETE SET NULL, -- de qué registro de emulsión (corrida) proviene este aceite
+    kg                 NUMERIC(8,2) NOT NULL CHECK (kg > 0)
+);
+
+CREATE INDEX idx_aceite_aportes_registro ON aceite_barril_aportes(registro_id);
+CREATE INDEX idx_aceite_aportes_barril ON aceite_barril_aportes(barril_id);
+CREATE INDEX idx_aceite_aportes_transformacion ON aceite_barril_aportes(transformacion_id);
+
 CREATE VIEW v_cuadre_corridas AS
 SELECT
     c.id,
