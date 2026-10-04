@@ -316,6 +316,7 @@ CREATE TABLE emulsion_registros (
     id             SERIAL PRIMARY KEY,
     fecha          DATE NOT NULL,
     mp_kg_manual   NUMERIC(12,2),
+    diferencia_motivo TEXT,        -- 'descuento' cuando la diferencia entre la MP declarada y la de las corridas se explica por un descuento
     observaciones  TEXT,
     creado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

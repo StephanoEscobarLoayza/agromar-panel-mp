@@ -388,7 +388,13 @@ function renderResumen() {
     let cuadre;
     if (dif === null) cuadre = r.corridas.length ? pill("ok", "Vinculado") : '<span class="hint-line">—</span>';
     else if (Math.abs(dif) <= 5) cuadre = pill("ok", "✓ Cuadra");
-    else cuadre = pill("warn", `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`);
+    else if (r.diferencia_motivo === "DESCUENTO") {
+      cuadre = `<span class="pill neutral" title="El Excel y el panel difieren porque se aplicó un descuento">Diferencia de ${fmtKg(Math.abs(dif))} kg por descuento</span>`
+        + (r.descuento_kg > 0 ? "" : `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="">Quitar marca</button></div>`);
+    } else {
+      cuadre = pill("warn", `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`)
+        + `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="descuento">Marcar por descuento</button></div>`;
+    }
     const mpSub = dif !== null && Math.abs(dif) > 5 ? `<div class="num-sub">corridas: ${fmtKg(r.mp_corridas_kg)}</div>` : "";
     const aceiteSub = r.conversion !== null ? `<div class="num-sub">${(r.conversion * 100).toFixed(1)} % de conversión</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">parcial</div>' : "");
     const eliminar = r.estado === "PRECAMARA"
@@ -406,6 +412,12 @@ function renderResumen() {
   }).join("");
 }
 document.getElementById("tbResumen").addEventListener("click", async (ev) => {
+  const m = ev.target.closest('[data-accion="motivo"]');
+  if (m) {
+    try { await apiPost(`/api/emulsion/registros/${m.dataset.id}`, { diferencia_motivo: m.dataset.motivo }); await recargar(); }
+    catch (e) { aviso("mensajeGlobal", e.message); }
+    return;
+  }
   const b = ev.target.closest('[data-accion="eliminar-registro"]');
   if (!b) return;
   if (!(await confirmar("¿Eliminar este registro de emulsión y todos sus cilindros? Esta acción no se puede deshacer."))) return;

@@ -103,7 +103,7 @@ def generar_subproductos_xlsx(registros, cilindros, barriles, kpis) -> bytes:
             ("Suma de las corridas (kg)", 15, _FMT_KG, None), ("Diferencia (kg)", 13, _FMT_KG, None), ("Cilindros", 10, _FMT_ENT, None),
             ("Desde", 15, None, None), ("Hasta", 15, None, None), ("Emulsión (kg)", 13, _FMT_KG, None),
             ("Aceite (kg)", 13, _FMT_KG, None), ("Aceite / t de MP", 12, _FMT_KG, None), ("Conversión aceite / emulsión", 14, _FMT_PCT, None),
-            ("Estado", 14, None, None), ("Observaciones", 36, None, None)]
+            ("Estado", 14, None, None), ("Motivo de la diferencia", 18, None, None), ("Observaciones", 36, None, None)]
     filas = []
     for r in registros:
         dif = r["diferencia_kg"]
@@ -113,8 +113,8 @@ def generar_subproductos_xlsx(registros, cilindros, barriles, kpis) -> bytes:
             f"EORG-2026-{r['primer_cilindro']}" if r["primer_cilindro"] else None,
             f"EORG-2026-{r['ultimo_cilindro']}" if r["ultimo_cilindro"] else None,
             r["emulsion_kg"], r["aceite_kg"], r["aceite_por_t_mp"], r["conversion"],
-            _ESTADO_REG.get(r["estado"], r["estado"]), r["observaciones"],
-        ], dif is not None and abs(dif) > 5))
+            _ESTADO_REG.get(r["estado"], r["estado"]), "Descuento" if r["diferencia_motivo"] else None, r["observaciones"],
+        ], dif is not None and abs(dif) > 5 and not r["diferencia_motivo"]))
     _hoja(wb, "Resumen por corrida", resumen, cols, filas, primera=True)
 
     # ---- 2. cilindros de emulsión ----

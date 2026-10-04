@@ -47,7 +47,10 @@ def _codigo_cilindro(numero: int) -> str:
 # Cada lista se arma con UNA sola consulta (la base está en la nube: cada ida y vuelta
 # cuesta casi medio segundo, así que varias consultas seguidas hacían lenta la pantalla).
 _SQL_REGISTROS = """
-    SELECT r.id, r.fecha, r.mp_kg_manual, r.observaciones,
+    SELECT r.id, r.fecha, r.mp_kg_manual, r.diferencia_motivo, r.observaciones,
+           COALESCE((SELECT SUM(a.kg_asignados * COALESCE(a.porcentaje_descuento, 0) / 100.0)
+                     FROM emulsion_registro_corridas rc JOIN asignaciones a ON a.corrida_id = rc.corrida_id
+                     WHERE rc.registro_id = r.id), 0) AS descuento_kg,
            COALESCE((
                SELECT json_agg(json_build_object(
                           'id', co.id, 'nombre', co.nombre,
@@ -118,6 +121,9 @@ def _lista_registros(conn):
             "mp_manual_kg": mp_manual,
             "mp_kg": mp,
             "diferencia_kg": (mp_corridas - mp_manual) if (co and mp_manual is not None) else None,
+            # la diferencia se explica por descuento si se marcó así o si los consumos de sus corridas llevan % de descuento
+            "diferencia_motivo": "DESCUENTO" if (r.diferencia_motivo == "descuento" or float(r.descuento_kg) > 0) else None,
+            "descuento_kg": float(r.descuento_kg),
             "n_cilindros": r.n, "n_procesados": r.n_proc,
             "primer_cilindro": r.mn, "ultimo_cilindro": r.mx,
             "emulsion_kg": emulsion, "pendiente_kg": float(r.pend_kg),
@@ -205,6 +211,10 @@ class NuevaTransformacion(BaseModel):
     cilindro_ids: List[int]
     observaciones: Optional[str] = None
     codigo_inicial: Optional[str] = None    # solo si aún no existe ningún barril
+
+
+class EditarRegistro(BaseModel):
+    diferencia_motivo: Optional[str] = None    # 'descuento' o vacío para quitar la marca
 
 
 class EditarBarril(BaseModel):
@@ -358,6 +368,17 @@ def crear_router(engine) -> APIRouter:
             if usados or con_aceite:
                 raise HTTPException(status_code=400, detail="No se puede eliminar: ya tiene cilindros transformados a aceite. Elimine primero esa transformación.")
             conn.execute(text("DELETE FROM emulsion_registros WHERE id = :i"), {"i": registro_id})
+        return {"ok": True}
+
+    @router.post("/api/emulsion/registros/{registro_id}")
+    def editar_registro(registro_id: int, p: EditarRegistro):
+        motivo = (p.diferencia_motivo or "").strip().lower() or None
+        if motivo not in (None, "descuento"):
+            raise HTTPException(status_code=400, detail="Motivo de diferencia no válido.")
+        with engine.begin() as conn:
+            r = conn.execute(text("UPDATE emulsion_registros SET diferencia_motivo = :m WHERE id = :i RETURNING id"), {"m": motivo, "i": registro_id})
+            if r.scalar() is None:
+                raise HTTPException(status_code=404, detail="Registro de emulsión no encontrado.")
         return {"ok": True}
 
     @router.get("/api/aceite/barriles")
