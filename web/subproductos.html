@@ -388,12 +388,14 @@ function renderResumen() {
     let cuadre;
     if (dif === null) cuadre = r.corridas.length ? pill("ok", "Vinculado") : '<span class="hint-line">—</span>';
     else if (Math.abs(dif) <= 5) cuadre = pill("ok", "✓ Cuadra");
-    else if (r.diferencia_motivo === "DESCUENTO") {
-      cuadre = `<span class="pill neutral" title="El Excel y el panel difieren porque se aplicó un descuento">Diferencia de ${fmtKg(Math.abs(dif))} kg por descuento</span>`
-        + (r.descuento_kg > 0 ? "" : `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="">Quitar marca</button></div>`);
+    else if (r.diferencia_motivo) {
+      const porPrecc = r.diferencia_motivo === "PRECC";
+      cuadre = `<span class="pill neutral" title="${porPrecc ? "El PRE CC es producto: se aplica como MP en el panel pero no pasa por extracción, por eso no genera emulsión" : "El Excel y el panel difieren porque se aplicó un descuento"}">Diferencia de ${fmtKg(Math.abs(dif))} kg por ${porPrecc ? "PRE CC" : "descuento"}</span>`
+        + (r.motivo_manual ? `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="">Quitar marca</button></div>` : "");
     } else {
       cuadre = pill("warn", `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`)
-        + `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="descuento">Marcar por descuento</button></div>`;
+        + `<div><button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="descuento">Marcar por descuento</button>`
+        + (r.precc_kg > 0 ? ` <button class="btn-link" data-accion="motivo" data-id="${r.id}" data-motivo="precc">Marcar por PRE CC</button>` : "") + `</div>`;
     }
     const mpSub = dif !== null && Math.abs(dif) > 5 ? `<div class="num-sub">corridas: ${fmtKg(r.mp_corridas_kg)}</div>` : "";
     const aceiteSub = r.conversion !== null ? `<div class="num-sub">${(r.conversion * 100).toFixed(1)} % de conversión</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">parcial</div>' : "");

@@ -51,6 +51,9 @@ _SQL_REGISTROS = """
            COALESCE((SELECT SUM(a.kg_asignados * COALESCE(a.porcentaje_descuento, 0) / 100.0)
                      FROM emulsion_registro_corridas rc JOIN asignaciones a ON a.corrida_id = rc.corrida_id
                      WHERE rc.registro_id = r.id), 0) AS descuento_kg,
+           COALESCE((SELECT SUM(a.kg_asignados)
+                     FROM emulsion_registro_corridas rc JOIN asignaciones a ON a.corrida_id = rc.corrida_id
+                     WHERE rc.registro_id = r.id AND a.lote_numero < 0), 0) AS precc_kg,
            COALESCE((
                SELECT json_agg(json_build_object(
                           'id', co.id, 'nombre', co.nombre,
@@ -114,16 +117,29 @@ def _lista_registros(conn):
         aceite = _f(r.aceite_kg) or 0.0
         estado = "PRECAMARA" if not r.n_proc else ("TRANSFORMADO" if r.n_proc == r.n else "PARCIAL")
         listo = estado == "TRANSFORMADO"
+        dif = (mp_corridas - mp_manual) if (co and mp_manual is not None) else None
+        precc = float(r.precc_kg)
+        # por qué difiere: marca manual; o consumos con % de descuento; o la diferencia coincide con el PRE CC que
+        # se aplicó como MP (el PRE CC es producto, no pasa por extracción, así que no genera emulsión)
+        if r.diferencia_motivo in ("descuento", "precc"):
+            motivo = r.diferencia_motivo.upper()
+        elif float(r.descuento_kg) > 0:
+            motivo = "DESCUENTO"
+        elif dif is not None and precc > 0 and abs(dif - precc) <= 5:
+            motivo = "PRECC"
+        else:
+            motivo = None
         regs.append({
             "id": r.id, "fecha": r.fecha, "observaciones": r.observaciones,
             "corridas": [{"id": x["id"], "nombre": x["nombre"], "kg": float(x["kg"])} for x in co],
             "mp_corridas_kg": mp_corridas if co else None,
             "mp_manual_kg": mp_manual,
             "mp_kg": mp,
-            "diferencia_kg": (mp_corridas - mp_manual) if (co and mp_manual is not None) else None,
-            # la diferencia se explica por descuento si se marcó así o si los consumos de sus corridas llevan % de descuento
-            "diferencia_motivo": "DESCUENTO" if (r.diferencia_motivo == "descuento" or float(r.descuento_kg) > 0) else None,
+            "diferencia_kg": dif,
+            "diferencia_motivo": motivo,
+            "motivo_manual": r.diferencia_motivo in ("descuento", "precc"),
             "descuento_kg": float(r.descuento_kg),
+            "precc_kg": precc,
             "n_cilindros": r.n, "n_procesados": r.n_proc,
             "primer_cilindro": r.mn, "ultimo_cilindro": r.mx,
             "emulsion_kg": emulsion, "pendiente_kg": float(r.pend_kg),
@@ -214,7 +230,7 @@ class NuevaTransformacion(BaseModel):
 
 
 class EditarRegistro(BaseModel):
-    diferencia_motivo: Optional[str] = None    # 'descuento' o vacío para quitar la marca
+    diferencia_motivo: Optional[str] = None    # 'descuento', 'precc' o vacío para quitar la marca
 
 
 class EditarBarril(BaseModel):
@@ -373,7 +389,7 @@ def crear_router(engine) -> APIRouter:
     @router.post("/api/emulsion/registros/{registro_id}")
     def editar_registro(registro_id: int, p: EditarRegistro):
         motivo = (p.diferencia_motivo or "").strip().lower() or None
-        if motivo not in (None, "descuento"):
+        if motivo not in (None, "descuento", "precc"):
             raise HTTPException(status_code=400, detail="Motivo de diferencia no válido.")
         with engine.begin() as conn:
             r = conn.execute(text("UPDATE emulsion_registros SET diferencia_motivo = :m WHERE id = :i RETURNING id"), {"m": motivo, "i": registro_id})

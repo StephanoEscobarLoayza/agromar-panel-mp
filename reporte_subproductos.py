@@ -113,7 +113,7 @@ def generar_subproductos_xlsx(registros, cilindros, barriles, kpis) -> bytes:
             f"EORG-2026-{r['primer_cilindro']}" if r["primer_cilindro"] else None,
             f"EORG-2026-{r['ultimo_cilindro']}" if r["ultimo_cilindro"] else None,
             r["emulsion_kg"], r["aceite_kg"], r["aceite_por_t_mp"], r["conversion"],
-            _ESTADO_REG.get(r["estado"], r["estado"]), "Descuento" if r["diferencia_motivo"] else None, r["observaciones"],
+            _ESTADO_REG.get(r["estado"], r["estado"]), {"DESCUENTO": "Descuento", "PRECC": "PRE CC"}.get(r["diferencia_motivo"]), r["observaciones"],
         ], dif is not None and abs(dif) > 5 and not r["diferencia_motivo"]))
     _hoja(wb, "Resumen por corrida", resumen, cols, filas, primera=True)
 
