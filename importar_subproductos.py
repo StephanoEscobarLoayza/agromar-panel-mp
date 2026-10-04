@@ -165,6 +165,22 @@ def leer_ubicaciones(wb):
     return ubic
 
 
+MESES = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+         "setiembre": 9, "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12}
+
+
+def fecha_del_nombre(nombre):
+    """«12-agosto JCC nj org» -> 12/08. La fecha de inicio guardada en una corrida puede
+    estar mal escrita (p. ej. 12-agosto guardada con inicio el 08/08); el nombre es más fiable."""
+    m = re.match(r"^\s*(\d{1,2})(?:\.\d+)?\s*[- ]\s*([A-Za-zñÑ]+)", nombre or "")
+    if m and m[2].lower() in MESES:
+        try:
+            return dt.date(ANIO, MESES[m[2].lower()], int(m[1]))
+        except ValueError:
+            return None
+    return None
+
+
 def vincular_corridas(bloque, corridas, usadas):
     """Mejor combinación (1 a 3) de corridas de los 3 días previos cuya suma de kg se
     acerca a la MP del bloque. Devuelve (lista de corridas, suma) o ([], 0)."""
@@ -180,7 +196,10 @@ def vincular_corridas(bloque, corridas, usadas):
             if mejor is None or dif < mejor_dif - 1e-6:
                 mejor, mejor_dif = combo, dif
     if mejor is None or mejor_dif / bloque["mp"] > TOLERANCIA_VINCULO:
-        return [], 0.0
+        # sin una suma que cuadre: se vinculan las corridas cuyo nombre lleva exactamente esa fecha
+        # (la diferencia de kg queda a la vista en la pantalla para revisarla)
+        mismas = [c for c in cand if fecha_del_nombre(c["nombre"]) == bloque["fecha"]]
+        return mismas, sum(c["kg"] for c in mismas)
     return list(mejor), sum(c["kg"] for c in mejor)
 
 
@@ -203,6 +222,8 @@ def main():
             "SELECT c.id, c.nombre, c.fecha_inicio::date AS fecha, COALESCE(SUM(a.kg_asignados), 0)::float AS kg "
             "FROM corridas c LEFT JOIN asignaciones a ON a.corrida_id = c.id GROUP BY c.id ORDER BY c.fecha_inicio"))]
         hay = c.execute(text("SELECT count(*) FROM emulsion_registros")).scalar()
+    for co in corridas:      # la fecha del nombre manda sobre la fecha de inicio guardada
+        co["fecha"] = fecha_del_nombre(co["nombre"]) or co["fecha"]
     if hay and not args.reiniciar:
         print(f"Ya hay {hay} registros de emulsión cargados. Use --reiniciar para volver a cargar desde cero.")
         return
