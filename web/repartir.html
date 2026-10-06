@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Repartir lotes · Agromar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="style.css">
+<style>
+  .cards2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
+  .tarjeta .lookup{background:var(--forest-tint)}
+  .tarjeta input.tipico{width:78px;padding:4px 8px;font-size:13px;text-align:right}
+  .bar-title{font-size:12.5px;font-weight:600;color:var(--text-2)}
+  .barra{display:flex;gap:2px;height:40px;margin-top:6px}
+  .barra .seg{display:flex;align-items:center;justify-content:center;min-width:2px;border-radius:4px;overflow:hidden;font-size:11px;font-weight:600;color:#123524}
+  .barra .seg span{padding:0 2px;white-space:nowrap;overflow:hidden}
+  .barra .seg.tk{color:#fff}
+  .leyenda{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--text-2)}
+  .leyenda i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .tira{display:flex;flex-wrap:wrap;gap:6px}
+  .tk-chip{width:40px;border-radius:8px;padding:3px 0 4px;text-align:center;color:#fff;cursor:grab;line-height:1.1;user-select:none;border:2px solid transparent}
+  .tk-chip small{display:block;font-size:9.5px;opacity:.85}
+  .tk-chip b{font-size:14px}
+  .tk-chip.dudoso{outline:2px dashed var(--warn);outline-offset:1px}
+  .tk-chip.sel{border-color:var(--text);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
+  .tk-chip.arrastrando{opacity:.4}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px 6px;border-radius:6px;font-size:11px}
+  .icon-btn:hover{color:var(--citrus);background:var(--citrus-tint)}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:14px 20px}
+  .btn-ghost{display:inline-block;background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none}
+  .btn-ghost:hover{border-color:var(--citrus);color:var(--citrus)}
+  .sub-note{font-size:12.5px;color:var(--text-muted);margin-top:12px;line-height:1.55}
+  .lista-check{border:1px solid var(--border);border-radius:10px;max-height:230px;overflow:auto;background:var(--surface)}
+  .lista-check .check-fila{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)}
+  .lista-check .check-fila:last-child{border-bottom:none}
+  .lista-check .check-fila:hover{background:var(--forest-tint)}
+  .lista-check .check-fila input{width:16px;height:16px;padding:0;accent-color:var(--forest-2);flex-shrink:0}
+  .lista-check .check-fila .nom{font-weight:600;flex:1;min-width:0}
+  .lista-check .check-fila .meta{font-size:12px;color:var(--text-muted);white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap hero-inner">
+    <div class="mark-row">
+      <div>
+        <div class="mark"><span class="agro">agro</span><span class="dot"></span><span class="mar">mar</span></div>
+        <div class="mark-sub">Industrial</div>
+      </div>
+      <nav class="tabs">
+        <button type="button" class="nav-dropdown-btn active" data-menu="menuRegistro">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2.3" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="2.3" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="2.3" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="10.1" y="10.1" width="5.6" height="5.6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Registro
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuCalidad">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Calidad
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuSubproductos">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.2c2.6 3.1 4.4 5.4 4.4 7.7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.8-4.6 4.4-7.7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Subproductos
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="nav-dropdown-btn" data-menu="menuParadas">
+          <svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Paradas
+          <svg class="nav-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+    </div>
+    <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
+    <h1 class="hero-title">Repartir lotes</h1>
+    <p class="hero-sub">Cuando dos corridas trabajan al mismo tiempo con los mismos lotes, el reparto de cada lote se calcula a partir de los tanques que llenó cada línea.</p>
+  </div>
+  <div class="wave">
+    <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="avisoGeneral" style="margin-top:24px"></div>
+
+  <section style="margin-top:8px">
+    <div class="section-head">
+      <h2>Corridas en paralelo</h2>
+      <span class="hint">los lotes se registran juntos y se reparten según los tanques</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="form-body">
+        <div class="field">
+          <label>Corridas que trabajaron al mismo tiempo</label>
+          <div class="lista-check" id="candidatas"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
+        </div>
+        <div class="hint-line">Se muestran las corridas del mismo día y las de un día antes o después. Se toman los lotes ya registrados en ellas y los tanques de «Medición de tanques», y el reparto se recalcula entre las corridas marcadas.</div>
+      </div>
+    </div>
+  </section>
+
+  <div id="contenido" hidden>
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head"><h3>Secuencia de tanques</h3><span class="hint-line" id="resumenTanques"></span></div>
+      <div class="form-body">
+        <div id="avisoTanques"></div>
+        <div class="tira" id="tira"></div>
+        <div class="leyenda" id="leyenda"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn-ghost" type="button" id="btnAntes">◀ Mover antes</button>
+          <button class="btn-ghost" type="button" id="btnDespues">Mover después ▶</button>
+          <span class="hint-line">Pulse un tanque para seleccionarlo y muévalo, o arrástrelo a su posición.</span>
+        </div>
+        <div class="field" style="margin-top:4px">
+          <label>O pegue la secuencia completa que dicte el supervisor <span class="hint-line" id="ayudaLetras"></span></label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <input type="text" id="seqTexto" style="flex:1;min-width:240px" placeholder="Ej. ABABBA…" autocomplete="off">
+            <button class="btn-ghost" type="button" id="btnSeq">Aplicar secuencia</button>
+          </div>
+          <div id="avisoSeq" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards2" id="tarjetas"></div>
+    <div id="avisoTotal" style="margin-top:14px"></div>
+
+    <div class="section-head" style="margin-top:34px">
+      <h2>Lotes frente a tanques</h2>
+      <span class="hint">cada tanque consume la MP de los lotes que están en su tramo</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="form-body">
+        <div class="bar-title">Lotes, en orden de uso <span class="hint-line">— se pueden reordenar en la tabla</span></div>
+        <div class="barra" id="barraLotes"></div>
+        <div class="bar-title" style="margin-top:14px">Tanques, en orden de llenado</div>
+        <div class="barra" id="barraTanques"></div>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:34px">
+      <h2>Reparto de cada lote</h2>
+      <span class="hint" id="notaPrecc"></span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="table-wrap">
+        <table class="tabla-compacta">
+          <thead id="theadLotes"></thead>
+          <tbody id="tbLotes"></tbody>
+          <tfoot id="tfLotes"></tfoot>
+        </table>
+      </div>
+      <div class="toolbar" style="border-top:1px solid var(--border);border-bottom:none">
+        <span class="hint-line" id="notaReparto"></span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn-ghost" href="corridas.html">Cancelar</a>
+          <button class="btn" type="button" id="btnAplicar" style="width:auto;padding:10px 22px">Aplicar reparto</button>
+        </div>
+      </div>
+    </div>
+    <div class="sub-note">Al aplicar, los lotes se distribuyen entre las corridas con las cantidades indicadas. El saldo de cada lote no cambia: solo se reparte lo que ya estaba registrado. El PRE CC no pasa por extracción y se queda donde está.</div>
+  </div>
+
+  <div id="resultado"></div>
+</div>
+
+<div class="foot">
+    <div class="foot-rule"></div>
+    <div class="foot-line">Del campo a planta, cuadrado al kilo.</div>
+    <div class="foot-year">Campaña Naranja · 2026</div>
+  </div>
+</div>
+
+<div class="nav-dropdown-menu" id="menuRegistro" hidden>
+  <a href="tablero.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 15.5h5M9 12.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tablero</a>
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M3.5 14V9.5M9 14V4M14.5 14V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Dashboards</a>
+  <a href="corridas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2 10h2.8l1.8-5.5L9.4 13l1.6-6.5H16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Corridas</a>
+  <a href="registrar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M11.3 3.3l3.4 3.4-7.6 7.6-3.9 1 1-3.9 7.1-7.1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Registrar consumo</a>
+  <a href="lotes.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M2.5 6.2 9 3l6.5 3.2v6.6L9 16l-6.5-3.2V6.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.2 9 9.4l6.5-3.2M9 9.4V16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Lotes</a>
+  <a href="trazabilidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="7.8" cy="7.8" r="4.8" stroke="currentColor" stroke-width="1.5"/><path d="M11.5 11.5L15.5 15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Trazabilidad de lote</a>
+  <a href="sincronizar.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M14.5 5.2A6 6 0 0 0 4 8.3M3.5 12.8A6 6 0 0 0 14 9.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M14.5 2.2v3.3h-3.3M3.5 15.8v-3.3h3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sincronizar</a>
+</div>
+<div class="nav-dropdown-menu" id="menuCalidad" hidden>
+  <a href="calidad.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M7 2.5h4M7.5 2.5v4.2L4 13.5a1.3 1.3 0 0 0 1.15 1.9h7.7A1.3 1.3 0 0 0 14 13.5l-3.5-6.8V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Siguiente bin</a>
+  <a href="mediciones.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.5v4M6 3.2l1 3.6M12 3.2l-1 3.6M6 6.5h6l1.3 8a1.5 1.5 0 0 1-1.5 1.8H6.2A1.5 1.5 0 0 1 4.7 14.5Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Medición de tanques</a>
+</div>
+<div class="nav-dropdown-menu" id="menuSubproductos" hidden>
+  <a href="subproductos.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><path d="M9 2.2c2.6 3.1 4.4 5.4 4.4 7.7a4.4 4.4 0 0 1-8.8 0c0-2.3 1.8-4.6 4.4-7.7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Emulsión y aceite</a>
+</div>
+<div class="nav-dropdown-menu" id="menuParadas" hidden>
+  <a href="paradas.html"><svg class="nav-icon" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="10" r="6.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 6.8V10l2.6 1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Registrar paradas</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+const LETRAS = ["A", "B", "C", "D"];
+const COLORES = ["var(--forest-2)", "var(--citrus)", "var(--series-1)", "var(--series-5)"];
+const TONOS = ["#8FB9A0", "#C9D8A8", "#E9CF8D", "#B9C7DB", "#D8B8C8", "#A8CDD1", "#DDBE9E"];
+const TOLERANCIA = 0.10;      // un rendimiento a menos de 10 % (relativo) del típico se considera habitual
+
+const fmt2 = (n) => Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (x) => (x * 100).toFixed(1) + " %";
+function aviso(id, texto, tipo) {
+  document.getElementById(id).innerHTML = texto ? `<div class="msg ${tipo || "bad"}" style="line-height:1.5">${escapeHtml(texto)}</div>` : "";
+}
+const ocultar = (si) => { document.getElementById("contenido").hidden = si; };
+
+let todas = [], candidatas = [], seleccion = new Set(), principal = null;
+let D = null, tanques = [], lotes = [], tipico = {}, sel = -1, arrastrando = -1, calc = null;
+
+// ---------------- selección de corridas ----------------
+async function iniciar() {
+  const idP = Number(new URLSearchParams(location.search).get("corrida"));
+  try { todas = await apiGet("/api/corridas"); } catch (e) { aviso("avisoGeneral", e.message); return; }
+  principal = todas.find((c) => c.id === idP);
+  if (!principal) {
+    document.getElementById("candidatas").innerHTML = "";
+    aviso("avisoGeneral", "Abra esta pantalla desde el enlace «Repartir lotes» de una corrida en «Corridas».");
+    return;
+  }
+  const dia = (c) => c.fecha_inicio.slice(0, 10);
+  const dif = (a, b) => Math.abs((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 86400000);
+  candidatas = todas.filter((c) => dif(dia(c), dia(principal)) <= 1)
+    .sort((a, b) => (a.fecha_inicio < b.fecha_inicio ? -1 : a.fecha_inicio > b.fecha_inicio ? 1 : a.id - b.id));
+  const mismoDia = candidatas.filter((c) => dia(c) === dia(principal) && c.id !== principal.id).slice(0, 3);
+  seleccion = new Set([principal.id, ...mismoDia.map((c) => c.id)]);
+  renderCandidatas();
+  await cargarDatos();
+}
+function renderCandidatas() {
+  document.getElementById("candidatas").innerHTML = candidatas.map((c) => `
+    <label class="check-fila"><input type="checkbox" value="${c.id}"${seleccion.has(c.id) ? " checked" : ""}${c.id === principal.id ? " disabled" : ""}>
+      <span class="nom">${escapeHtml(c.nombre)}</span><span class="meta">${fmtF(c.fecha_inicio)} · ${escapeHtml(c.tipo_proceso || "—")} · ${fmtKg(c.kg_asignados_total)} kg</span></label>`).join("");
+}
+function fmtF(iso) { const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}/${y}`; }
+document.getElementById("candidatas").addEventListener("change", (ev) => {
+  const cb = ev.target.closest("input[type=checkbox]");
+  if (!cb) return;
+  if (cb.checked) { if (seleccion.size >= 4) { cb.checked = false; aviso("avisoGeneral", "Se pueden repartir hasta cuatro corridas a la vez."); return; } seleccion.add(Number(cb.value)); }
+  else seleccion.delete(Number(cb.value));
+  cargarDatos();
+});
+
+// ---------------- carga de datos ----------------
+async function cargarDatos() {
+  document.getElementById("resultado").innerHTML = "";
+  aviso("avisoGeneral", "");
+  const ids = [...seleccion].sort((a, b) => a - b);
+  if (ids.length < 2) { ocultar(true); aviso("avisoGeneral", "Marque al menos dos corridas para repartir sus lotes.", "warn"); return; }
+  try { D = await apiGet("/api/repartir/datos?corridas=" + ids.join(",")); }
+  catch (e) { ocultar(true); aviso("avisoGeneral", e.message); return; }
+  if (D.pendientes.length) {
+    ocultar(true);
+    aviso("avisoGeneral", `Los lotes ${D.pendientes.join(", ")} tienen kg pendiente. Complételos en «Registrar consumo» antes de repartir.`, "warn"); return;
+  }
+  if (!D.lotes.length) { ocultar(true); aviso("avisoGeneral", "Las corridas marcadas no tienen lotes registrados.", "warn"); return; }
+  const sinPT = D.corridas.filter((c) => !(c.pt_kg > 0));
+  if (sinPT.length) {
+    ocultar(true);
+    aviso("avisoGeneral", `Registre primero el producto terminado («Productos de salida») de: ${sinPT.map((c) => c.nombre).join(", ")}. El reparto se calcula con el producto terminado de cada corrida.`, "warn"); return;
+  }
+  const sinTanques = D.corridas.filter((c) => !c.tanques.length);
+  if (sinTanques.length) {
+    ocultar(true);
+    aviso("avisoGeneral", `Faltan las mediciones de tanque de: ${sinTanques.map((c) => c.nombre).join(", ")}. El reparto se calcula a partir de los tanques que llenó cada corrida; regístrelos en «Medición de tanques».`, "warn"); return;
+  }
+  D.corridas.forEach((c, i) => { c.letra = LETRAS[i]; c.color = COLORES[i]; c.idx = i; });
+  tipico = {};
+  D.corridas.forEach((c) => { tipico[c.id] = c.tipico || (c.mp_kg > 0 ? c.pt_kg / c.mp_kg : 0.5); c.sinHistorico = !c.tipico; });
+
+  // los tanques de todas las corridas, en el orden en que se registraron
+  const todos = [];
+  D.corridas.forEach((c) => c.tanques.forEach((t) => todos.push({ ...t, c: c.idx, ts: Date.parse(t.registrado) })));
+  todos.sort((a, b) => a.ts - b.ts || a.id - b.id);
+  tanques = todos;
+  // una racha larga de tanques de la misma línea suele ser orden tipeado, no orden real
+  let ini = 0;
+  for (let i = 1; i <= tanques.length; i++) {
+    if (i === tanques.length || tanques[i].c !== tanques[ini].c) {
+      if (i - ini >= 6) for (let k = ini; k < i; k++) tanques[k].dudoso = true;
+      ini = i;
+    }
+  }
+  const gaps = tanques.slice(1).map((t, i) => (t.ts - tanques[i].ts) / 60000).sort((a, b) => a - b);
+  const mediana = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+  const dud = tanques.filter((t) => t.dudoso).length;
+  const msgs = [];
+  if (mediana < 3 && tanques.length > 4) msgs.push(`Los tanques se registraron en muy pocos minutos entre uno y otro (mediana de ${mediana.toFixed(1)} min), así que su orden puede no ser el del llenado real.`);
+  if (dud) msgs.push(`${dud} tanques seguidos de una misma línea (marcados con borde discontinuo) probablemente se anotaron por bloques.`);
+  aviso("avisoTanques", msgs.length ? msgs.join(" ") + " Confírmelo con su supervisor y corríjalo aquí." : "El orden de los tanques se tomó de la hora en que se registró cada uno.", msgs.length ? "warn" : "ok");
+
+  lotes = D.lotes.map((l) => ({ ...l }));
+  sel = -1;
+  document.getElementById("ayudaLetras").textContent = "(" + D.corridas.map((c) => `${c.letra} = ${c.nombre}`).join(", ") + ")";
+  document.getElementById("seqTexto").placeholder = "Ej. " + tanques.slice(0, 8).map((t) => LETRAS[t.c]).join("") + "…";
+  ocultar(false);
+  renderTodo();
+}
+
+// ---------------- cálculo ----------------
+function calcular() {
+  const cs = D.corridas;
+  const M = lotes.reduce((a, l) => a + l.kg, 0);
+  const ideal = cs.map((c) => c.pt_kg / (tipico[c.id] || 0.0001));      // MP que necesitaría para dar su rendimiento típico
+  const S = ideal.reduce((a, b) => a + b, 0);
+  const totalConPrecc = M + cs.reduce((a, c) => a + c.precc_kg, 0);
+  let mpExt = cs.map((c, i) => Math.max(totalConPrecc * ideal[i] / S - c.precc_kg, 0));   // el PRE CC no pasa por extracción
+  const sE = mpExt.reduce((a, b) => a + b, 0);
+  mpExt = sE > 0 ? mpExt.map((x) => x * M / sE) : mpExt.map(() => M / cs.length);
+  cs.forEach((c) => { c.porLitros = c.tanques.every((t) => t.litros > 0); });
+  tanques.forEach((t) => { t.w = cs[t.c].porLitros ? t.litros : 1; });
+  const wTot = cs.map((c, i) => tanques.filter((t) => t.c === i).reduce((a, t) => a + t.w, 0));
+  tanques.forEach((t) => { t.mp = mpExt[t.c] * t.w / wTot[t.c]; });
+  // cada tanque consume, en orden, la MP de los lotes que caen en su tramo
+  const A = lotes.map(() => cs.map(() => 0));
+  let li = 0, resto = lotes[0].kg;
+  tanques.forEach((t) => {
+    let falta = t.mp;
+    while (falta > 1e-6 && li < lotes.length) {
+      const toma = Math.min(falta, resto);
+      A[li][t.c] += toma; falta -= toma; resto -= toma;
+      if (resto <= 1e-6) { li++; resto = li < lotes.length ? lotes[li].kg : 0; }
+    }
+  });
+  // 2 decimales por celda, conservando exactamente el total de cada lote
+  A.forEach((fila, i) => {
+    const r = fila.map((x) => Math.round(x * 100) / 100);
+    const dif = Math.round((lotes[i].kg - r.reduce((a, b) => a + b, 0)) * 100) / 100;
+    const mayor = r.indexOf(Math.max(...r));
+    r[mayor] = Math.round((r[mayor] + dif) * 100) / 100;
+    A[i] = r;
+  });
+  const mpFinal = cs.map((c, i) => A.reduce((a, f) => a + f[i], 0));
+  const necesaria = S;                         // MP que necesitarían entre todas para dar su rendimiento típico
+  return { M, A, mpFinal, exceso: totalConPrecc / necesaria - 1 };
+}
+
+// ---------------- pantalla ----------------
+function renderTodo() {
+  calc = calcular();
+  renderTira(); renderTarjetas(); renderBarras(); renderTabla();
+  const x = calc.exceso;
+  aviso("avisoTotal", Math.abs(x) > 0.05
+    ? `La MP total de estas corridas es ${Math.abs(x * 100).toFixed(1)} % ${x > 0 ? "mayor" : "menor"} que la necesaria para dar sus rendimientos típicos con el producto terminado registrado. Por eso los rendimientos resultantes quedan ${x > 0 ? "por debajo" : "por encima"} de lo típico en todas las corridas; conviene revisar la MP o el producto terminado del día.`
+    : "", "warn");
+}
+function renderTira() {
+  document.getElementById("tira").innerHTML = tanques.map((t, i) => `
+    <div class="tk-chip${t.dudoso ? " dudoso" : ""}${i === sel ? " sel" : ""}" draggable="true" data-i="${i}" style="background:${D.corridas[t.c].color}"
+         title="${escapeHtml(D.corridas[t.c].nombre)} · ${escapeHtml(t.tanque)}${t.litros ? " · " + fmtKg(t.litros) + " L" : ""}${t.dudoso ? " · orden por confirmar" : ""}">
+      <small>${i + 1}</small><b>${D.corridas[t.c].letra}</b></div>`).join("");
+  document.getElementById("leyenda").innerHTML = D.corridas.map((c) =>
+    `<span><i style="background:${c.color}"></i>${c.letra} = <b>${escapeHtml(c.nombre)}</b> (${c.tanques.length} tanques)</span>`).join("");
+  document.getElementById("resumenTanques").textContent = `${tanques.length} tanques · ` + D.corridas.map((c) => `${c.tanques.length} de ${c.letra}`).join(", ");
+}
+function renderTarjetas() {
+  document.getElementById("tarjetas").innerHTML = D.corridas.map((c, i) => {
+    const mpTot = calc.mpFinal[i] + c.precc_kg, rd = mpTot > 0 ? c.pt_kg / mpTot : 0, tip = tipico[c.id];
+    const ok = tip > 0 && Math.abs(rd / tip - 1) <= TOLERANCIA;
+    return `<div class="panel tarjeta" style="margin-top:0;border-top:3px solid ${c.color}"><div class="form-body" style="gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><strong style="font-size:15px">${c.letra} · ${escapeHtml(c.nombre)}</strong><span class="tag">${escapeHtml(c.tipo_proceso || "—")}</span></div>
+      <div class="lookup">
+        <div class="lookup-row"><span>MP de extracción</span><span class="num">${fmtKg(calc.mpFinal[i])} kg</span></div>
+        ${c.precc_kg > 0 ? `<div class="lookup-row"><span>PRE CC (no pasa por extracción)</span><span class="num">${fmtKg(c.precc_kg)} kg</span></div>` : ""}
+        <div class="lookup-row"><span>MP total de la corrida</span><span class="num">${fmtKg(mpTot)} kg</span></div>
+        <div class="lookup-row"><span>Producto terminado</span><span class="num">${fmtKg(c.pt_kg)} kg</span></div>
+        <div class="lookup-row"><span>Rendimiento resultante</span><span class="num">${pct(rd)}</span></div>
+        <div class="lookup-row"><span>Rendimiento típico (editable)</span><span><input type="number" class="tipico" data-id="${c.id}" step="0.1" min="1" max="99" value="${(tip * 100).toFixed(1)}"> %</span></div>
+      </div>
+      <div>${ok ? '<span class="pill ok">✓ Dentro de lo habitual</span>' : '<span class="pill warn">Revisar: se aparta de lo típico</span>'}
+        ${c.sinHistorico ? '<div class="hint-line" style="margin-top:6px">No hay historial de este proceso: se tomó su rendimiento actual como típico. Ajústelo si corresponde.</div>' : ""}</div>
+    </div></div>`;
+  }).join("");
+}
+function renderBarras() {
+  document.getElementById("barraLotes").innerHTML = lotes.map((l, i) =>
+    `<div class="seg" style="flex:${l.kg};background:${TONOS[i % TONOS.length]}" title="Lote ${l.numero} · ${fmtKg(l.kg)} kg"><span>${l.numero}</span></div>`).join("");
+  document.getElementById("barraTanques").innerHTML = tanques.map((t, i) =>
+    `<div class="seg tk" style="flex:${t.mp};background:${D.corridas[t.c].color}" title="Tanque ${i + 1} · ${escapeHtml(D.corridas[t.c].nombre)} · ${fmtKg(t.mp)} kg de MP"><span>${D.corridas[t.c].letra}</span></div>`).join("");
+}
+function renderTabla() {
+  const cs = D.corridas;
+  document.getElementById("theadLotes").innerHTML = `<tr><th></th><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">Kg del lote</th>` +
+    cs.map((c) => `<th class="right">→ ${c.letra} (kg)</th>`).join("") + `<th>Resultado</th></tr>`;
+  document.getElementById("tbLotes").innerHTML = lotes.map((l, i) => {
+    const fila = calc.A[i], con = fila.filter((x) => x > 0);
+    const res = con.length === 1
+      ? `<span class="pill ok">Entero a ${cs[fila.findIndex((x) => x > 0)].letra}</span>`
+      : `<span class="pill warn">Compartido ${fila.map((x) => Math.round(x / l.kg * 100)).join(" / ")} %</span>`;
+    return `<tr>
+      <td style="white-space:nowrap"><button class="icon-btn" data-sube="${i}" title="Subir">▲</button><button class="icon-btn" data-baja="${i}" title="Bajar">▼</button></td>
+      <td class="strong num">#${l.numero}</td><td>${escapeHtml(l.proveedor)}</td><td><span class="tag">${l.almacen === "BINES" ? "Bines" : l.almacen === "SILO" ? "Silo" : "Mixto"}</span></td>
+      <td class="right num">${fmtKg(l.kg)}</td>${fila.map((x) => `<td class="right num">${x > 0 ? fmtKg(x) : "—"}</td>`).join("")}<td>${res}</td></tr>`;
+  }).join("");
+  document.getElementById("tfLotes").innerHTML = `<tr style="font-weight:600"><td></td><td colspan="3">Total</td><td class="right num">${fmtKg(calc.M)}</td>` +
+    calc.mpFinal.map((x) => `<td class="right num">${fmtKg(x)}</td>`).join("") + `<td></td></tr>`;
+  const comp = calc.A.filter((f) => f.filter((x) => x > 0).length > 1).length;
+  document.getElementById("notaReparto").textContent = `${comp} de ${lotes.length} lotes quedan compartidos entre corridas.`;
+  const precc = cs.reduce((a, c) => a + c.precc_kg, 0);
+  document.getElementById("notaPrecc").textContent = precc > 0 ? `El PRE CC (${fmtKg(precc)} kg) queda en su corrida` : "";
+}
+
+// ---------------- interacción: tanques ----------------
+function mover(de, a) {
+  if (a < 0 || a >= tanques.length || de === a) return;
+  const [t] = tanques.splice(de, 1);
+  tanques.splice(a, 0, t);
+  sel = a;
+  renderTodo();
+}
+document.getElementById("tira").addEventListener("click", (ev) => {
+  const c = ev.target.closest(".tk-chip");
+  if (!c) return;
+  sel = sel === Number(c.dataset.i) ? -1 : Number(c.dataset.i);
+  renderTira();
+});
+document.getElementById("tira").addEventListener("dragstart", (ev) => {
+  const c = ev.target.closest(".tk-chip");
+  if (!c) return;
+  arrastrando = Number(c.dataset.i);
+  ev.dataTransfer.effectAllowed = "move";
+  ev.dataTransfer.setData("text/plain", String(arrastrando));
+  c.classList.add("arrastrando");
+});
+document.getElementById("tira").addEventListener("dragover", (ev) => { if (arrastrando >= 0) ev.preventDefault(); });
+document.getElementById("tira").addEventListener("drop", (ev) => {
+  const c = ev.target.closest(".tk-chip");
+  ev.preventDefault();
+  if (c && arrastrando >= 0) mover(arrastrando, Number(c.dataset.i));
+  arrastrando = -1;
+});
+document.getElementById("tira").addEventListener("dragend", () => { arrastrando = -1; renderTira(); });
+document.getElementById("btnAntes").addEventListener("click", () => { if (sel >= 0) mover(sel, sel - 1); });
+document.getElementById("btnDespues").addEventListener("click", () => { if (sel >= 0) mover(sel, sel + 1); });
+document.getElementById("btnSeq").addEventListener("click", () => {
+  aviso("avisoSeq", "");
+  const usadas = LETRAS.slice(0, D.corridas.length).join("");
+  const texto = document.getElementById("seqTexto").value.toUpperCase().replace(/[^A-D]/g, "");
+  if (!texto) { aviso("avisoSeq", `Escriba la secuencia con las letras ${usadas.split("").join(", ")}.`); return; }
+  if ([...texto].some((l) => !usadas.includes(l))) { aviso("avisoSeq", `Solo se pueden usar las letras ${usadas.split("").join(", ")}.`); return; }
+  if (texto.length !== tanques.length) { aviso("avisoSeq", `La secuencia tiene ${texto.length} tanques y hay ${tanques.length} registrados.`); return; }
+  const falla = D.corridas.find((c) => [...texto].filter((l) => l === c.letra).length !== c.tanques.length);
+  if (falla) {
+    aviso("avisoSeq", `La secuencia tiene ${[...texto].filter((l) => l === falla.letra).length} tanques de ${falla.letra}, pero ${falla.nombre} tiene ${falla.tanques.length} registrados. La secuencia solo ordena los tanques existentes; si falta alguno, regístrelo en «Medición de tanques».`);
+    return;
+  }
+  const colas = D.corridas.map((c, i) => tanques.filter((t) => t.c === i).sort((a, b) => a.ts - b.ts || a.id - b.id));
+  const nuevo = [...texto].map((l) => colas[LETRAS.indexOf(l)].shift());
+  nuevo.forEach((t) => { t.dudoso = false; });
+  tanques = nuevo; sel = -1;
+  aviso("avisoTanques", "La secuencia fue ingresada manualmente.", "ok");
+  renderTodo();
+});
+
+// ---------------- interacción: lotes y rendimientos ----------------
+document.getElementById("tbLotes").addEventListener("click", (ev) => {
+  const s = ev.target.closest("[data-sube]"), b = ev.target.closest("[data-baja]");
+  const i = s ? Number(s.dataset.sube) : b ? Number(b.dataset.baja) : -1;
+  const j = s ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= lotes.length) return;
+  [lotes[i], lotes[j]] = [lotes[j], lotes[i]];
+  renderTodo();
+});
+document.getElementById("tarjetas").addEventListener("change", (ev) => {
+  const inp = ev.target.closest("input.tipico");
+  if (!inp) return;
+  const v = Number(inp.value) / 100;
+  if (v > 0 && v < 1) { tipico[Number(inp.dataset.id)] = v; renderTodo(); }
+});
+
+// ---------------- aplicar ----------------
+document.getElementById("btnAplicar").addEventListener("click", async () => {
+  const cs = D.corridas;
+  if (!(await confirmar(`¿Aplicar el reparto? Los ${lotes.length} lotes se redistribuirán entre ${cs.map((c) => c.nombre).join(", ")} con las cantidades de la tabla. Podrá volver a repartirlos después si hace falta.`))) return;
+  const btn = document.getElementById("btnAplicar");
+  btn.disabled = true;
+  const reparto = {};
+  lotes.forEach((l, i) => { reparto[l.numero] = Object.fromEntries(cs.map((c, k) => [c.id, calc.A[i][k]])); });
+  try {
+    const r = await apiPost("/api/repartir/aplicar", { corridas: cs.map((c) => c.id), reparto });
+    ocultar(true);
+    document.getElementById("resultado").innerHTML = `
+      <div class="panel" style="margin-top:24px"><div class="form-body">
+        <div class="msg ok" style="line-height:1.5">El reparto fue aplicado: ${r.lotes} lotes, ${r.lotes_partidos} de ellos repartidos entre más de una corrida.</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+          <a class="btn-link strong" href="corridas.html" style="text-decoration:none">Volver a Corridas</a>
+          ${cs.map((c) => `<a class="btn-link" href="/api/corridas/${c.id}/trazabilidad.xlsx" style="text-decoration:none">Trazabilidad (Excel) de ${escapeHtml(c.nombre)}</a>`).join("")}
+        </div></div></div>`;
+  } catch (e) {
+    btn.disabled = false;
+    aviso("avisoGeneral", /Method Not Allowed|Not Found/i.test(e.message) ? "El servidor que respondió todavía no tiene esta función. Actualice el servidor (git pull) y reinícielo." : e.message);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
+
+iniciar();
+</script>
+</body>
+</html>

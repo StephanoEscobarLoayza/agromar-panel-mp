@@ -34,6 +34,7 @@ producción.
 | **Calidad → Siguiente bin** | Si se acaba un bin a media corrida, calcula cuál conviene reponer (por fecha o por el que más ayuda a mantener Brix/Ratio) sin pasarse de la Acidez máxima. |
 | **Medición de tanques** | Brix/Acidez/pH medidos de verdad con refractómetro por tanque — manda sobre el estimado de los lotes en los reportes en cuanto hay al menos una medición. |
 | **Paradas** | Registro de paradas de planta durante una corrida (motivo, duración). |
+| **Repartir lotes** (enlace en cada corrida de `Corridas` que comparte día con otra) | Cuando dos corridas trabajan en paralelo con los mismos lotes, reparte cada lote entre ellas según los tanques que llenó cada línea (orden de los tanques por su hora de registro, corregible en la pantalla) y los rendimientos típicos de cada proceso. Muestra el resultado antes de aplicar y conserva los kg y bines de cada lote; el PRE CC no entra al reparto. Lógica en `repartir.py`. |
 | **Subproductos** | Seguimiento de la emulsión y del aceite de naranja orgánica: cilindros de emulsión (EORG-2026-N), transformación a aceite, barriles de 183 kg con su origen por corrida, ubicación y registro en Nisira, rendimiento de aceite por tonelada de MP y descarga en Excel. Reemplaza las hojas «Subproductos» del Excel de planta. |
 | **Sincronizar** | Trae los lotes nuevos/actualizados desde el Google Sheet de recepción (además de correr sola cada 20 min), y descarga un respaldo completo en Excel (una hoja por tabla). |
 

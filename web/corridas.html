@@ -177,6 +177,8 @@ function sugerirNombre() {
   if (!nombreInput.dataset.tocado) nombreInput.value = sugerido;
 }
 
+let CORRIDAS_EN_PARALELO = new Set();   // ids de corridas que comparten día con otra corrida
+
 function corridaCard(c) {
   const rango = c.fecha_final
     ? `${fmtDate(c.fecha_inicio)} — ${fmtDate(c.fecha_final)}`
@@ -191,6 +193,10 @@ function corridaCard(c) {
   }
   acciones.push(`<button class="btn-link" data-accion="editar-corrida" data-id="${c.id}">Editar</button>`);
   acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
+  // solo si hay otra corrida el mismo día: es el caso de dos corridas trabajando en paralelo con los mismos lotes
+  if (CORRIDAS_EN_PARALELO.has(c.id) && Number(c.n_asignaciones) > 0) {
+    acciones.push(`<a class="btn-link strong" href="repartir.html?corrida=${c.id}" style="text-decoration:none" title="Repartir los lotes entre las corridas que trabajaron al mismo tiempo">Repartir lotes</a>`);
+  }
   acciones.push(`<a class="btn-link" href="/api/corridas/${c.id}/reporte.pdf" target="_blank" rel="noopener" style="text-decoration:none"
     onclick="this.href='/api/corridas/${c.id}/reporte.pdf?t='+Date.now()">Reporte PDF</a>`);
   acciones.push(`<a class="btn-link" href="/api/corridas/${c.id}/trazabilidad.xlsx" style="text-decoration:none"
@@ -363,6 +369,9 @@ async function cargar() {
   try {
     const corridas = await apiGet("/api/corridas");
     const cont = document.getElementById("corridas");
+    const porDia = {};
+    corridas.forEach((c) => { (porDia[c.fecha_inicio.slice(0, 10)] = porDia[c.fecha_inicio.slice(0, 10)] || []).push(c.id); });
+    CORRIDAS_EN_PARALELO = new Set(Object.values(porDia).filter((v) => v.length > 1).flat());
 
     if (corridas.length === 0) {
       cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';

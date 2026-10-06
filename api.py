@@ -34,6 +34,7 @@ from reporte_stock import generar_reporte_stock_pdf
 from reporte_trazabilidad import generar_trazabilidad_xlsx
 from reporte_paradas import generar_paradas_periodo_xlsx
 from subproductos import crear_router as crear_router_subproductos
+from repartir import crear_router as crear_router_repartir
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
@@ -2124,6 +2125,9 @@ def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
 
 # subproductos (emulsión y aceite) - endpoints en subproductos.py
 app.include_router(crear_router_subproductos(engine))
+
+# reparto de lotes entre corridas en paralelo - endpoints en repartir.py
+app.include_router(crear_router_repartir(engine, _sync_lote_derivado_pre_cc))
 
 
 # ---------------------------------------------------------------------------
