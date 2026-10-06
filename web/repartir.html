@@ -97,7 +97,7 @@
           <label>Corridas que trabajaron al mismo tiempo</label>
           <div class="lista-check" id="candidatas"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
         </div>
-        <div class="hint-line">Se muestran las corridas del mismo día y las de un día antes o después. Se toman los lotes ya registrados en ellas y los tanques de «Medición de tanques», y el reparto se recalcula entre las corridas marcadas.</div>
+        <div class="hint-line">Se muestran las corridas del mismo día y las de un día antes o después; se marcan las del mismo día y las que siguen abiertas a la vez. Se toman los lotes ya registrados en ellas y los tanques de «Medición de tanques», y el reparto se recalcula entre las corridas marcadas.</div>
       </div>
     </div>
   </section>
@@ -225,7 +225,9 @@ async function iniciar() {
   const dif = (a, b) => Math.abs((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 86400000);
   candidatas = todas.filter((c) => dif(dia(c), dia(principal)) <= 1)
     .sort((a, b) => (a.fecha_inicio < b.fecha_inicio ? -1 : a.fecha_inicio > b.fecha_inicio ? 1 : a.id - b.id));
-  const mismoDia = candidatas.filter((c) => dia(c) === dia(principal) && c.id !== principal.id).slice(0, 3);
+  // se marcan de entrada las que empezaron el mismo día o siguen abiertas a la vez que la principal
+  const mismoDia = candidatas.filter((c) => c.id !== principal.id && (dia(c) === dia(principal) ||
+    (c.fecha_final === null && principal.fecha_final === null))).slice(0, 3);
   seleccion = new Set([principal.id, ...mismoDia.map((c) => c.id)]);
   renderCandidatas();
   await cargarDatos();
