@@ -115,7 +115,7 @@
   <section class="vista activa" id="vista-resumen">
     <div class="section-head">
       <h2>Rendimiento de aceite</h2>
-      <span class="hint">kg de aceite por tonelada de materia prima procesada</span>
+      <span class="hint">Kg de aceite por tonelada de materia prima procesada</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="chart-wrap" id="chartWrap"><div class="tip" id="tip"></div></div>
@@ -124,7 +124,7 @@
 
     <div class="section-head" style="margin-top:36px">
       <h2>Producción por corrida</h2>
-      <span class="hint">las corridas y la materia prima se toman de «Registrar consumo»</span>
+      <span class="hint">Las corridas y la materia prima se toman de «Registrar consumo»</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="table-wrap">
@@ -147,7 +147,7 @@
   <section class="vista" id="vista-emulsion">
     <div class="section-head">
       <h2>Cilindros de emulsión</h2>
-      <span class="hint">código correlativo EORG-2026-N</span>
+      <span class="hint">Código correlativo EORG-2026-N</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="toolbar">
@@ -175,7 +175,7 @@
   <section class="vista" id="vista-aceite">
     <div class="section-head">
       <h2>Barriles de aceite</h2>
-      <span class="hint">seguimiento por número de cilindro, con su origen y ubicación</span>
+      <span class="hint">Seguimiento por número de cilindro, con su origen y ubicación</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="toolbar">
@@ -202,7 +202,7 @@
   <section class="vista" id="vista-registrar">
     <div class="section-head">
       <h2>Registrar producción</h2>
-      <span class="hint">emulsión y transformación a aceite</span>
+      <span class="hint">Emulsión y transformación a aceite</span>
     </div>
     <div class="flow">
       <div class="panel" style="margin-top:0">
@@ -217,7 +217,7 @@
             <div class="lista-check" id="emuCorridas"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
           </div>
           <div class="field">
-            <label for="emuMpManual">MP procesada (kg) <span class="hint-line">— solo si no hay corridas del panel</span></label>
+            <label for="emuMpManual">MP procesada (kg) <span class="hint-line">· Solo si no hay corridas del panel</span></label>
             <input type="number" id="emuMpManual" min="0" step="1" inputmode="decimal" placeholder="Ej. 132550">
           </div>
           <div class="two-col">
@@ -253,7 +253,7 @@
 
     <div class="section-head" style="margin-top:36px">
       <h2>Últimas transformaciones</h2>
-      <span class="hint">solo se puede deshacer la más reciente</span>
+      <span class="hint">Solo se puede deshacer la más reciente</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="table-wrap">
@@ -354,7 +354,7 @@ function renderKpis() {
   el.innerHTML = `
     <div class="kpi"><div class="kpi-label">Emulsión producida</div><div class="kpi-value num citrus">${fmtKg(k.emulsion_kg)} kg</div><div class="kpi-note">${fmtInt(k.n_cilindros)} cilindros · ${fmtInt(k.n_registros)} registros</div></div>
     <div class="kpi"><div class="kpi-label">Aceite obtenido</div><div class="kpi-value num">${fmtKg(k.aceite_kg)} kg</div><div class="kpi-note">${fmtInt(k.n_barriles)} barriles</div></div>
-    <div class="kpi"><div class="kpi-label">Aceite por tonelada de MP</div><div class="kpi-value num">${k.aceite_por_t_mp === null ? "—" : fmt2(k.aceite_por_t_mp) + " kg"}</div><div class="kpi-note">promedio de las corridas transformadas</div></div>
+    <div class="kpi"><div class="kpi-label">Aceite por tonelada de MP</div><div class="kpi-value num">${k.aceite_por_t_mp === null ? "—" : fmt2(k.aceite_por_t_mp) + " kg"}</div><div class="kpi-note">Promedio de las corridas transformadas</div></div>
     <div class="kpi"><div class="kpi-label">Por transformar a aceite</div><div class="kpi-value num">${fmtKg(k.pendiente_kg)} kg</div><div class="kpi-note">${fmtInt(k.pendiente_cilindros)} cilindros en precámara</div></div>`;
   ajustarKpiValues(el);
 }
@@ -460,8 +460,8 @@ function renderResumen() {
         : `Diferencia ${dif > 0 ? "+" : "−"}${fmtKg(Math.abs(dif))} kg`;
       cuadre = `<button type="button" class="pill ${motivo ? "neutral" : "warn"} pill-btn" data-accion="motivo" data-id="${r.id}" title="Pulse para indicar o cambiar el motivo de la diferencia">${etiqueta}<span class="caret">▾</span></button>`;
     }
-    const mpSub = dif !== null && Math.abs(dif) > 5 ? `<div class="num-sub">corridas: ${fmtKg(r.mp_corridas_kg)}</div>` : "";
-    const aceiteSub = r.conversion !== null ? `<div class="num-sub" title="Aceite obtenido sobre la emulsión transformada">${(r.conversion * 100).toFixed(1)} % conv.</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">parcial</div>' : "");
+    const mpSub = dif !== null && Math.abs(dif) > 5 ? `<div class="num-sub">Corridas: ${fmtKg(r.mp_corridas_kg)}</div>` : "";
+    const aceiteSub = r.conversion !== null ? `<div class="num-sub" title="Aceite obtenido sobre la emulsión transformada">${(r.conversion * 100).toFixed(1)} % conv.</div>` : (r.estado === "PARCIAL" ? '<div class="num-sub">Parcial</div>' : "");
     const eliminar = r.estado === "PRECAMARA"
       ? `<button class="btn-link btn-link-bad" data-accion="eliminar-registro" data-id="${r.id}" title="Eliminar este registro de emulsión">✕</button>` : "";
     return `<tr>
@@ -511,7 +511,7 @@ async function cargarCilindros(lista) {
       <td class="strong num">${c.codigo}</td>
       <td class="num">${fmtF(c.fecha)}</td>
       <td>${c.corridas.length ? `<div class="chips-mini">${c.corridas.map((n) => `<span class="tag">${escapeHtml(n)}</span>`).join("")}</div>` : pill("neutral", "Sin vincular")}</td>
-      <td class="right num">${c.peso_neto_kg === null ? '<span class="hint-line">pendiente</span>' : fmt2(c.peso_neto_kg)}</td>
+      <td class="right num">${c.peso_neto_kg === null ? '<span class="hint-line">Pendiente</span>' : fmt2(c.peso_neto_kg)}</td>
       <td>${c.estado === "PRECAMARA" ? pill("warn", "En precámara") : pill("ok", "Procesado")}</td>
       <td class="num">${c.transformacion_fecha ? fmtF(c.transformacion_fecha) : '<span class="hint-line">—</span>'}</td>
     </tr>`).join("") : '<tr><td colspan="6" class="empty" style="text-align:center">No hay cilindros en este estado.</td></tr>';
@@ -548,8 +548,8 @@ function renderBarriles() {
     const origen = b.aportes.map((a) => `<div class="num origen-linea">${fmtF(a.registro_fecha || a.fecha)} <span class="num-sub">· ${fmt2(a.kg)} kg</span></div>`).join("");
     const traz = b.mezcla ? pill("warn", `Mezcla de ${b.n_origenes} corridas`) : pill("ok", "Única");
     let nota = "";
-    if (b.estado === "ABIERTO") nota = `<div class="num-sub">abierto · faltan ${fmt2(b.capacidad_kg - b.kg)}</div>`;
-    else if (b.kg > b.capacidad_kg + 0.005) nota = `<div class="num-sub" style="color:var(--warn)">excede ${fmt2(b.kg - b.capacidad_kg)}</div>`;
+    if (b.estado === "ABIERTO") nota = `<div class="num-sub">Abierto · faltan ${fmt2(b.capacidad_kg - b.kg)}</div>`;
+    else if (b.kg > b.capacidad_kg + 0.005) nota = `<div class="num-sub" style="color:var(--warn)">Excede en ${fmt2(b.kg - b.capacidad_kg)}</div>`;
     const opciones = [...UBICACIONES]; if (b.ubicacion && !opciones.includes(b.ubicacion)) opciones.push(b.ubicacion);
     const sel = `<select class="sel-ubic" data-id="${b.id}"><option value=""${b.ubicacion ? "" : " selected"}>—</option>${opciones.map((u) => `<option${u === b.ubicacion ? " selected" : ""}>${escapeHtml(u)}</option>`).join("")}</select>`;
     return `<tr>
