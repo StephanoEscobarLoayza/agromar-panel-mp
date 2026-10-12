@@ -26,6 +26,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
+from db import crear_motor
 from sync_lotes import sincronizar_lotes
 from reporte_base import ahora_peru
 from reporte_corrida import generar_reporte_pdf
@@ -43,7 +44,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL_POOLED") or os.environ.get("DATABASE
 if not DATABASE_URL:
     raise RuntimeError("Falta DATABASE_URL o DATABASE_URL_POOLED en .env")
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = crear_motor(DATABASE_URL, pool_pre_ping=True)
 
 app = FastAPI(title="Panel de cuadre - Agromar")
 app.add_middleware(
@@ -997,7 +998,7 @@ def listar_productos_corrida(corrida_id: int):
 # tocado (Stephano lo notó con los lotes 2449/2450 de la corrida 94 - salía
 # el saldo completo del lote en vez del que de verdad quedaba).
 _SQL_KG_SALDO_AL_CIERRE = """
-    CASE WHEN :fecha_final IS NULL THEN v.kg_saldo ELSE
+    CASE WHEN CAST(:fecha_final AS timestamp) IS NULL THEN v.kg_saldo ELSE
         l.peso_neto_kg - COALESCE((
             SELECT SUM(a2.kg_asignados) FROM asignaciones a2
             WHERE a2.lote_numero = a.lote_numero
@@ -1007,7 +1008,7 @@ _SQL_KG_SALDO_AL_CIERRE = """
     END
 """
 _SQL_BINES_SALDO_AL_CIERRE = """
-    CASE WHEN :fecha_final IS NULL THEN v.bines_saldo ELSE
+    CASE WHEN CAST(:fecha_final AS timestamp) IS NULL THEN v.bines_saldo ELSE
         l.bines_totales - COALESCE((
             SELECT SUM(a2.bines_consumidos) FROM asignaciones a2
             WHERE a2.lote_numero = a.lote_numero
@@ -1017,7 +1018,7 @@ _SQL_BINES_SALDO_AL_CIERRE = """
     END
 """
 _SQL_KG_CONSUMIDO_AL_CIERRE = """
-    CASE WHEN :fecha_final IS NULL THEN v.kg_consumidos ELSE
+    CASE WHEN CAST(:fecha_final AS timestamp) IS NULL THEN v.kg_consumidos ELSE
         COALESCE((
             SELECT SUM(a2.kg_asignados) FROM asignaciones a2
             WHERE a2.lote_numero = a.lote_numero
