@@ -198,7 +198,7 @@ def _kpis(conn, registros):
     listos = [r for r in registros if r["estado"] == "TRANSFORMADO" and r["mp_kg"]]
     mp_listos = sum(r["mp_kg"] for r in listos)
     ac, nb = conn.execute(text(
-        "SELECT (SELECT COALESCE(SUM(kg), 0) FROM aceite_barril_aportes), (SELECT count(*) FROM aceite_barriles)")).fetchone()
+        "SELECT (SELECT COALESCE(SUM(kg), 0) FROM aceite_barril_aportes), (SELECT count(*) FROM aceite_barriles b WHERE EXISTS (SELECT 1 FROM aceite_barril_aportes ap WHERE ap.barril_id = b.id))")).fetchone()
     return {
         "n_registros": len(registros), "n_cilindros": sum(r["n_cilindros"] for r in registros),
         "emulsion_kg": sum(r["emulsion_kg"] for r in registros),
@@ -265,33 +265,41 @@ def _repartir_por_registro(conn, ids_cilindros, aceite: Decimal):
 
 
 def _asignar_a_barriles(conn, transformacion_id: int, partes, codigo_inicial: Optional[str]):
-    """Reparte el aceite en los barriles en orden: primero completa el último barril
-    si quedó abierto; luego abre barriles nuevos (códigos correlativos) hasta agotarlo.
-    El último barril puede quedar abierto para la siguiente transformación."""
-    ultimo = conn.execute(text("""
+    """Reparte el aceite en los barriles en orden: primero completa los barriles que tienen espacio
+    libre (el de menor número primero; normalmente solo el último, pero al deshacer una transformación
+    anterior quedan libres los barriles que ocupaba); luego abre barriles nuevos (códigos correlativos)
+    hasta agotarlo. El último barril puede quedar abierto para la siguiente transformación."""
+    barriles = conn.execute(text("""
         SELECT b.id, b.numero, b.codigo, b.capacidad_kg, COALESCE(SUM(ap.kg), 0) AS usado
         FROM aceite_barriles b LEFT JOIN aceite_barril_aportes ap ON ap.barril_id = b.id
-        GROUP BY b.id ORDER BY b.numero DESC LIMIT 1
-    """)).fetchone()
-    if ultimo is None:
+        GROUP BY b.id ORDER BY b.numero
+    """)).fetchall()
+    if not barriles:
         if not (codigo_inicial or "").strip().isdigit():
             raise HTTPException(status_code=400, detail="Todavía no hay barriles registrados: indique el código del primer barril.")
-        numero, codigo, capacidad, libre, barril = 0, int(codigo_inicial) - 1, Decimal(183), Decimal(0), None
+        numero, codigo, capacidad = 0, int(codigo_inicial) - 1, Decimal(183)
     else:
+        ultimo = barriles[-1]
         numero, codigo, capacidad = ultimo.numero, int(ultimo.codigo), _d(ultimo.capacidad_kg)
-        libre, barril = capacidad - _d(ultimo.usado), (ultimo.id, ultimo.codigo, False)
+    cola = [(b.id, b.codigo, _d(b.capacidad_kg) - _d(b.usado)) for b in barriles
+            if _d(b.capacidad_kg) - _d(b.usado) > Decimal("0.004")]      # barriles con espacio, de menor a mayor número
 
     aportes = {}    # codigo del barril -> {"codigo", "kg", "nuevo"}
+    barril, libre = None, Decimal(0)
     for registro_id, kg_total in partes:
         restante = kg_total
         while restante > Decimal("0.004"):
             if barril is None or libre <= Decimal("0.004"):
-                numero += 1
-                codigo += 1
-                bid = conn.execute(text("""
-                    INSERT INTO aceite_barriles (numero, codigo, capacidad_kg, ubicacion) VALUES (:n, :c, :cap, :u) RETURNING id
-                """), {"n": numero, "c": str(codigo), "cap": capacidad, "u": UBICACION_NUEVOS_BARRILES}).scalar()
-                barril, libre = (bid, str(codigo), True), capacidad
+                if cola:
+                    bid, bcodigo, libre = cola.pop(0)
+                    barril = (bid, bcodigo, False)
+                else:
+                    numero += 1
+                    codigo += 1
+                    bid = conn.execute(text("""
+                        INSERT INTO aceite_barriles (numero, codigo, capacidad_kg, ubicacion) VALUES (:n, :c, :cap, :u) RETURNING id
+                    """), {"n": numero, "c": str(codigo), "cap": capacidad, "u": UBICACION_NUEVOS_BARRILES}).scalar()
+                    barril, libre = (bid, str(codigo), True), capacidad
             kg = min(libre, restante).quantize(_CENT, ROUND_HALF_UP)
             conn.execute(text("""
                 INSERT INTO aceite_barril_aportes (barril_id, transformacion_id, registro_id, kg) VALUES (:b, :t, :r, :k)
@@ -449,29 +457,44 @@ def crear_router(engine) -> APIRouter:
 
     @router.delete("/api/aceite/transformaciones/{transformacion_id}")
     def eliminar_transformacion(transformacion_id: int):
-        """Solo se puede deshacer la última transformación: los barriles se llenan en
-        orden, así que quitar una anterior obligaría a reacomodar todos los siguientes."""
+        """Deshace cualquier transformación: sus cilindros vuelven a precámara y se quita su aceite de los
+        barriles. Los demás aportes no se mueven (el código de cada barril es una etiqueta física): los
+        barriles que quedan con espacio se completan primero con la siguiente transformación. Los barriles
+        vacíos del final se eliminan; los vacíos del medio se conservan para volver a usarlos."""
         with engine.begin() as conn:
             conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _LOCK_NUMERACION})
-            ultima = conn.execute(text("SELECT id FROM aceite_transformaciones ORDER BY id DESC LIMIT 1")).scalar()
-            if ultima is None:
+            if conn.execute(text("SELECT 1 FROM aceite_transformaciones WHERE id = :i"), {"i": transformacion_id}).scalar() is None:
                 raise HTTPException(status_code=404, detail="Transformación no encontrada.")
-            if ultima != transformacion_id:
-                raise HTTPException(status_code=400, detail="Solo se puede deshacer la última transformación registrada.")
+            tocados = [r.codigo for r in conn.execute(text("""
+                SELECT DISTINCT b.numero, b.codigo FROM aceite_barril_aportes ap JOIN aceite_barriles b ON b.id = ap.barril_id
+                WHERE ap.transformacion_id = :i ORDER BY b.numero
+            """), {"i": transformacion_id})]
             conn.execute(text("DELETE FROM aceite_transformaciones WHERE id = :i"), {"i": transformacion_id})  # aportes se borran en cascada; los cilindros vuelven a precámara
             conn.execute(text("""
-                DELETE FROM aceite_barriles b WHERE NOT EXISTS (SELECT 1 FROM aceite_barril_aportes ap WHERE ap.barril_id = b.id)
+                DELETE FROM aceite_barriles b
+                WHERE NOT EXISTS (SELECT 1 FROM aceite_barril_aportes ap WHERE ap.barril_id = b.id)
+                  AND b.numero > COALESCE((SELECT MAX(b2.numero) FROM aceite_barriles b2
+                                           WHERE EXISTS (SELECT 1 FROM aceite_barril_aportes ap2 WHERE ap2.barril_id = b2.id)), 0)
             """))
-        return {"ok": True}
+            libres = [{"codigo": r.codigo, "kg_libre": float(r.libre)} for r in conn.execute(text("""
+                SELECT b.codigo, b.capacidad_kg - COALESCE(SUM(ap.kg), 0) AS libre
+                FROM aceite_barriles b LEFT JOIN aceite_barril_aportes ap ON ap.barril_id = b.id
+                WHERE b.codigo = ANY(:c)
+                GROUP BY b.id HAVING b.capacidad_kg - COALESCE(SUM(ap.kg), 0) > 0.004 ORDER BY b.numero
+            """), {"c": tocados})]
+        return {"ok": True, "libres": libres}
 
     @router.get("/api/subproductos/transformaciones")
     def transformaciones():
-        """Lista de transformaciones (la más reciente primero) - la pantalla solo deja deshacer la última."""
+        """Lista de transformaciones (la más reciente primero), con los barriles que ocupa cada una."""
         with engine.connect() as conn:
             res = conn.execute(text("""
-                SELECT t.id, t.fecha, t.aceite_kg, count(c.id) AS n_cilindros, COALESCE(sum(c.peso_neto_kg), 0) AS emulsion_kg
+                SELECT t.id, t.fecha, t.aceite_kg, count(c.id) AS n_cilindros, COALESCE(sum(c.peso_neto_kg), 0) AS emulsion_kg,
+                       COALESCE((SELECT json_agg(x.codigo ORDER BY x.numero)
+                                 FROM (SELECT DISTINCT b.numero, b.codigo FROM aceite_barril_aportes ap
+                                       JOIN aceite_barriles b ON b.id = ap.barril_id WHERE ap.transformacion_id = t.id) x), '[]'::json) AS barriles
                 FROM aceite_transformaciones t LEFT JOIN emulsion_cilindros c ON c.transformacion_id = t.id
-                GROUP BY t.id ORDER BY t.id DESC LIMIT 15
+                GROUP BY t.id ORDER BY t.id DESC LIMIT 300
             """))
             return [{**dict(r._mapping), "aceite_kg": _f(r.aceite_kg), "emulsion_kg": _f(r.emulsion_kg)} for r in res]
 

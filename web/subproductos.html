@@ -195,7 +195,7 @@
       </div>
       <div id="masBarriles" style="padding:12px 20px;text-align:center"></div>
     </div>
-    <div class="sub-note">Los barriles se llenan en orden hasta 183 kg. Cuando una transformación deja un saldo, el barril queda abierto y la siguiente lo completa; el sistema conserva cuántos kg aportó cada corrida y marca el barril como mezcla cuando su aceite proviene de más de una.</div>
+    <div class="sub-note">Los barriles se llenan en orden hasta 183 kg. Cuando una transformación deja un saldo, el barril queda abierto y la siguiente lo completa; el sistema conserva cuántos kg aportó cada corrida y marca el barril como mezcla cuando su aceite proviene de más de una. Si se deshace una transformación anterior, sus barriles quedan con espacio y la siguiente transformación los completa primero.</div>
   </section>
 
   <!-- ============ REGISTRAR ============ -->
@@ -253,15 +253,16 @@
 
     <div class="section-head" style="margin-top:36px">
       <h2>Últimas transformaciones</h2>
-      <span class="hint">Solo se puede deshacer la más reciente</span>
+      <span class="hint">Puede deshacer cualquier transformación</span>
     </div>
     <div class="panel" style="margin-top:0">
       <div class="table-wrap">
         <table class="tabla-compacta">
-          <thead><tr><th>Fecha</th><th class="right">Cilindros</th><th class="right">Emulsión (kg)</th><th class="right">Aceite (kg)</th><th class="right">Conversión</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th class="right">Cilindros</th><th class="right">Emulsión (kg)</th><th class="right">Aceite (kg)</th><th class="right">Conversión</th><th>Barriles</th><th></th></tr></thead>
           <tbody id="tbTransformaciones"></tbody>
         </table>
       </div>
+      <div id="masTransformaciones" style="padding:12px 20px;text-align:center"></div>
     </div>
   </section>
 
@@ -310,7 +311,7 @@ const pill = (tipo, texto) => `<span class="pill ${tipo}">${texto}</span>`;
 const hoy = () => ahoraLocal().slice(0, 10);
 
 let datos = { kpis: null, registros: [] };
-let barriles = [], precamara = [], corridasDisp = [], transformaciones = [];
+let barriles = [], precamara = [], corridasDisp = [], transformaciones = [], trLimite = 15;
 let ultimoCilindro = 0;
 let cilFiltro = "", cilLimite = 100, barFiltro = "", barLimite = 60;
 
@@ -546,7 +547,7 @@ function renderBarriles() {
   const vistos = lista.slice(0, barLimite);
   document.getElementById("tbBarriles").innerHTML = vistos.length ? vistos.map((b) => {
     const origen = b.aportes.map((a) => `<div class="num origen-linea">${fmtF(a.registro_fecha || a.fecha)} <span class="num-sub">· ${fmt2(a.kg)} kg</span></div>`).join("");
-    const traz = b.mezcla ? pill("warn", `Mezcla de ${b.n_origenes} corridas`) : pill("ok", "Única");
+    const traz = b.aportes.length === 0 ? pill("neutral", "Libre") : b.mezcla ? pill("warn", `Mezcla de ${b.n_origenes} corridas`) : pill("ok", "Única");
     let nota = "";
     if (b.estado === "ABIERTO") nota = `<div class="num-sub">Abierto · faltan ${fmt2(b.capacidad_kg - b.kg)}</div>`;
     else if (b.kg > b.capacidad_kg + 0.005) nota = `<div class="num-sub" style="color:var(--warn)">Excede en ${fmt2(b.kg - b.capacidad_kg)}</div>`;
@@ -657,12 +658,16 @@ function renderPrecamara() {
 function planBarriles(aceite) {
   const ultimo = barriles[0];
   const cap = ultimo ? ultimo.capacidad_kg : 183;
-  let libre = ultimo ? Math.max(cap - ultimo.kg, 0) : 0;
   let codigo = ultimo ? Number(ultimo.codigo) : null;
   const lineas = [];
   let resto = aceite;
-  if (ultimo && libre > 0.004) { const t = Math.min(libre, resto); lineas.push({ codigo: ultimo.codigo, kg: t, nuevo: false }); resto -= t; libre -= t; }
-  while (resto > 0.004 && codigo !== null) { codigo += 1; const t = Math.min(cap, resto); lineas.push({ codigo: String(codigo), kg: t, nuevo: true }); resto -= t; libre = cap - t; }
+  const conEspacio = barriles.filter((b) => b.capacidad_kg - b.kg > 0.004).sort((a, b) => a.numero - b.numero);
+  for (const b of conEspacio) {
+    if (resto <= 0.004) break;
+    const t = Math.min(b.capacidad_kg - b.kg, resto);
+    lineas.push({ codigo: b.codigo, kg: t, previo: b.kg, nuevo: false }); resto -= t;
+  }
+  while (resto > 0.004 && codigo !== null) { codigo += 1; const t = Math.min(cap, resto); lineas.push({ codigo: String(codigo), kg: t, previo: 0, nuevo: true }); resto -= t; }
   return { lineas, cap };
 }
 function resumenTransformacion() {
@@ -675,12 +680,12 @@ function resumenTransformacion() {
   if (aceite > 0 && emulsion > 0) filas.push(["Conversión aceite / emulsión", `${(aceite / emulsion * 100).toFixed(1)} %`]);
   if (aceite > 0 && marc.length) {
     const { lineas, cap } = planBarriles(aceite);
-    const comp = lineas.find((l) => !l.nuevo), nuevos = lineas.filter((l) => l.nuevo);
-    if (comp) filas.push(["Completa el barril abierto", `${comp.codigo} con ${fmt2(comp.kg)} kg`]);
+    const comp = lineas.filter((l) => !l.nuevo), nuevos = lineas.filter((l) => l.nuevo);
+    if (comp.length) filas.push([comp.length === 1 ? "Completa el barril abierto" : "Completa los barriles abiertos", comp.map((l) => `${l.codigo} con ${fmt2(l.kg)} kg`).join(", ")]);
     if (nuevos.length) filas.push(["Barriles nuevos", nuevos.map((l) => l.codigo).join(", ")]);
     const ult = lineas[lineas.length - 1];
     if (ult) {
-      const usado = ult.nuevo ? ult.kg : (barriles[0].kg + ult.kg);
+      const usado = ult.previo + ult.kg;
       if (usado < cap - 0.005) filas.push(["Queda abierto", `${ult.codigo} · ${fmt2(usado)} de ${fmt2(cap)} kg`]);
     }
   }
@@ -712,22 +717,43 @@ document.getElementById("btnTransformacion").addEventListener("click", async () 
 });
 
 // ---------- últimas transformaciones ----------
+function codigosBarriles(lista) {
+  if (!lista || !lista.length) return "—";
+  return lista.length <= 3 ? lista.join(", ") : `${lista[0]} a ${lista[lista.length - 1]} (${lista.length})`;
+}
 function renderTransformaciones() {
-  document.getElementById("tbTransformaciones").innerHTML = transformaciones.length ? transformaciones.map((t, i) => `<tr>
+  const vistas = transformaciones.slice(0, trLimite);
+  document.getElementById("tbTransformaciones").innerHTML = vistas.length ? vistas.map((t) => `<tr>
       <td class="strong num">${fmtF(t.fecha)}</td>
       <td class="right num">${t.n_cilindros}</td>
       <td class="right num">${fmt2(t.emulsion_kg)}</td>
       <td class="right num">${fmt2(t.aceite_kg)}</td>
       <td class="right num">${t.emulsion_kg > 0 ? (t.aceite_kg / t.emulsion_kg * 100).toFixed(1) + " %" : "—"}</td>
-      <td>${i === 0 ? `<button class="btn-link btn-link-bad" data-accion="deshacer" data-id="${t.id}">Deshacer</button>` : ""}</td>
-    </tr>`).join("") : '<tr><td colspan="6" class="empty" style="text-align:center">Aún no hay transformaciones registradas.</td></tr>';
+      <td class="num">${codigosBarriles(t.barriles)}</td>
+      <td><button class="btn-link btn-link-bad" data-accion="deshacer" data-id="${t.id}">Deshacer</button></td>
+    </tr>`).join("") : '<tr><td colspan="7" class="empty" style="text-align:center">Aún no hay transformaciones registradas.</td></tr>';
+  document.getElementById("masTransformaciones").innerHTML = transformaciones.length > trLimite
+    ? `<button type="button" class="btn-link strong" id="btnMasTr">Mostrar más (${fmtInt(transformaciones.length - trLimite)} restantes)</button>` : "";
 }
+document.getElementById("masTransformaciones").addEventListener("click", (ev) => {
+  if (!ev.target.closest("#btnMasTr")) return;
+  trLimite += 30;
+  renderTransformaciones();
+});
 document.getElementById("tbTransformaciones").addEventListener("click", async (ev) => {
   const b = ev.target.closest('[data-accion="deshacer"]');
   if (!b) return;
-  if (!(await confirmar("¿Deshacer la última transformación? Sus cilindros volverán a precámara y se quitará el aceite de los barriles."))) return;
-  try { await apiDelete(`/api/aceite/transformaciones/${b.dataset.id}`); await recargar(); aviso("mensajeGlobal", "La transformación fue deshecha.", "ok"); }
-  catch (e) { toast(textoError(e)); }
+  const t = transformaciones.find((x) => String(x.id) === b.dataset.id);
+  if (!t) return;
+  const barrilesTxt = t.barriles.length ? ` y se quitará su aceite de los barriles ${codigosBarriles(t.barriles)}` : "";
+  const cilTxt = t.n_cilindros === 1 ? "Su cilindro volverá" : `Sus ${t.n_cilindros} cilindros volverán`;
+  if (!(await confirmar(`¿Deshacer la transformación del ${fmtF(t.fecha)} (${fmt2(t.aceite_kg)} kg de aceite)? ${cilTxt} a precámara${barrilesTxt}. Los demás barriles no se modifican; los que queden con espacio se completarán primero con la siguiente transformación.`))) return;
+  try {
+    const r = await apiDelete(`/api/aceite/transformaciones/${b.dataset.id}`);
+    await recargar();
+    const libres = (r.libres || []).map((x) => `${x.codigo} (${fmt2(x.kg_libre)} kg libres)`).join(", ");
+    aviso("mensajeGlobal", "La transformación fue deshecha." + (libres ? ` Barriles con espacio: ${libres}.` : ""), "ok");
+  } catch (e) { toast(textoError(e)); }
 });
 
 // ---------- carga general ----------
