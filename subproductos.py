@@ -61,12 +61,13 @@ _SQL_REGISTROS = """
                       ORDER BY co.fecha_inicio, co.id)
                FROM emulsion_registro_corridas rc JOIN corridas co ON co.id = rc.corrida_id
                WHERE rc.registro_id = r.id), '[]'::json) AS corridas,
-           cs.n, cs.n_proc, cs.kg AS emulsion_kg, cs.pend_kg, cs.mn, cs.mx, ac.kg AS aceite_kg
+           cs.n, cs.n_proc, cs.kg AS emulsion_kg, cs.pend_kg, cs.mn, cs.mx, cs.n_sin_peso, ac.kg AS aceite_kg
     FROM emulsion_registros r
     LEFT JOIN LATERAL (
         SELECT count(*) AS n, count(transformacion_id) AS n_proc, COALESCE(SUM(peso_neto_kg), 0) AS kg,
                COALESCE(SUM(peso_neto_kg) FILTER (WHERE transformacion_id IS NULL), 0) AS pend_kg,
-               MIN(numero) AS mn, MAX(numero) AS mx
+               MIN(numero) AS mn, MAX(numero) AS mx,
+               count(*) FILTER (WHERE peso_neto_kg IS NULL) AS n_sin_peso
         FROM emulsion_cilindros WHERE registro_id = r.id) cs ON TRUE
     LEFT JOIN LATERAL (SELECT SUM(kg) AS kg FROM aceite_barril_aportes WHERE registro_id = r.id) ac ON TRUE
     ORDER BY r.fecha DESC, r.id DESC
@@ -140,7 +141,7 @@ def _lista_registros(conn):
             "motivo_manual": r.diferencia_motivo in ("descuento", "precc"),
             "descuento_kg": float(r.descuento_kg),
             "precc_kg": precc,
-            "n_cilindros": r.n, "n_procesados": r.n_proc,
+            "n_cilindros": r.n, "n_procesados": r.n_proc, "n_sin_peso": r.n_sin_peso,
             "primer_cilindro": r.mn, "ultimo_cilindro": r.mx,
             "emulsion_kg": emulsion, "pendiente_kg": float(r.pend_kg),
             "aceite_kg": aceite if (r.n_proc or aceite) else None,
@@ -236,6 +237,15 @@ class EditarRegistro(BaseModel):
 class EditarBarril(BaseModel):
     ubicacion: Optional[str] = None
     nisira: Optional[bool] = None
+
+
+class PesoCilindro(BaseModel):
+    peso_neto_kg: float
+
+
+class PesoRegistro(BaseModel):
+    peso_por_cilindro_kg: Optional[float] = None    # el mismo peso para cada cilindro sin peso
+    peso_total_kg: Optional[float] = None           # peso total de la emulsión del registro (como en el Excel)
 
 
 def _fecha_valida(s: str) -> date:
@@ -404,6 +414,46 @@ def crear_router(engine) -> APIRouter:
             if r.scalar() is None:
                 raise HTTPException(status_code=404, detail="Registro de emulsión no encontrado.")
         return {"ok": True}
+
+    @router.post("/api/emulsion/cilindros/{cilindro_id}")
+    def registrar_peso_cilindro(cilindro_id: int, p: PesoCilindro):
+        """Pone el peso de un cilindro que se registró con el peso pendiente."""
+        if not (p.peso_neto_kg and p.peso_neto_kg > 0):
+            raise HTTPException(status_code=400, detail="El peso del cilindro debe ser mayor a 0.")
+        with engine.begin() as conn:
+            r = conn.execute(text("UPDATE emulsion_cilindros SET peso_neto_kg = :p WHERE id = :i RETURNING id"),
+                             {"p": _d(p.peso_neto_kg).quantize(_CENT, ROUND_HALF_UP), "i": cilindro_id})
+            if r.scalar() is None:
+                raise HTTPException(status_code=404, detail="Cilindro no encontrado.")
+        return {"ok": True}
+
+    @router.post("/api/emulsion/registros/{registro_id}/peso")
+    def registrar_peso_registro(registro_id: int, p: PesoRegistro):
+        """Pone el peso a los cilindros de un registro que quedaron con el peso pendiente: el mismo peso por
+        cilindro, o el peso total de la emulsión del registro (se reparte entre los que no tienen peso, después
+        de descontar los que ya lo tienen)."""
+        if bool(p.peso_por_cilindro_kg and p.peso_por_cilindro_kg > 0) == bool(p.peso_total_kg and p.peso_total_kg > 0):
+            raise HTTPException(status_code=400, detail="Indique el peso por cilindro o el peso total, pero no ambos.")
+        with engine.begin() as conn:
+            filas = conn.execute(text("SELECT id, peso_neto_kg FROM emulsion_cilindros WHERE registro_id = :r ORDER BY numero FOR UPDATE"),
+                                 {"r": registro_id}).fetchall()
+            if not filas:
+                raise HTTPException(status_code=404, detail="Registro de emulsión no encontrado.")
+            pendientes = [f.id for f in filas if f.peso_neto_kg is None]
+            if not pendientes:
+                raise HTTPException(status_code=400, detail="Todos los cilindros de este registro ya tienen peso.")
+            if p.peso_por_cilindro_kg and p.peso_por_cilindro_kg > 0:
+                pesos = [_d(p.peso_por_cilindro_kg).quantize(_CENT, ROUND_HALF_UP)] * len(pendientes)
+            else:
+                con_peso = sum((_d(f.peso_neto_kg) for f in filas if f.peso_neto_kg is not None), Decimal(0))
+                resto = _d(p.peso_total_kg).quantize(_CENT, ROUND_HALF_UP) - con_peso
+                if resto <= 0:
+                    raise HTTPException(status_code=400, detail=f"El peso total debe ser mayor que los {con_peso:,.2f} kg de los cilindros que ya tienen peso.")
+                base = (resto / len(pendientes)).quantize(_CENT, ROUND_HALF_UP)
+                pesos = [base] * (len(pendientes) - 1) + [resto - base * (len(pendientes) - 1)]      # el último absorbe el redondeo
+            for cid, peso in zip(pendientes, pesos):
+                conn.execute(text("UPDATE emulsion_cilindros SET peso_neto_kg = :p WHERE id = :i"), {"p": peso, "i": cid})
+        return {"ok": True, "actualizados": len(pendientes), "peso_por_cilindro_kg": float(pesos[0])}
 
     @router.get("/api/aceite/barriles")
     def barriles(ubicacion: Optional[str] = None):

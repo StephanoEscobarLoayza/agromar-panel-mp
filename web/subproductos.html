@@ -403,6 +403,57 @@ function renderGrafico() {
   wrap.onmouseleave = () => { tip.style.opacity = 0; };
 }
 
+// ---------- peso de los cilindros pendientes ----------
+// Devuelve {peso_neto_kg} (un cilindro), {peso_por_cilindro_kg} o {peso_total_kg} (un registro), o null si se cancela.
+function pedirPeso({ titulo, detalle, unico }) {
+  return new Promise((resolve) => {
+    const campo = (id, etiqueta, ayuda) => `<div class="field"><label for="${id}">${etiqueta}</label><input type="number" step="0.01" min="0" id="${id}" inputmode="decimal" style="width:100%">${ayuda ? `<div class="hint-line">${ayuda}</div>` : ""}</div>`;
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px";
+    overlay.innerHTML = `
+      <div class="panel" style="max-width:440px;width:100%;margin:0">
+        <div class="form-body">
+          <div>
+            <div style="font-weight:600;font-size:15px">${titulo}</div>
+            <p style="margin:6px 0 0;font-size:13px;color:var(--text-2);line-height:1.5">${detalle}</p>
+          </div>
+          ${unico ? campo("pesoUno", "Peso neto del cilindro (kg)", "")
+                  : campo("pesoPor", "Peso neto por cilindro (kg)", "Se aplica a cada cilindro sin peso.") +
+                    campo("pesoTot", "O peso total de la emulsión del registro (kg)", "Se reparte entre los cilindros sin peso, descontando los que ya tienen peso.")}
+          <div id="pesoError" class="msg bad" style="display:none"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" class="btn-link" data-v="__cancelar" style="padding:9px 16px">Cancelar</button>
+            <button type="button" class="btn" data-v="__guardar" style="width:auto;padding:9px 20px">Guardar</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const num = (id) => { const el = overlay.querySelector("#" + id); return el && el.value !== "" ? Number(el.value) : null; };
+    if (!unico) {          // solo un campo a la vez
+      overlay.querySelector("#pesoPor").addEventListener("input", () => { overlay.querySelector("#pesoTot").value = ""; });
+      overlay.querySelector("#pesoTot").addEventListener("input", () => { overlay.querySelector("#pesoPor").value = ""; });
+    }
+    setTimeout(() => (overlay.querySelector("#pesoUno") || overlay.querySelector("#pesoPor")).focus(), 50);
+    const cerrar = (v) => { overlay.remove(); resolve(v); };
+    const error = (t) => { const e = overlay.querySelector("#pesoError"); e.textContent = t; e.style.display = "block"; };
+    overlay.addEventListener("click", (ev) => {
+      if (ev.target === overlay) return cerrar(null);
+      const b = ev.target.closest("[data-v]");
+      if (!b) return;
+      if (b.dataset.v === "__cancelar") return cerrar(null);
+      if (unico) {
+        const v = num("pesoUno");
+        return v > 0 ? cerrar({ peso_neto_kg: v }) : error("Indique un peso mayor a 0.");
+      }
+      const por = num("pesoPor"), tot = num("pesoTot");
+      if (por > 0) return cerrar({ peso_por_cilindro_kg: por });
+      if (tot > 0) return cerrar({ peso_total_kg: tot });
+      error("Indique el peso por cilindro o el peso total.");
+    });
+    overlay.addEventListener("keydown", (ev) => { if (ev.key === "Enter") overlay.querySelector('[data-v="__guardar"]').click(); if (ev.key === "Escape") cerrar(null); });
+  });
+}
+
 // ---------- motivo de una diferencia de MP ----------
 // Devuelve "descuento", "precc", "" (quitar la marca) o null (cancelar).
 function elegirMotivo(r) {
@@ -470,7 +521,7 @@ function renderResumen() {
       <td>${corr}</td>
       <td class="right num">${r.mp_kg === null ? "—" : fmtKg(r.mp_kg)}${mpSub}</td>
       <td>${cuadre}</td>
-      <td class="right num">${fmt2(r.emulsion_kg)}<div class="num-sub">${r.n_cilindros} cilindros</div></td>
+      <td class="right num">${fmt2(r.emulsion_kg)}<div class="num-sub">${r.n_cilindros} cilindros</div>${r.n_sin_peso > 0 ? `<div style="margin-top:4px"><button type="button" class="pill warn pill-btn" data-accion="peso" data-id="${r.id}" title="Pulse para registrar el peso de los cilindros pendientes">${r.n_sin_peso} sin peso<span class="caret">▾</span></button></div>` : ""}</td>
       <td class="right num">${r.aceite_kg === null ? "—" : fmt2(r.aceite_kg)}${aceiteSub}</td>
       <td class="right num">${r.aceite_por_t_mp === null ? "—" : fmt2(r.aceite_por_t_mp)}</td>
       <td style="white-space:nowrap">${ESTADO_REG[r.estado]} ${eliminar}</td>
@@ -478,6 +529,19 @@ function renderResumen() {
   }).join("");
 }
 document.getElementById("tbResumen").addEventListener("click", async (ev) => {
+  const pb = ev.target.closest('[data-accion="peso"]');
+  if (pb) {
+    const r = datos.registros.find((x) => x.id === Number(pb.dataset.id));
+    if (!r) return;
+    const v = await pedirPeso({ titulo: `Peso de los cilindros del ${fmtF(r.fecha)}`, detalle: `${r.n_sin_peso} de ${r.n_cilindros} cilindros de este registro no tienen peso registrado.` });
+    if (!v) return;
+    try {
+      const res = await apiPost(`/api/emulsion/registros/${r.id}/peso`, v);
+      await recargar();
+      toast(`El peso fue registrado en ${res.actualizados} cilindro${res.actualizados === 1 ? "" : "s"}: ${fmt2(res.peso_por_cilindro_kg)} kg ${res.actualizados === 1 ? "" : "cada uno"}.`.replace(/ \.$/, "."), "ok");
+    } catch (e) { toast(textoError(e)); }
+    return;
+  }
   const m = ev.target.closest('[data-accion="motivo"]');
   if (m) {
     const r = datos.registros.find((x) => x.id === Number(m.dataset.id));
@@ -512,13 +576,24 @@ async function cargarCilindros(lista) {
       <td class="strong num">${c.codigo}</td>
       <td class="num">${fmtF(c.fecha)}</td>
       <td>${c.corridas.length ? `<div class="chips-mini">${c.corridas.map((n) => `<span class="tag">${escapeHtml(n)}</span>`).join("")}</div>` : pill("neutral", "Sin vincular")}</td>
-      <td class="right num">${c.peso_neto_kg === null ? '<span class="hint-line">Pendiente</span>' : fmt2(c.peso_neto_kg)}</td>
+      <td class="right num">${c.peso_neto_kg === null ? `<span class="hint-line">Pendiente</span> <button type="button" class="btn-link strong" data-accion="peso-cil" data-id="${c.id}" data-codigo="${c.codigo}">Registrar peso</button>` : fmt2(c.peso_neto_kg)}</td>
       <td>${c.estado === "PRECAMARA" ? pill("warn", "En precámara") : pill("ok", "Procesado")}</td>
       <td class="num">${c.transformacion_fecha ? fmtF(c.transformacion_fecha) : '<span class="hint-line">—</span>'}</td>
     </tr>`).join("") : '<tr><td colspan="6" class="empty" style="text-align:center">No hay cilindros en este estado.</td></tr>';
   document.getElementById("notaEmu").textContent = `Se muestran ${fmtInt(lista.length)} de ${fmtInt(total)} cilindros`;
   document.getElementById("masEmulsion").innerHTML = lista.length < total ? '<button type="button" class="btn-link strong" id="btnMasEmu">Mostrar más</button>' : "";
 }
+document.getElementById("tbEmulsion").addEventListener("click", async (ev) => {
+  const b = ev.target.closest('[data-accion="peso-cil"]');
+  if (!b) return;
+  const v = await pedirPeso({ titulo: `Peso del cilindro ${b.dataset.codigo}`, detalle: "Este cilindro se registró con el peso pendiente.", unico: true });
+  if (!v) return;
+  try {
+    await apiPost(`/api/emulsion/cilindros/${b.dataset.id}`, v);
+    await recargar();
+    toast(`El peso del cilindro ${b.dataset.codigo} fue registrado: ${fmt2(v.peso_neto_kg)} kg.`, "ok");
+  } catch (e) { toast(textoError(e)); }
+});
 document.getElementById("chipsEmu").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-f]");
   if (!b) return;
