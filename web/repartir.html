@@ -84,9 +84,7 @@
 </div>
 
 <div class="wrap">
-  <div id="avisoGeneral" style="margin-top:24px"></div>
-
-  <section style="margin-top:8px">
+  <section style="margin-top:32px">
     <div class="section-head">
       <h2>Corridas en paralelo</h2>
       <span class="hint">Los lotes se registran juntos y se reparten según los tanques</span>
@@ -100,6 +98,7 @@
         <div class="hint-line">Se muestran las corridas del mismo día y las de un día antes o después; se marcan las del mismo día y las que siguen abiertas a la vez. Se toman los lotes ya registrados en ellas y los tanques de «Medición de tanques», y el reparto se recalcula entre las corridas marcadas.</div>
       </div>
     </div>
+    <div id="avisoGeneral" style="margin-top:16px"></div>
   </section>
 
   <div id="contenido" hidden>
@@ -204,7 +203,9 @@ const TOLERANCIA = 0.10;      // un rendimiento a menos de 10 % (relativo) del t
 const fmt2 = (n) => Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (x) => (x * 100).toFixed(1) + " %";
 function aviso(id, texto, tipo) {
-  document.getElementById(id).innerHTML = texto ? `<div class="msg ${tipo || "bad"}" style="line-height:1.5">${escapeHtml(texto)}</div>` : "";
+  const el = document.getElementById(id);
+  el.innerHTML = texto ? `<div class="msg ${tipo || "bad"}" style="line-height:1.5">${escapeHtml(texto)}</div>` : "";
+  if (texto && id === "avisoGeneral") setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);    // que el aviso siempre quede a la vista
 }
 const ocultar = (si) => { document.getElementById("contenido").hidden = si; };
 
@@ -513,7 +514,7 @@ document.getElementById("btnAplicar").addEventListener("click", async () => {
   } catch (e) {
     btn.disabled = false;
     aviso("avisoGeneral", /Method Not Allowed|Not Found/i.test(e.message) ? "El servidor que respondió todavía no tiene esta función. Actualice el servidor (git pull) y reinícielo." : e.message);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.getElementById("avisoGeneral").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 });
 
