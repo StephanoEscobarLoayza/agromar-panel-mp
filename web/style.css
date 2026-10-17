@@ -150,7 +150,7 @@ section{margin-top:40px}
 .chip b{color:var(--text);font-weight:600}
 .empty{color:var(--text-muted);font-size:13.5px;padding:20px 0}
 td.empty{padding:20px}
-.corrida-acciones{display:flex;gap:16px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.corrida-acciones{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 .btn-link{background:none;border:none;padding:0;font-size:12.5px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;transition:color .15s ease}
 .btn-link:hover{color:var(--citrus)}
 .btn-link.strong{color:var(--citrus)}
@@ -340,4 +340,50 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
   .wrap{padding:0 18px}
   nav.tabs{width:100%;justify-content:space-between}
   nav.tabs a{padding:8px 8px;font-size:12.5px}
+}
+
+/* ============ Tablet y celular ============ */
+/* Objetivos táctiles cómodos (el dedo necesita al menos ~34 px) en tablet y en pantallas táctiles */
+@media (max-width:1024px),(pointer:coarse){
+  .btn-link,.edit-inline .btn-link{padding:8px 6px;min-height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center}
+  .pill-btn,.csel-btn,.pill-select{min-height:34px}
+  .tag{font-size:11.5px}
+  .icon-btn{min-width:36px;min-height:36px}
+  a.lote-link{display:inline-block;padding:8px 2px}
+  /* aviso de que una tabla se puede deslizar hacia un lado (lo marca app.js) */
+  .table-wrap.desborda::before{content:"Deslice hacia un lado para ver más columnas ›";display:block;position:sticky;left:0;width:max-content;max-width:100%;padding:8px 14px 2px;font-size:11.5px;color:var(--text-muted)}
+}
+
+/* Celular */
+@media (max-width:760px){
+  /* la barra superior se parte en líneas: antes «Subproductos» y «Paradas» quedaban fuera de la pantalla */
+  nav.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}
+  nav.tabs a,.nav-dropdown-btn{padding:9px 10px;font-size:13px}
+  .nav-dropdown-btn{width:100%;justify-content:flex-start;background:rgba(244,239,224,.06)}
+  .nav-dropdown-btn.active{background:rgba(244,239,224,.14)}
+  .nav-dropdown-btn .nav-caret{margin-left:auto}
+  .hero-title{font-size:32px}
+  .hero-sub{font-size:14px}
+  .hero-eyebrow{margin-top:22px}
+  /* con menos de 16 px el iPhone amplía la pantalla al tocar un campo */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea{font-size:16px}
+  th,td{padding-left:12px;padding-right:12px}
+  .tabla-compacta th,.tabla-compacta td{padding-left:8px;padding-right:8px}
+
+  /* tablas anchas: cada fila pasa a ser una tarjeta con «columna: valor» (app.js rotula las celdas) */
+  .table-wrap{overflow-x:visible}
+  .table-wrap:has(table.tabla-tarjetas)::before{display:none}
+  table.tabla-tarjetas,table.tabla-tarjetas tbody,table.tabla-tarjetas tfoot,table.tabla-tarjetas tr,table.tabla-tarjetas td{display:block;width:100%}
+  table.tabla-tarjetas thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  table.tabla-tarjetas tr{padding:12px 16px;border-bottom:1px solid var(--border)}
+  table.tabla-tarjetas tbody tr:nth-child(even){background:var(--row-alt)}
+  table.tabla-tarjetas td,table.tabla-tarjetas tbody tr:nth-child(even) td,table.tabla-tarjetas tbody tr:hover td{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:5px 0;border:none;text-align:right;background:none}
+  table.tabla-tarjetas td::before{content:attr(data-label);flex:0 0 auto;max-width:42%;text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+  table.tabla-tarjetas td[data-label=""]::before{display:none}
+  table.tabla-tarjetas td[data-label=""]{justify-content:flex-end;gap:6px}
+  table.tabla-tarjetas td:first-child{padding-bottom:8px;margin-bottom:4px;border-bottom:1px dashed var(--border);font-size:15px;font-weight:600;color:var(--text)}
+  table.tabla-tarjetas td.empty{display:block;text-align:center}
+  table.tabla-tarjetas td.empty::before{display:none}
+  table.tabla-tarjetas td[colspan]{display:block;text-align:left}
+  table.tabla-tarjetas td[colspan]::before{display:none}
 }

@@ -198,6 +198,9 @@ document.addEventListener("DOMContentLoaded", () => {
         menu.style.left = Math.round(r.left) + "px";
         menu.style.top = Math.round(r.bottom + 6) + "px";
         menu.hidden = false;
+        // en el celular el botón de la columna derecha dejaba el menú fuera de la pantalla: se acota al ancho visible
+        const maxIzq = document.documentElement.clientWidth - menu.getBoundingClientRect().width - 8;
+        menu.style.left = Math.max(8, Math.min(Math.round(r.left), maxIzq)) + "px";
       }
     });
   });
@@ -227,3 +230,38 @@ document.addEventListener("wheel", (ev) => {
   wrap.scrollLeft += ev.deltaY;
   ev.preventDefault();
 }, { passive: false });
+
+// Tablas anchas en el celular: cada celda lleva el nombre de su columna (se muestra al verse como tarjeta)
+// y las tablas que se desbordan se marcan para avisar que se pueden deslizar hacia un lado.
+(function () {
+  function rotular(tabla) {
+    const etiquetas = [...tabla.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+    tabla.querySelectorAll("tbody tr, tfoot tr").forEach((tr) => {
+      let col = 0;
+      [...tr.children].forEach((td) => {
+        if (td.dataset.label === undefined) td.dataset.label = etiquetas[col] || "";
+        col += td.colSpan || 1;
+      });
+    });
+  }
+  function marcarDesborde() {
+    document.querySelectorAll(".table-wrap").forEach((w) => {
+      w.classList.toggle("desborda", w.clientWidth > 0 && w.scrollWidth > w.clientWidth + 4);
+    });
+  }
+  const vistas = new WeakSet();
+  let pendiente = null;
+  function revisar() {
+    document.querySelectorAll("table.tabla-tarjetas").forEach((t) => {
+      rotular(t);
+      if (!vistas.has(t)) { vistas.add(t); new MutationObserver(() => rotular(t)).observe(t, { childList: true, subtree: true }); }
+    });
+    marcarDesborde();
+  }
+  function programar() { clearTimeout(pendiente); pendiente = setTimeout(revisar, 150); }
+  document.addEventListener("DOMContentLoaded", () => {
+    revisar();
+    new MutationObserver(programar).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", programar);
+  });
+})();
