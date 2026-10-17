@@ -537,7 +537,7 @@ document.getElementById("tbResumen").addEventListener("click", async (ev) => {
     if (!v) return;
     try {
       const res = await apiPost(`/api/emulsion/registros/${r.id}/peso`, v);
-      await recargar();
+      await recargar(["resumen", "precamara", "lista"]);
       toast(`El peso fue registrado en ${res.actualizados} cilindro${res.actualizados === 1 ? "" : "s"}: ${fmt2(res.peso_por_cilindro_kg)} kg ${res.actualizados === 1 ? "" : "cada uno"}.`.replace(/ \.$/, "."), "ok");
     } catch (e) { toast(textoError(e)); }
     return;
@@ -563,7 +563,7 @@ document.getElementById("tbResumen").addEventListener("click", async (ev) => {
   const b = ev.target.closest('[data-accion="eliminar-registro"]');
   if (!b) return;
   if (!(await confirmar("¿Eliminar este registro de emulsión y todos sus cilindros? Esta acción no se puede deshacer."))) return;
-  try { await apiDelete(`/api/emulsion/registros/${b.dataset.id}`); await recargar(); aviso("mensajeGlobal", "El registro de emulsión fue eliminado.", "ok"); }
+  try { await apiDelete(`/api/emulsion/registros/${b.dataset.id}`); await recargar(["resumen", "precamara", "corridas", "lista"]); aviso("mensajeGlobal", "El registro de emulsión fue eliminado.", "ok"); }
   catch (e) { toast(textoError(e)); }
 });
 
@@ -590,7 +590,7 @@ document.getElementById("tbEmulsion").addEventListener("click", async (ev) => {
   if (!v) return;
   try {
     await apiPost(`/api/emulsion/cilindros/${b.dataset.id}`, v);
-    await recargar();
+    await recargar(["resumen", "precamara", "lista"]);
     toast(`El peso del cilindro ${b.dataset.codigo} fue registrado: ${fmt2(v.peso_neto_kg)} kg.`, "ok");
   } catch (e) { toast(textoError(e)); }
 });
@@ -710,15 +710,18 @@ document.getElementById("btnEmulsion").addEventListener("click", async () => {
     n_cilindros: Math.floor(Number(document.getElementById("emuN").value)) || 0,
     peso_total_kg: Number(document.getElementById("emuPeso").value) || 0,
   };
-  btn.disabled = true;
+  const textoBoton = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
   try {
     const r = await apiPost("/api/emulsion", cuerpo);
     ["emuMpManual", "emuN", "emuPeso"].forEach((id) => { document.getElementById(id).value = ""; });
-    await recargar();
     const cods = r.cilindros;
+    aviso("emuMensaje", `Emulsión registrada: ${cods.length === 1 ? cods[0] : cods[0] + " a " + cods[cods.length - 1].replace(PREFIJO, "")}, de ${fmt2(r.peso_por_cilindro_kg)} kg c/u. Actualizando la pantalla…`, "ok");
+    btn.textContent = "Actualizando…";
+    await recargar(["resumen", "precamara", "corridas", "lista"]);        // la emulsión no cambia los barriles ni las transformaciones
     aviso("emuMensaje", `Emulsión registrada: ${cods.length === 1 ? cods[0] : cods[0] + " a " + cods[cods.length - 1].replace(PREFIJO, "")}, de ${fmt2(r.peso_por_cilindro_kg)} kg c/u.`, "ok");
   } catch (e) { aviso("emuMensaje", e.message); }
-  btn.disabled = false;
+  btn.disabled = false; btn.textContent = textoBoton;
 });
 
 // ---------- registrar: transformación a aceite ----------
@@ -780,15 +783,18 @@ document.getElementById("btnTransformacion").addEventListener("click", async () 
     aceite_kg: Number(document.getElementById("trAceite").value) || 0,
     cilindro_ids: cilindrosMarcados().map((c) => Number(c.value)),
   };
-  btn.disabled = true;
+  const textoBoton = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
   try {
     const r = await apiPost("/api/aceite/transformaciones", cuerpo);
     document.getElementById("trAceite").value = "";
-    await recargar();
     const det = r.aportes.map((a) => `${a.codigo} (${fmt2(a.kg)} kg${a.nuevo ? ", nuevo" : ""})`).join(", ");
+    aviso("trMensaje", `Aceite registrado: ${det}. Actualizando la pantalla…`, "ok");
+    btn.textContent = "Actualizando…";
+    await recargar(["resumen", "barriles", "precamara", "transformaciones", "lista"]);       // las corridas disponibles no cambian
     aviso("trMensaje", `Aceite registrado: ${det}.`, "ok");
   } catch (e) { aviso("trMensaje", e.message); }
-  btn.disabled = false;
+  btn.disabled = false; btn.textContent = textoBoton;
 });
 
 // ---------- últimas transformaciones ----------
@@ -825,29 +831,37 @@ document.getElementById("tbTransformaciones").addEventListener("click", async (e
   if (!(await confirmar(`¿Deshacer la transformación del ${fmtF(t.fecha)} (${fmt2(t.aceite_kg)} kg de aceite)? ${cilTxt} a precámara${barrilesTxt}. Los demás barriles no se modifican; los que queden con espacio se completarán primero con la siguiente transformación.`))) return;
   try {
     const r = await apiDelete(`/api/aceite/transformaciones/${b.dataset.id}`);
-    await recargar();
+    await recargar(["resumen", "barriles", "precamara", "transformaciones", "lista"]);
     const libres = (r.libres || []).map((x) => `${x.codigo} (${fmt2(x.kg_libre)} kg libres)`).join(", ");
     aviso("mensajeGlobal", "La transformación fue deshecha." + (libres ? ` Barriles con espacio: ${libres}.` : ""), "ok");
   } catch (e) { toast(textoError(e)); }
 });
 
 // ---------- carga general ----------
-async function recargar() {
-  const [res, bar, pre, tr, cor, lis] = await Promise.all([
-    apiGet("/api/subproductos/resumen"),
-    apiGet("/api/aceite/barriles"),
-    apiGet("/api/emulsion/cilindros?estado=PRECAMARA"),
-    apiGet("/api/subproductos/transformaciones"),
-    apiGet("/api/subproductos/corridas?dias=21"),
-    apiGet(`/api/emulsion/cilindros?estado=${cilFiltro}&limite=${cilLimite}`),
-  ]);
-  datos = res; barriles = bar; precamara = pre.slice().sort((a, b) => a.numero - b.numero);
-  transformaciones = tr; corridasDisp = cor;
+// Sin argumentos recarga todo; con una lista de partes (p. ej. ["resumen", "precamara"]) pide solo esas, que es mucho
+// más rápido desde el celular: tras registrar una emulsión no hace falta volver a traer los 200 barriles.
+async function recargar(partes) {
+  const pedidos = {
+    resumen: () => apiGet("/api/subproductos/resumen"),
+    barriles: () => apiGet("/api/aceite/barriles"),
+    precamara: () => apiGet("/api/emulsion/cilindros?estado=PRECAMARA"),
+    transformaciones: () => apiGet("/api/subproductos/transformaciones"),
+    corridas: () => apiGet("/api/subproductos/corridas?dias=21"),
+    lista: () => apiGet(`/api/emulsion/cilindros?estado=${cilFiltro}&limite=${cilLimite}`),
+  };
+  const claves = Object.keys(pedidos).filter((k) => !partes || partes.includes(k));
+  const valores = await Promise.all(claves.map((k) => pedidos[k]()));
+  const R = Object.fromEntries(claves.map((k, i) => [k, valores[i]]));
+  if (R.resumen) datos = R.resumen;
+  if (R.barriles) barriles = R.barriles;
+  if (R.precamara) precamara = R.precamara.slice().sort((a, b) => a.numero - b.numero);
+  if (R.transformaciones) transformaciones = R.transformaciones;
+  if (R.corridas) corridasDisp = R.corridas;
   ultimoCilindro = Math.max(0, ...datos.registros.map((r) => r.ultimo_cilindro || 0));
   renderKpis(); renderGrafico(); renderResumen(); renderBarriles();
   renderCorridasDisp(); renderPrecamara(); renderTransformaciones();
   resumenEmulsion(); resumenTransformacion();
-  await cargarCilindros(lis);
+  if (R.lista) await cargarCilindros(R.lista);
 }
 
 document.getElementById("emuFecha").value = hoy();

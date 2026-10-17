@@ -296,28 +296,41 @@ def _asignar_a_barriles(conn, transformacion_id: int, partes, codigo_inicial: Op
 
     aportes = {}    # codigo del barril -> {"codigo", "kg", "nuevo"}
     barril, libre = None, Decimal(0)
+    nuevos = []     # barriles que hay que abrir: (numero, codigo)
+    plan = []       # (id de un barril existente o None, posición en `nuevos` o None, registro, kg)
     for registro_id, kg_total in partes:
         restante = kg_total
         while restante > Decimal("0.004"):
             if barril is None or libre <= Decimal("0.004"):
                 if cola:
                     bid, bcodigo, libre = cola.pop(0)
-                    barril = (bid, bcodigo, False)
+                    barril = (bid, None, bcodigo, False)
                 else:
                     numero += 1
                     codigo += 1
-                    bid = conn.execute(text("""
-                        INSERT INTO aceite_barriles (numero, codigo, capacidad_kg, ubicacion) VALUES (:n, :c, :cap, :u) RETURNING id
-                    """), {"n": numero, "c": str(codigo), "cap": capacidad, "u": UBICACION_NUEVOS_BARRILES}).scalar()
-                    barril, libre = (bid, str(codigo), True), capacidad
+                    nuevos.append((numero, str(codigo)))
+                    barril, libre = (None, len(nuevos) - 1, str(codigo), True), capacidad
             kg = min(libre, restante).quantize(_CENT, ROUND_HALF_UP)
-            conn.execute(text("""
-                INSERT INTO aceite_barril_aportes (barril_id, transformacion_id, registro_id, kg) VALUES (:b, :t, :r, :k)
-            """), {"b": barril[0], "t": transformacion_id, "r": registro_id, "k": kg})
-            a = aportes.setdefault(barril[1], {"codigo": barril[1], "kg": 0.0, "nuevo": barril[2]})
+            plan.append((barril[0], barril[1], registro_id, kg))
+            a = aportes.setdefault(barril[2], {"codigo": barril[2], "kg": 0.0, "nuevo": barril[3]})
             a["kg"] = round(a["kg"] + float(kg), 2)
             libre -= kg
             restante -= kg
+    # se escribe todo de una vez (dos consultas en total, sin importar cuántos barriles o aportes sean)
+    ids_nuevos = []
+    if nuevos:
+        filas = conn.execute(text("""
+            INSERT INTO aceite_barriles (numero, codigo, capacidad_kg, ubicacion)
+            SELECT t.n, t.c, :cap, :u FROM unnest(CAST(:ns AS integer[]), CAST(:cs AS text[])) AS t(n, c) RETURNING id, numero
+        """), {"ns": [n for n, _ in nuevos], "cs": [c for _, c in nuevos], "cap": capacidad, "u": UBICACION_NUEVOS_BARRILES}).fetchall()
+        por_numero = {f.numero: f.id for f in filas}
+        ids_nuevos = [por_numero[n] for n, _ in nuevos]
+    if plan:
+        conn.execute(text("""
+            INSERT INTO aceite_barril_aportes (barril_id, transformacion_id, registro_id, kg)
+            SELECT t.b, :t, t.r, t.k FROM unnest(CAST(:bs AS integer[]), CAST(:rs AS integer[]), CAST(:ks AS numeric[])) AS t(b, r, k)
+        """), {"bs": [b if b is not None else ids_nuevos[i] for b, i, _, _ in plan], "rs": [r for _, _, r, _ in plan],
+               "ks": [k for _, _, _, k in plan], "t": transformacion_id})
     return list(aportes.values())
 
 
@@ -381,13 +394,14 @@ def crear_router(engine) -> APIRouter:
                 INSERT INTO emulsion_registros (fecha, mp_kg_manual, observaciones) VALUES (:f, :mp, :o) RETURNING id
             """), {"f": fecha, "mp": p.mp_kg_manual if (p.mp_kg_manual and p.mp_kg_manual > 0) else None,
                    "o": (p.observaciones or "").strip() or None}).scalar()
-            for cid in corrida_ids:
-                conn.execute(text("INSERT INTO emulsion_registro_corridas (registro_id, corrida_id) VALUES (:r, :c)"), {"r": rid, "c": cid})
+            if corrida_ids:       # todo en una sola consulta: cada viaje a la base cuesta, sobre todo desde el celular
+                conn.execute(text("INSERT INTO emulsion_registro_corridas (registro_id, corrida_id) SELECT :r, x FROM unnest(CAST(:ids AS integer[])) AS x"),
+                             {"r": rid, "ids": corrida_ids})
             sig = conn.execute(text("SELECT COALESCE(MAX(numero), 0) + 1 FROM emulsion_cilindros")).scalar()
-            for i, peso in enumerate(pesos):
-                conn.execute(text("""
-                    INSERT INTO emulsion_cilindros (numero, registro_id, fecha, peso_neto_kg) VALUES (:n, :r, :f, :p)
-                """), {"n": sig + i, "r": rid, "f": fecha, "p": peso})
+            conn.execute(text("""
+                INSERT INTO emulsion_cilindros (numero, registro_id, fecha, peso_neto_kg)
+                SELECT t.n, :r, :f, t.p FROM unnest(CAST(:ns AS integer[]), CAST(:ps AS numeric[])) AS t(n, p)
+            """), {"ns": [sig + i for i in range(len(pesos))], "ps": pesos, "r": rid, "f": fecha})
         return {"ok": True, "id": rid, "cilindros": [_codigo_cilindro(sig + i) for i in range(p.n_cilindros)],
                 "peso_por_cilindro_kg": float(base)}
 
