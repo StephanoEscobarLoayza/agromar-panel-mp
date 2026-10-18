@@ -13,6 +13,8 @@
   .cards2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
   .tarjeta .lookup{background:var(--forest-tint)}
   .tarjeta input.tipico{width:78px;padding:4px 8px;font-size:13px;text-align:right}
+  input.kg-tramo{width:96px;padding:4px 8px;font-size:13px;text-align:right}
+  .btn-tramo{font-size:11px;font-weight:500;padding:2px 0;min-height:0;min-width:0;white-space:nowrap}
   .bar-title{font-size:12.5px;font-weight:600;color:var(--text-2)}
   .barra{display:flex;gap:2px;height:40px;margin-top:6px}
   .barra .seg{display:flex;align-items:center;justify-content:center;min-width:2px;border-radius:4px;overflow:hidden;font-size:11px;font-weight:600;color:#123524}
@@ -125,6 +127,7 @@
     </div>
 
     <div class="cards2" id="tarjetas"></div>
+    <div class="hint-line" style="margin-top:10px">El rendimiento estimado es un cálculo del reparto, no una medición: la MP de cada corrida se asigna a partir de su producto terminado y de su rendimiento típico.</div>
     <div id="avisoTotal" style="margin-top:14px"></div>
 
     <div class="section-head" style="margin-top:34px">
@@ -161,7 +164,7 @@
         </div>
       </div>
     </div>
-    <div class="sub-note">Al aplicar, los lotes se distribuyen entre las corridas con las cantidades indicadas. El saldo de cada lote no cambia: solo se reparte lo que ya estaba registrado. El PRE CC no pasa por extracción y se queda donde está. Si un lote lo usó una sola línea, elija «Solo» y la letra de esa corrida en la columna «Asignación»: el lote se asigna entero a ella y el resto se reparte según los tanques.</div>
+    <div class="sub-note">Al aplicar, los lotes se distribuyen entre las corridas con las cantidades indicadas. El saldo de cada lote no cambia: solo se reparte lo que ya estaba registrado. El PRE CC no pasa por extracción y se queda donde está. Si un lote lo usó una sola línea, elija «Solo» y la letra de esa corrida en la columna «Asignación»: el lote se asigna entero a ella y el resto se reparte según los tanques. Si un lote se usó en dos momentos separados (por ejemplo, un rato al inicio y otro más tarde), use «Dividir»: queda en dos tramos que se mueven por separado con ▲▼, y usted indica cuántos kg tuvo el primero.</div>
   </div>
 
   <div id="resultado"></div>
@@ -296,7 +299,7 @@ async function cargarDatos() {
   if (dud) msgs.push(`${dud} tanques seguidos de una misma línea (marcados con borde discontinuo) probablemente se anotaron por bloques.`);
   aviso("avisoTanques", msgs.length ? msgs.join(" ") + " Confírmelo con su supervisor y corríjalo aquí." : "El orden de los tanques se tomó de la hora en que se registró cada uno.", msgs.length ? "warn" : "ok");
 
-  lotes = D.lotes.map((l) => ({ ...l }));
+  lotes = D.lotes.map((l) => ({ ...l, total: l.kg }));      // `total` = kg del lote; si se divide en tramos, cada fila lleva una parte
   sel = -1;
   // avisos que no bloquean: lotes cuyos kg están en una corrida no marcada, y lotes que aún tienen saldo
   const notas = [];
@@ -364,7 +367,7 @@ function renderTodo() {
   renderTira(); renderTarjetas(); renderBarras(); renderTabla();
   const x = calc.exceso;
   aviso("avisoTotal", Math.abs(x) > 0.05
-    ? `La MP total de estas corridas es ${Math.abs(x * 100).toFixed(1)} % ${x > 0 ? "mayor" : "menor"} que la necesaria para dar sus rendimientos típicos con el producto terminado registrado. Por eso los rendimientos resultantes quedan ${x > 0 ? "por debajo" : "por encima"} de lo típico en todas las corridas; conviene revisar la MP o el producto terminado del día.`
+    ? `La MP total de estas corridas es ${Math.abs(x * 100).toFixed(1)} % ${x > 0 ? "mayor" : "menor"} que la necesaria para dar sus rendimientos típicos con el producto terminado registrado. Por eso los rendimientos estimados quedan ${x > 0 ? "por debajo" : "por encima"} de lo típico en todas las corridas; conviene revisar la MP o el producto terminado del día.`
     : "", "warn");
 }
 function renderTira() {
@@ -387,7 +390,7 @@ function renderTarjetas() {
         ${c.precc_kg > 0 ? `<div class="lookup-row"><span>PRE CC (no pasa por extracción)</span><span class="num">${fmtKg(c.precc_kg)} kg</span></div>` : ""}
         <div class="lookup-row"><span>MP total de la corrida</span><span class="num">${fmtKg(mpTot)} kg</span></div>
         <div class="lookup-row"><span>Producto terminado</span><span class="num">${fmtKg(c.pt_kg)} kg</span></div>
-        <div class="lookup-row"><span>Rendimiento resultante</span><span class="num">${pct(rd)}</span></div>
+        <div class="lookup-row"><span title="PT dividido entre la MP que el reparto le asigna a esta corrida. Es un cálculo, no una medición.">Rendimiento estimado</span><span class="num">${pct(rd)}</span></div>
         <div class="lookup-row"><span>Rendimiento típico (editable)</span><span><input type="number" class="tipico" data-id="${c.id}" step="0.1" min="1" max="99" value="${(tip * 100).toFixed(1)}"> %</span></div>
       </div>
       <div>${ok ? '<span class="pill ok">✓ Dentro de lo habitual</span>' : '<span class="pill warn">Revisar: se aparta de lo típico</span>'}
@@ -395,9 +398,21 @@ function renderTarjetas() {
     </div></div>`;
   }).join("");
 }
+// Un lote usado en dos momentos separados se divide en tramos: cada tramo es una fila de `lotes` con el mismo número.
+const ordinal = (j) => (j === 1 ? "1.er" : j === 3 ? "3.er" : `${j}.º`);
+function infoTramos() {
+  const n = {}, visto = {};
+  lotes.forEach((l) => { n[l.numero] = (n[l.numero] || 0) + 1; });
+  return lotes.map((l) => { visto[l.numero] = (visto[l.numero] || 0) + 1; return { j: visto[l.numero], n: n[l.numero] }; });
+}
+const indicesDe = (numero) => lotes.map((l, i) => (l.numero === numero ? i : -1)).filter((i) => i >= 0);
+
 function renderBarras() {
-  document.getElementById("barraLotes").innerHTML = lotes.map((l, i) =>
-    `<div class="seg" style="flex:${l.kg};background:${TONOS[i % TONOS.length]}" title="Lote ${l.numero} · ${fmtKg(l.kg)} kg"><span>${l.numero}</span></div>`).join("");
+  const tr = infoTramos();
+  document.getElementById("barraLotes").innerHTML = lotes.map((l, i) => {
+    const t = tr[i].n > 1 ? ` (${ordinal(tr[i].j)} tramo)` : "";
+    return `<div class="seg" style="flex:${l.kg};background:${TONOS[i % TONOS.length]}" title="Lote ${l.numero}${t} · ${fmtKg(l.kg)} kg"><span>${l.numero}${tr[i].n > 1 ? "·" + tr[i].j : ""}</span></div>`;
+  }).join("");
   document.getElementById("barraTanques").innerHTML = tanques.map((t, i) =>
     `<div class="seg tk" style="flex:${t.mp};background:${D.corridas[t.c].color}" title="Tanque ${i + 1} · ${escapeHtml(D.corridas[t.c].nombre)} · ${fmtKg(t.mp)} kg de MP"><span>${D.corridas[t.c].letra}</span></div>`).join("");
 }
@@ -405,8 +420,16 @@ function renderTabla() {
   const cs = D.corridas;
   document.getElementById("theadLotes").innerHTML = `<tr><th></th><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">Kg del lote</th>` +
     cs.map((c) => `<th class="right">→ ${c.letra} (kg)</th>`).join("") + `<th title="Si un lote lo usó una sola línea, fíjelo a esa corrida">Asignación</th><th>Resultado</th></tr>`;
+  const tr = infoTramos();
   document.getElementById("tbLotes").innerHTML = lotes.map((l, i) => {
     const fila = calc.A[i], con = fila.filter((x) => x > 0);
+    const dividido = tr[i].n > 1;
+    const etiquetaTramo = dividido ? `<span class="tag" style="white-space:nowrap" title="Este lote se usó en ${tr[i].n} momentos separados">${ordinal(tr[i].j)} tramo</span>` : "";
+    const botones = (l.kg >= 2 ? `<button class="btn-link btn-tramo" type="button" data-divide="${i}" title="Dividir este lote en dos tramos, si se usó en dos momentos separados">Dividir</button>` : "") +
+      (dividido ? `<button class="btn-link btn-tramo" type="button" data-une="${i}" title="Volver a juntar todos los tramos de este lote">Unir tramos</button>` : "");
+    const kgCelda = dividido && tr[i].j < tr[i].n
+      ? `<input type="number" class="kg-tramo" data-tramo="${i}" min="1" step="1" value="${Math.round(l.kg * 100) / 100}" title="Kg que se usaron en este tramo. El último tramo recibe el resto del lote.">`
+      : fmtKg(l.kg);
     const fijo = l.fijo != null && l.fijo >= 0;
     const res = fijo
       ? `<span class="pill ok">Fijo en ${cs[l.fijo].letra}</span>`
@@ -417,14 +440,19 @@ function renderTabla() {
         <option value="">Automática</option>${cs.map((c, k) => `<option value="${k}"${l.fijo === k ? " selected" : ""}>Solo ${c.letra}</option>`).join("")}</select>`;
     return `<tr>
       <td style="white-space:nowrap"><button class="icon-btn" data-sube="${i}" title="Subir">▲</button><button class="icon-btn" data-baja="${i}" title="Bajar">▼</button></td>
-      <td class="strong num">#${l.numero}</td><td>${escapeHtml(l.proveedor)}</td><td><span class="tag">${l.almacen === "BINES" ? "Bines" : l.almacen === "SILO" ? "Silo" : "Mixto"}</span></td>
-      <td class="right num">${fmtKg(l.kg)}</td>${fila.map((x) => `<td class="right num">${x > 0 ? fmtKg(x) : "—"}</td>`).join("")}<td>${asig}</td><td>${res}</td></tr>`;
+      <td class="strong num" style="min-width:104px">#${l.numero}${etiquetaTramo ? `<div>${etiquetaTramo}</div>` : ""}<div style="display:flex;gap:10px;flex-wrap:wrap">${botones}</div></td><td>${escapeHtml(l.proveedor)}</td><td><span class="tag">${l.almacen === "BINES" ? "Bines" : l.almacen === "SILO" ? "Silo" : "Mixto"}</span></td>
+      <td class="right num">${kgCelda}</td>${fila.map((x) => `<td class="right num">${x > 0 ? fmtKg(x) : "—"}</td>`).join("")}<td>${asig}</td><td>${res}</td></tr>`;
   }).join("");
   document.getElementById("tfLotes").innerHTML = `<tr style="font-weight:600"><td></td><td colspan="3">Total</td><td class="right num">${fmtKg(calc.M)}</td>` +
     calc.mpFinal.map((x) => `<td class="right num">${fmtKg(x)}</td>`).join("") + `<td></td><td></td></tr>`;
-  const comp = calc.A.filter((f) => f.filter((x) => x > 0).length > 1).length;
+  // los tramos de un mismo lote se suman para saber si el lote queda compartido
+  const porLote = {};
+  lotes.forEach((l, i) => { const f = porLote[l.numero] || (porLote[l.numero] = cs.map(() => 0)); calc.A[i].forEach((x, k) => { f[k] += x; }); });
+  const nLotes = Object.keys(porLote).length;
+  const comp = Object.values(porLote).filter((f) => f.filter((x) => x > 0).length > 1).length;
   const nFijos = lotes.filter((l) => l.fijo != null && l.fijo >= 0).length;
-  document.getElementById("notaReparto").textContent = `${comp} de ${lotes.length} lotes quedan compartidos entre corridas.` + (nFijos ? ` ${nFijos} ${nFijos === 1 ? "lote está fijado" : "lotes están fijados"} a una sola corrida.` : "");
+  document.getElementById("notaReparto").textContent = `${comp} de ${nLotes} lotes quedan compartidos entre corridas.` + (nFijos ? ` ${nFijos} ${nFijos === 1 ? "lote está fijado" : "lotes están fijados"} a una sola corrida.` : "") +
+    (lotes.length > nLotes ? ` Para estimar los kg de un tramo: un tanque trae ≈ ${cs.map((c, k) => `${c.letra} ${fmtKg(calc.mpFinal[k] / Math.max(c.tanques.length, 1))} kg`).join(", ")}.` : "");
   const precc = cs.reduce((a, c) => a + c.precc_kg, 0);
   document.getElementById("notaPrecc").textContent = precc > 0 ? `El PRE CC (${fmtKg(precc)} kg) queda en su corrida` : "";
 }
@@ -482,7 +510,25 @@ document.getElementById("btnSeq").addEventListener("click", () => {
 });
 
 // ---------------- interacción: lotes y rendimientos ----------------
+const redondear2 = (x) => Math.round(x * 100) / 100;
 document.getElementById("tbLotes").addEventListener("click", (ev) => {
+  const d = ev.target.closest("[data-divide]"), u = ev.target.closest("[data-une]");
+  if (d) {          // dividir un lote en dos tramos (se usó en dos momentos separados): el nuevo tramo queda justo debajo
+    const i = Number(d.dataset.divide), l = lotes[i];
+    if (l.kg < 2) return;
+    const k1 = Math.round(l.kg / 2);
+    lotes.splice(i + 1, 0, { ...l, kg: redondear2(l.kg - k1) });
+    l.kg = k1;
+    renderTodo();
+    return;
+  }
+  if (u) {          // volver a juntar todos los tramos del lote en uno solo, en el lugar del primero
+    const l = lotes[Number(u.dataset.une)], g = indicesDe(l.numero);
+    lotes[g[0]].kg = l.total;
+    g.slice(1).reverse().forEach((k) => lotes.splice(k, 1));
+    renderTodo();
+    return;
+  }
   const s = ev.target.closest("[data-sube]"), b = ev.target.closest("[data-baja]");
   const i = s ? Number(s.dataset.sube) : b ? Number(b.dataset.baja) : -1;
   const j = s ? i - 1 : i + 1;
@@ -491,6 +537,17 @@ document.getElementById("tbLotes").addEventListener("click", (ev) => {
   renderTodo();
 });
 document.getElementById("tbLotes").addEventListener("change", (ev) => {
+  const kg = ev.target.closest("input.kg-tramo");
+  if (kg) {         // kg de un tramo: el último tramo del lote recibe el resto, así el lote conserva su total
+    const i = Number(kg.dataset.tramo), l = lotes[i], g = indicesDe(l.numero), ultimo = g[g.length - 1];
+    const otros = g.filter((k) => k !== i && k !== ultimo).reduce((a, k) => a + lotes[k].kg, 0);
+    const maximo = redondear2(l.total - otros - 1);           // el último tramo conserva al menos 1 kg
+    const v = Math.min(Math.max(redondear2(Number(kg.value) || 0), 1), Math.max(maximo, 1));
+    l.kg = v;
+    lotes[ultimo].kg = redondear2(l.total - otros - v);
+    renderTodo();
+    return;
+  }
   const sel = ev.target.closest("select.sel-fijo");
   if (!sel) return;
   lotes[Number(sel.dataset.fijo)].fijo = sel.value === "" ? null : Number(sel.value);
@@ -506,11 +563,14 @@ document.getElementById("tarjetas").addEventListener("change", (ev) => {
 // ---------------- aplicar ----------------
 document.getElementById("btnAplicar").addEventListener("click", async () => {
   const cs = D.corridas;
-  if (!(await confirmar(`¿Aplicar el reparto? Los ${lotes.length} lotes se redistribuirán entre ${cs.map((c) => c.nombre).join(", ")} con las cantidades de la tabla. Podrá volver a repartirlos después si hace falta.`))) return;
+  if (!(await confirmar(`¿Aplicar el reparto? Los ${new Set(lotes.map((l) => l.numero)).size} lotes se redistribuirán entre ${cs.map((c) => c.nombre).join(", ")} con las cantidades de la tabla. Podrá volver a repartirlos después si hace falta.`))) return;
   const btn = document.getElementById("btnAplicar");
   btn.disabled = true;
   const reparto = {};
-  lotes.forEach((l, i) => { reparto[l.numero] = Object.fromEntries(cs.map((c, k) => [c.id, calc.A[i][k]])); });
+  lotes.forEach((l, i) => {       // los tramos de un mismo lote se suman por corrida
+    const f = reparto[l.numero] || (reparto[l.numero] = Object.fromEntries(cs.map((c) => [c.id, 0])));
+    cs.forEach((c, k) => { f[c.id] = redondear2(f[c.id] + calc.A[i][k]); });
+  });
   try {
     const r = await apiPost("/api/repartir/aplicar", { corridas: cs.map((c) => c.id), reparto });
     ocultar(true);
