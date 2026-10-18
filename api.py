@@ -1222,6 +1222,48 @@ def reporte_periodo_pdf(desde: str, hasta: str):
     )
 
 
+def _secuencia_corridas(conn) -> list:
+    """Ids de todas las corridas, de la más antigua a la más reciente. Si el usuario ordenó la lista de «Corridas» a mano
+    se respeta ese orden (la lista se ve de la más reciente arriba a la más antigua abajo); las corridas que todavía no
+    tienen lugar elegido son las nuevas y van al final, por fecha de inicio."""
+    if _asegurar_orden_corridas():
+        filas = conn.execute(text(
+            "SELECT c.id, c.fecha_inicio, o.posicion FROM corridas c LEFT JOIN corridas_orden o ON o.corrida_id = c.id")).fetchall()
+    else:
+        filas = [(f.id, f.fecha_inicio, None) for f in conn.execute(text("SELECT id, fecha_inicio FROM corridas")).fetchall()]
+    con = sorted((f for f in filas if f[2] is not None), key=lambda f: -f[2])
+    sin = sorted((f for f in filas if f[2] is None), key=lambda f: (f[1], f[0]))
+    return [f[0] for f in con] + [f[0] for f in sin]
+
+
+def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte):
+    """Saldo de cada lote DESPUÉS de esta corrida, siguiendo la secuencia de corridas: peso neto menos lo que consumieron
+    esta corrida y todas las anteriores (las posteriores todavía no lo habían consumido). Así lo que una corrida deja
+    de un lote es justo el stock con el que empieza la siguiente, también cuando varias corridas trabajaron en paralelo.
+    Devuelve {numero: {...}} de los lotes de MP (número positivo) que ya habían llegado a `fecha_corte`."""
+    seq = _secuencia_corridas(conn)
+    previas = seq[: seq.index(corrida_id) + 1] if corrida_id in seq else [corrida_id]
+    consumo = {r.lote_numero: (float(r.kg), float(r.bines)) for r in conn.execute(text(
+        "SELECT lote_numero, COALESCE(SUM(kg_asignados), 0) AS kg, COALESCE(SUM(bines_consumidos), 0) AS bines "
+        "FROM asignaciones WHERE corrida_id = ANY(:ids) AND lote_numero > 0 GROUP BY lote_numero"), {"ids": previas})}
+    res = {}
+    for l in conn.execute(text(
+        "SELECT numero, proveedor, procedencia, fecha_ingreso, peso_neto_kg, bines_totales, kg_saldo, estado_actual "
+        "FROM v_saldo_lotes WHERE numero > 0")).fetchall():
+        if l.fecha_ingreso is not None and l.fecha_ingreso > fecha_corte:
+            continue
+        kg, bines = consumo.get(l.numero, (0.0, 0.0))
+        peso = float(l.peso_neto_kg or 0)
+        res[l.numero] = {
+            "numero": l.numero, "proveedor": l.proveedor, "procedencia": l.procedencia, "fecha_ingreso": l.fecha_ingreso,
+            "peso_neto_kg": peso, "kg_consumidos": kg, "kg_saldo": peso - kg,
+            "bines_totales": l.bines_totales, "bines_saldo": (float(l.bines_totales) - bines) if l.bines_totales is not None else None,
+            # un lote que la hoja de planta ya dio por procesado pero que en la app conserva un saldo suelto es "ruido": no es stock real
+            "es_stock": (l.estado_actual or "").strip().upper() in ("EN PROCESO", "EN ESPERA") or float(l.kg_saldo or 0) <= 0.01,
+        }
+    return res
+
+
 @app.get("/api/corridas/{corrida_id}/trazabilidad.xlsx")
 def trazabilidad_corrida_xlsx(corrida_id: int):
     """Exporta UNA corrida al formato de la hoja de Trazabilidad de planta:
@@ -1275,16 +1317,30 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
         # No incluye lotes derivados (PRE CC) ya en saldo 0 aquí - esos se
         # agregan aparte más abajo, solo si esta corrida los consumió, para
         # no arrastrar lotes derivados viejos sin ninguna relación con ella.
+        # Los lotes de MP (número positivo) se muestran con el saldo que queda DESPUÉS de esta corrida según la
+        # secuencia de corridas (ver _saldo_tras_corrida); los derivados de PRE CC (número negativo) siguen con su saldo actual.
         stock = rows(conn.execute(text(
             """
             SELECT numero, proveedor, procedencia, fecha_ingreso, peso_neto_kg,
                    kg_consumidos, kg_saldo, bines_saldo, bines_totales, estado_actual
             FROM v_saldo_lotes
-            WHERE kg_saldo > 0.01
+            WHERE numero < 0
+              AND kg_saldo > 0.01
               AND UPPER(TRIM(estado_actual)) IN ('EN PROCESO', 'EN ESPERA')
             ORDER BY numero
             """
         )))
+        ff = corrida.get("fecha_final")
+        fecha_corte = ff.date() if hasattr(ff, "date") else date.today()
+        tras = _saldo_tras_corrida(conn, corrida_id, fecha_corte)
+
+    for lo in lotes:                        # los lotes de esta corrida: saldo y procesado hasta esta corrida
+        t = tras.get(lo.get("lote_numero"))
+        if t is not None:
+            lo["kg_saldo"], lo["kg_consumidos"], lo["bines_saldo"] = t["kg_saldo"], t["kg_consumidos"], t["bines_saldo"]
+    stock += [t for t in tras.values() if t["kg_saldo"] > 0.01 and t["es_stock"]]
+    stock.sort(key=lambda s: s["numero"])
+    corrida["saldo_por_secuencia"] = True
 
     xlsx_bytes = generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock)
     nombre = f"trazabilidad-{corrida['nombre']}.xlsx".replace(" ", "-").replace("/", "-")

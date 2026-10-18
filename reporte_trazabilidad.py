@@ -10,6 +10,8 @@ dato de entrada -por ejemplo el % de descuento a brix que le pasa su jefe- o
 llena a mano un campo que la app no guarda, la hoja recalcule sola, igual que
 la de planta. Lo que no está en la app (GRP, N° Guía, % descuento a brix,
 cáscara / semilla, GNC) sale en blanco para llenarlo a mano al cierre."""
+import re
+import unicodedata
 from datetime import date, datetime
 from io import BytesIO
 
@@ -60,6 +62,19 @@ def _f(v):
         return float(v)
     except (TypeError, ValueError):
         return v
+
+
+def _dia_mes_del_nombre(nombre):
+    """(día, mes) si el nombre de la corrida empieza con una fecha como «17-Octubre JCC»; si no, None."""
+    m = re.match(r"\s*(\d{1,2})\s*[-/ ]\s*([^\W\d_]+)", nombre or "")
+    if not m:
+        return None
+    mes = "".join(c for c in unicodedata.normalize("NFD", m.group(2).upper()) if unicodedata.category(c) != "Mn")
+    mes = {"SEPTIEMBRE": "SETIEMBRE"}.get(mes, mes)
+    dia = int(m.group(1))
+    if mes not in _MESES or not 1 <= dia <= 31:
+        return None
+    return dia, _MESES.index(mes) + 1
 
 
 def _lote_txt(numero):
@@ -211,7 +226,10 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     ff = _f(corrida.get("fecha_final"))
     proceso = corrida.get("tipo_proceso") or ""
     if isinstance(fi, datetime):
-        titulo = f"NARANJA {fi.day:02d} DE {_MESES[fi.month - 1]} {fi.year}  -  {proceso}".strip(" -")
+        # el día y el mes del título siguen al nombre de la corrida («17-Octubre JCC»): una corrida que empezó
+        # un día y terminó al siguiente se llama por el día en que terminó. Si el nombre no trae fecha, se usa la de inicio.
+        dia, mes = _dia_mes_del_nombre(corrida.get("nombre")) or (fi.day, fi.month)
+        titulo = f"NARANJA {dia:02d} DE {_MESES[mes - 1]} {fi.year}  -  {proceso}".strip(" -")
     else:
         titulo = f"NARANJA  -  {proceso}".strip(" -")
 
@@ -418,7 +436,9 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     parciales = [p for p in parciales if p["numero"] >= 0]
     completos = [s for s in stock if s.get("numero") not in mis_lotes and (s.get("numero") or 0) >= 0]
 
-    fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales)
+    nota_saldo = ("Lo que queda de cada lote al terminar esta corrida, siguiendo el orden de las corridas: "
+                  "es el stock con el que empieza la siguiente.") if corrida.get("saldo_por_secuencia") else None
+    fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales, nota=nota_saldo)
     fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos)
     fin3 = fin2
     if pre_cc:
