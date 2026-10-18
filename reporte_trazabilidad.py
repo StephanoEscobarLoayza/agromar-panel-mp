@@ -422,7 +422,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
         vistos.add(n)
         parciales.append({
             "numero": n,
-            "peso_neto_kg": lo.get("peso_neto_kg"),
+            # con el saldo por secuencia, «Peso Neto» es lo que le quedaba al lote al empezar esta corrida
+            "peso_neto_kg": lo["saldo_inicial_kg"] if lo.get("saldo_inicial_kg") is not None else lo.get("peso_neto_kg"),
             "kg_consumidos": lo.get("kg_consumidos"),
             "kg_saldo": lo.get("kg_saldo"),
             "bines_saldo": lo.get("bines_saldo"),
@@ -436,10 +437,12 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     parciales = [p for p in parciales if p["numero"] >= 0]
     completos = [s for s in stock if s.get("numero") not in mis_lotes and (s.get("numero") or 0) >= 0]
 
-    nota_saldo = ("Lo que queda de cada lote al terminar esta corrida, siguiendo el orden de las corridas: "
-                  "es el stock con el que empieza la siguiente.") if corrida.get("saldo_por_secuencia") else None
+    sec = bool(corrida.get("saldo_por_secuencia"))
+    nota_saldo = ("Peso Neto = lo que tenía el lote al empezar esta corrida (el saldo de la anterior); Peso procesado = lo que usó esta corrida; "
+                  "Peso saldo = lo que queda, y es el stock con el que empieza la siguiente.") if sec else None
+    nota_completos = "Lotes que esta corrida no usó: llegan y salen con el mismo saldo." if sec else None
     fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales, nota=nota_saldo)
-    fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos)
+    fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos, nota=nota_completos)
     fin3 = fin2
     if pre_cc:
         fin3 = _cuadro_stock(
