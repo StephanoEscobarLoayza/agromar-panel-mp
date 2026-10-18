@@ -79,9 +79,23 @@ def aplicar_reparto(conn, corrida_ids: List[int], reparto: Dict[int, Dict[int, D
     """), {"ids": corrida_ids}).fetchall()
     por_lote: Dict[int, list] = {}
     for f in filas:
-        if f.kg_asignados is None:
-            raise HTTPException(status_code=400, detail=f"El lote {f.lote_numero} tiene kg pendiente: complételo en «Registrar consumo» antes de repartir.")
         por_lote.setdefault(f.lote_numero, []).append(f)
+    # las filas con kg pendiente cuentan como cero y el reparto las llena; un lote sin ningún kg en estas corridas se omite
+    # si sus kg están en otra corrida, y bloquea si no tiene kg en ninguna parte
+    sin_kg = [l for l, fs in por_lote.items() if all(f.kg_asignados is None for f in fs)]
+    if sin_kg:
+        en_otras = {r.lote_numero for r in conn.execute(text("""
+            SELECT DISTINCT lote_numero FROM asignaciones
+            WHERE lote_numero = ANY(:n) AND kg_asignados IS NOT NULL AND NOT (corrida_id = ANY(:ids))
+        """), {"n": sin_kg, "ids": corrida_ids})}
+        sin_ninguno = sorted(set(sin_kg) - en_otras)
+        if sin_ninguno:
+            nums = ", ".join(str(l) for l in sin_ninguno)
+            raise HTTPException(status_code=400, detail=f"{'El lote' if len(sin_ninguno) == 1 else 'Los lotes'} {nums} {'tiene' if len(sin_ninguno) == 1 else 'tienen'} kg pendiente: complételo en «Registrar consumo» antes de repartir.")
+        for l in sin_kg:
+            del por_lote[l]
+    # lotes que todavía tienen saldo: su marca de "pendiente" en una corrida se conserva si esa corrida no recibe kg
+    abiertos = {r.numero for r in conn.execute(text("SELECT numero FROM v_saldo_lotes WHERE numero = ANY(:n) AND kg_saldo > 0"), {"n": list(por_lote)})} if por_lote else set()
 
     if set(reparto) != set(por_lote):
         faltan = sorted(set(por_lote) - set(reparto))
@@ -91,7 +105,7 @@ def aplicar_reparto(conn, corrida_ids: List[int], reparto: Dict[int, Dict[int, D
     bajadas, subidas = [], []      # primero se reduce y se borra, después se aumenta o se inserta: el saldo nunca se excede a medias
     partidos = 0
     for lote, filas_lote in por_lote.items():
-        total_viejo = sum(Decimal(f.kg_asignados) for f in filas_lote)
+        total_viejo = sum(Decimal(f.kg_asignados) for f in filas_lote if f.kg_asignados is not None)
         nuevo = {int(c): Decimal(str(k)).quantize(_CENT, ROUND_HALF_UP) for c, k in reparto[lote].items()}
         if any(c not in corrida_ids for c in nuevo) or any(k < 0 for k in nuevo.values()):
             raise HTTPException(status_code=400, detail=f"El reparto del lote {lote} no es válido.")
@@ -114,11 +128,13 @@ def aplicar_reparto(conn, corrida_ids: List[int], reparto: Dict[int, Dict[int, D
             for c in sorted(nuevo, key=lambda c: exacto[c] - bines[c], reverse=True)[:resto]:
                 bines[c] += 1
 
-        plantilla = filas_lote[0]
+        plantilla = next(f for f in filas_lote if f.kg_asignados is not None)
         for c, kg in nuevo.items():
-            existentes = [f for f in filas_lote if f.corrida_id == c]
+            existentes = sorted((f for f in filas_lote if f.corrida_id == c), key=lambda f: f.kg_asignados is None)      # primero la que tiene kg
             if kg <= 0:
                 for f in existentes:
+                    if f.kg_asignados is None and lote in abiertos:
+                        continue
                     bajadas.append(("DELETE FROM asignaciones WHERE id = :id", {"id": f.id}))
                 continue
             if existentes:
@@ -129,7 +145,7 @@ def aplicar_reparto(conn, corrida_ids: List[int], reparto: Dict[int, Dict[int, D
                 obs = obs if _NOTA in obs else (obs + " | " if obs else "") + _NOTA
                 sql = "UPDATE asignaciones SET kg_asignados = :kg, bines_consumidos = :b, observaciones = :o WHERE id = :id"
                 par = {"kg": kg, "b": (bines[c] if bines_total > 0 else None), "o": obs, "id": principal.id}
-                (bajadas if kg < Decimal(principal.kg_asignados) else subidas).append((sql, par))
+                (bajadas if principal.kg_asignados is not None and kg < Decimal(principal.kg_asignados) else subidas).append((sql, par))
             else:
                 obs = plantilla.observaciones or ""
                 obs = obs if _NOTA in obs else (obs + " | " if obs else "") + _NOTA
@@ -180,12 +196,28 @@ def crear_router(engine, sync_pre_cc=None) -> APIRouter:
             """), {"ids": ids}).fetchall()
             tipicos = _rendimientos_tipicos(conn)
 
+            # Un lote con kg en alguna de las corridas marcadas y "pendiente" en otra no bloquea el reparto: el reparto llena
+            # la parte pendiente. Un lote sin kg en ninguna de las marcadas se omite si sus kg están en otra corrida
+            # (se avisa), y solo bloquea si no tiene kg en ninguna parte.
+            con_kg = {a.lote_numero for a in asig if a.kg_asignados is not None and a.lote_numero > 0}
+            sin_kg = sorted({a.lote_numero for a in asig if a.kg_asignados is None} - con_kg)
+            en_otras: Dict[int, List[str]] = {}
+            if sin_kg:
+                for f in conn.execute(text("""
+                    SELECT a.lote_numero, c.nombre FROM asignaciones a JOIN corridas c ON c.id = a.corrida_id
+                    WHERE a.lote_numero = ANY(:n) AND a.kg_asignados IS NOT NULL AND NOT (a.corrida_id = ANY(:ids))
+                    GROUP BY a.lote_numero, c.id, c.nombre, c.fecha_inicio ORDER BY c.fecha_inicio, c.id
+                """), {"n": sin_kg, "ids": ids}):
+                    en_otras.setdefault(f.lote_numero, []).append(f.nombre)
+            en_proceso = []
+            if con_kg:
+                en_proceso = [f.numero for f in conn.execute(text(
+                    "SELECT numero FROM v_saldo_lotes WHERE numero = ANY(:n) AND kg_saldo > 0 ORDER BY numero"), {"n": sorted(con_kg)})]
+
         precc: Dict[int, float] = {}
         lotes: Dict[int, dict] = {}
-        pendientes = set()
         for a in asig:
             if a.kg_asignados is None:
-                pendientes.add(a.lote_numero)
                 continue
             if a.lote_numero < 0:                              # PRE CC: producto, no pasa por extracción
                 precc[a.corrida_id] = precc.get(a.corrida_id, 0.0) + float(a.kg_asignados)
@@ -209,7 +241,9 @@ def crear_router(engine, sync_pre_cc=None) -> APIRouter:
                             for t in tanques if t.corrida_id == c.id],
             } for c in cor],
             "lotes": sorted(lotes.values(), key=lambda x: (x["orden"], x["numero"])),
-            "pendientes": sorted(pendientes),
+            "pendientes": [l for l in sin_kg if l not in en_otras],
+            "omitidos": [{"lote": l, "en": en_otras[l]} for l in sin_kg if l in en_otras],
+            "en_proceso": en_proceso,
         }
 
     @router.post("/api/repartir/aplicar")

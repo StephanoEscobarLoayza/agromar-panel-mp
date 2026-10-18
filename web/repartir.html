@@ -144,6 +144,7 @@
       <h2>Reparto de cada lote</h2>
       <span class="hint" id="notaPrecc"></span>
     </div>
+    <div id="avisoLotes" style="margin-bottom:12px"></div>
     <div class="panel" style="margin-top:0">
       <div class="table-wrap">
         <table class="tabla-compacta">
@@ -257,7 +258,7 @@ async function cargarDatos() {
   catch (e) { ocultar(true); aviso("avisoGeneral", e.message); return; }
   if (D.pendientes.length) {
     ocultar(true);
-    aviso("avisoGeneral", `Los lotes ${D.pendientes.join(", ")} tienen kg pendiente. Complételos en «Registrar consumo» antes de repartir.`, "warn"); return;
+    aviso("avisoGeneral", `${D.pendientes.length === 1 ? "El lote" : "Los lotes"} ${D.pendientes.join(", ")} ${D.pendientes.length === 1 ? "no tiene" : "no tienen"} kg registrados en ninguna corrida. Complete su kg en «Registrar consumo» antes de repartir.`, "warn"); return;
   }
   if (!D.lotes.length) { ocultar(true); aviso("avisoGeneral", "Las corridas marcadas no tienen lotes registrados.", "warn"); return; }
   const sinPT = D.corridas.filter((c) => !(c.pt_kg > 0));
@@ -297,6 +298,15 @@ async function cargarDatos() {
 
   lotes = D.lotes.map((l) => ({ ...l }));
   sel = -1;
+  // avisos que no bloquean: lotes cuyos kg están en una corrida no marcada, y lotes que aún tienen saldo
+  const notas = [];
+  if (D.omitidos.length) {
+    notas.push(`${D.omitidos.length === 1 ? "El lote" : "Los lotes"} ${D.omitidos.map((o) => `${o.lote} (kg en ${o.en.join(" y ")})`).join("; ")} no ${D.omitidos.length === 1 ? "entra" : "entran"} en este reparto porque sus kg están en una corrida que no está marcada. Si también lo usaron las corridas marcadas, marque esa corrida.`);
+  }
+  if (D.en_proceso.length) {
+    notas.push(`${D.en_proceso.length === 1 ? "El lote" : "Los lotes"} ${D.en_proceso.join(", ")} ${D.en_proceso.length === 1 ? "todavía tiene" : "todavía tienen"} saldo: se reparte solo lo consumido hasta ahora. Cuando ${D.en_proceso.length === 1 ? "termine" : "terminen"}, vuelva a repartir.`);
+  }
+  aviso("avisoLotes", notas.join(" "), "warn");
   document.getElementById("ayudaLetras").textContent = "(" + D.corridas.map((c) => `${c.letra} = ${c.nombre}`).join(", ") + ")";
   document.getElementById("seqTexto").placeholder = "Ej. " + tanques.slice(0, 8).map((t) => LETRAS[t.c]).join("") + "…";
   ocultar(false);
