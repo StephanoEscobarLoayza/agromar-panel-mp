@@ -39,13 +39,20 @@ function _siNoAutenticado(res) {
   return null;
 }
 
+// El servidor responde `detail` como texto, o como una lista de objetos cuando rechaza los datos enviados (antes se veía «[object Object]»).
+function _mensajeError(body, res) {
+  const d = body && body.detail;
+  if (Array.isArray(d)) return d.map((x) => (x && x.msg) || JSON.stringify(x)).join(" ");
+  return d || `Error ${res.status}`;
+}
+
 async function apiGet(path) {
   const res = await fetch(path);
   if (!res.ok) {
     const corte = _siNoAutenticado(res);
     if (corte) return corte;
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `Error ${res.status}`);
+    throw new Error(_mensajeError(body, res));
   }
   return res.json();
 }
@@ -62,7 +69,7 @@ async function apiPost(path, data) {
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.detail || `Error ${res.status}`);
+    throw new Error(_mensajeError(body, res));
   }
   return body;
 }
@@ -75,7 +82,7 @@ async function apiDelete(path) {
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.detail || `Error ${res.status}`);
+    throw new Error(_mensajeError(body, res));
   }
   return body;
 }

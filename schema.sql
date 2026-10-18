@@ -392,3 +392,9 @@ SELECT
 FROM corridas c
 LEFT JOIN asignaciones a ON a.corrida_id = c.id
 GROUP BY c.id, c.nombre, c.fecha_inicio, c.fecha_final, c.mp_kg_objetivo, c.stock_inicio_kg, c.stock_cierre_kg, c.tipo_proceso;
+
+-- Orden manual de la lista de «Corridas» (la API también la crea sola si falta)
+CREATE TABLE IF NOT EXISTS corridas_orden (
+    corrida_id INTEGER PRIMARY KEY REFERENCES corridas(id) ON DELETE CASCADE,
+    posicion   INTEGER NOT NULL
+);

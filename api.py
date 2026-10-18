@@ -15,7 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response, Request
@@ -709,8 +709,32 @@ def sync_lotes_endpoint():
 # ---------------------------------------------------------------------------
 # corridas
 # ---------------------------------------------------------------------------
+_orden_corridas_listo = False
+
+
+def _asegurar_orden_corridas() -> bool:
+    """El orden que el usuario le da a la lista de «Corridas» se guarda en su propia tabla, que se crea sola la
+    primera vez que se usa (así no hace falta correr ningún script en cada PC). Devuelve False si no se pudo crear."""
+    global _orden_corridas_listo
+    if _orden_corridas_listo:
+        return True
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS corridas_orden ("
+                "corrida_id INTEGER PRIMARY KEY REFERENCES corridas(id) ON DELETE CASCADE, posicion INTEGER NOT NULL)"
+            ))
+    except Exception as e:
+        print(f"[orden de corridas] no se pudo crear la tabla: {e}")
+        return False
+    _orden_corridas_listo = True
+    return True
+
+
 @app.get("/api/corridas")
 def listar_corridas(abiertas: bool = False):
+    # la lista sale siempre por fecha de inicio; `posicion` es el lugar que el usuario le dio a mano (NULL = sin elegir)
+    con_orden = not abiertas and _asegurar_orden_corridas()
     with engine.connect() as conn:
         if abiertas:
             result = conn.execute(
@@ -719,11 +743,43 @@ def listar_corridas(abiertas: bool = False):
                     "FROM corridas WHERE estado = 'abierta' ORDER BY fecha_inicio DESC"
                 )
             )
+        elif con_orden:
+            result = conn.execute(
+                text(
+                    "SELECT v.*, o.posicion FROM v_cuadre_corridas v "
+                    "LEFT JOIN corridas_orden o ON o.corrida_id = v.id ORDER BY v.fecha_inicio DESC, v.id DESC"
+                )
+            )
         else:
             result = conn.execute(
-                text("SELECT * FROM v_cuadre_corridas ORDER BY fecha_inicio DESC")
+                text("SELECT * FROM v_cuadre_corridas ORDER BY fecha_inicio DESC, id DESC")
             )
         return rows(result)
+
+
+class OrdenCorridas(BaseModel):
+    ids: List[int]      # todas las corridas de la lista, de arriba hacia abajo
+
+
+# va antes de "/api/corridas/{corrida_id}" para que "orden" no se tome como el id de una corrida
+@app.post("/api/corridas/orden")
+def guardar_orden_corridas(o: OrdenCorridas):
+    """Guarda el orden que el usuario eligió en la lista de «Corridas» (se comparte entre todos los equipos)."""
+    ids = list(dict.fromkeys(o.ids))
+    if not _asegurar_orden_corridas():
+        raise HTTPException(status_code=500, detail="No se pudo guardar el orden de las corridas.")
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM corridas_orden"))
+        if ids:
+            conn.execute(
+                text(
+                    "INSERT INTO corridas_orden (corrida_id, posicion) "
+                    "SELECT t.i, t.p FROM unnest(CAST(:ids AS integer[]), CAST(:ps AS integer[])) AS t(i, p) "
+                    "WHERE EXISTS (SELECT 1 FROM corridas c WHERE c.id = t.i)"
+                ),
+                {"ids": ids, "ps": list(range(1, len(ids) + 1))},
+            )
+    return {"ok": True}
 
 
 def _sql_stock_total_asof(fecha_param: str) -> str:

@@ -82,7 +82,10 @@
   <section>
     <div class="section-head">
       <h2>Corridas</h2>
-      <button class="btn" id="btnMostrarForm" style="width:auto;padding:8px 16px">+ Nueva corrida</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn-ordenar" id="btnOrdenar" aria-pressed="false">Ordenar corridas</button>
+        <button class="btn" id="btnMostrarForm" style="width:auto;padding:8px 16px">+ Nueva corrida</button>
+      </div>
     </div>
 
     <div class="panel" id="formNuevaCorrida" style="display:none;margin-bottom:16px">
@@ -109,6 +112,7 @@
       </div>
     </div>
 
+    <div class="corrida-nota" id="ordenNota"></div>
     <div id="corridas"><div class="empty">Cargando…</div></div>
   </section>
 
@@ -177,6 +181,11 @@ function sugerirNombre() {
   if (!nombreInput.dataset.tocado) nombreInput.value = sugerido;
 }
 
+const _TRAZO = 'viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+const ICONO_SUBIR = `<svg ${_TRAZO}><path d="M3.5 10.5 8 6l4.5 4.5"/></svg>`;
+const ICONO_BAJAR = `<svg ${_TRAZO}><path d="M3.5 5.5 8 10l4.5-4.5"/></svg>`;
+const ICONO_ASA = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="6" cy="3.5" r="1.3"/><circle cx="10" cy="3.5" r="1.3"/><circle cx="6" cy="8" r="1.3"/><circle cx="10" cy="8" r="1.3"/><circle cx="6" cy="12.5" r="1.3"/><circle cx="10" cy="12.5" r="1.3"/></svg>';
+
 let CORRIDAS_EN_PARALELO = new Set();   // ids de corridas que comparten día de inicio con otra corrida, o siguen abiertas a la vez
 
 function corridaCard(c) {
@@ -210,11 +219,16 @@ function corridaCard(c) {
   ).join("");
 
   return `
-    <div class="corrida${abierta ? " live" : ""}">
+    <div class="corrida${abierta ? " live" : ""}" data-id="${c.id}">
       <div class="corrida-top">
         <div>
           <div class="corrida-name">${abierta ? '<span class="live-dot" title="En curso"></span>' : ""}${escapeHtml(c.nombre)}</div>
           <div class="corrida-range">${rango}</div>
+        </div>
+        <div class="corrida-mover">
+          <button type="button" data-accion="subir" data-id="${c.id}" title="Subir esta corrida" aria-label="Subir esta corrida">${ICONO_SUBIR}</button>
+          <button type="button" data-accion="bajar" data-id="${c.id}" title="Bajar esta corrida" aria-label="Bajar esta corrida">${ICONO_BAJAR}</button>
+          <span class="mover-asa" draggable="true" data-id="${c.id}" title="Arrastre para mover esta corrida" aria-hidden="true">${ICONO_ASA}</span>
         </div>
       </div>
       <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
@@ -365,6 +379,95 @@ async function cargarChecklistFinalizar(corridaId) {
   }
 }
 
+// Orden de las tarjetas: las que el usuario ya colocó van en su lugar (campo `posicion`); las nuevas, que aún no
+// tienen lugar, van arriba por fecha de inicio. Los indicadores de arriba siguen usando el orden por fecha.
+function ordenManual(lista) {
+  const sinLugar = lista.filter((c) => c.posicion === null || c.posicion === undefined);
+  const conLugar = lista.filter((c) => c.posicion !== null && c.posicion !== undefined).sort((a, b) => a.posicion - b.posicion);
+  return [...sinLugar, ...conLugar];
+}
+const tarjetasCorridas = () => [...document.querySelectorAll("#corridas > .corrida[data-id]")];
+function actualizarFlechas() {
+  const t = tarjetasCorridas();
+  t.forEach((el, i) => {
+    el.querySelector('[data-accion="subir"]').disabled = i === 0;
+    el.querySelector('[data-accion="bajar"]').disabled = i === t.length - 1;
+  });
+}
+// modo «Ordenar corridas»: solo entonces se ven las flechas y el asa de cada tarjeta
+const AYUDA_ORDEN = "Mueva cada corrida con las flechas o arrástrela desde el asa. El orden se guarda solo.";
+document.getElementById("btnOrdenar").addEventListener("click", (ev) => {
+  const b = ev.currentTarget;
+  const activo = document.getElementById("corridas").classList.toggle("ordenando");
+  b.textContent = activo ? "Listo" : "Ordenar corridas";
+  b.classList.toggle("activo", activo);
+  b.setAttribute("aria-pressed", String(activo));
+  document.getElementById("ordenNota").textContent = activo ? AYUDA_ORDEN : "";
+});
+let guardandoOrden = Promise.resolve();
+let _vuelta = null;
+function guardarOrden() {
+  const ids = tarjetasCorridas().map((t) => Number(t.dataset.id));
+  const nota = document.getElementById("ordenNota");
+  const modoOrdenar = () => document.getElementById("corridas").classList.contains("ordenando");
+  guardandoOrden = guardandoOrden.then(() => apiPost("/api/corridas/orden", { ids })).then(
+    () => {
+      nota.textContent = "Orden guardado.";
+      clearTimeout(_vuelta);
+      _vuelta = setTimeout(() => { nota.textContent = modoOrdenar() ? AYUDA_ORDEN : ""; }, 2500);
+    },
+    (e) => { clearTimeout(_vuelta); nota.textContent = "No se pudo guardar el orden: " + e.message; }
+  );
+}
+// pone `el` antes o después de `destino` y guarda el nuevo orden
+function colocarTarjeta(el, destino, antes) {
+  if (!el || !destino || el === destino) return;
+  destino.parentNode.insertBefore(el, antes ? destino : destino.nextSibling);
+  actualizarFlechas();
+  guardarOrden();
+}
+document.getElementById("corridas").addEventListener("click", (ev) => {
+  const b = ev.target.closest('button[data-accion="subir"], button[data-accion="bajar"]');
+  if (!b || b.disabled) return;
+  const el = b.closest(".corrida");
+  if (b.dataset.accion === "subir") colocarTarjeta(el, el.previousElementSibling, true);
+  else colocarTarjeta(el, el.nextElementSibling, false);
+  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
+// arrastrar desde el asa (solo con mouse; en pantallas táctiles el asa no se muestra y se usan las flechas)
+(function () {
+  const cont = document.getElementById("corridas");
+  let arrastrada = null;
+  const limpiar = () => cont.querySelectorAll(".destino-antes,.destino-despues,.arrastrando").forEach((e) => e.classList.remove("destino-antes", "destino-despues", "arrastrando"));
+  cont.addEventListener("dragstart", (ev) => {
+    const asa = ev.target.closest && ev.target.closest(".mover-asa");
+    if (!asa) return;
+    arrastrada = asa.closest(".corrida");
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData("text/plain", arrastrada.dataset.id);
+    ev.dataTransfer.setDragImage(arrastrada, 24, 24);
+    setTimeout(() => arrastrada && arrastrada.classList.add("arrastrando"), 0);
+  });
+  cont.addEventListener("dragover", (ev) => {
+    if (!arrastrada) return;
+    const t = ev.target.closest(".corrida");
+    if (!t || t === arrastrada) return;
+    ev.preventDefault();
+    const r = t.getBoundingClientRect();
+    const antes = ev.clientY < r.top + r.height / 2;
+    cont.querySelectorAll(".destino-antes,.destino-despues").forEach((e) => e.classList.remove("destino-antes", "destino-despues"));
+    t.classList.add(antes ? "destino-antes" : "destino-despues");
+  });
+  cont.addEventListener("drop", (ev) => {
+    if (!arrastrada) return;
+    ev.preventDefault();
+    const t = ev.target.closest(".corrida");
+    if (t && t !== arrastrada) colocarTarjeta(arrastrada, t, ev.clientY < t.getBoundingClientRect().top + t.getBoundingClientRect().height / 2);
+    limpiar(); arrastrada = null;
+  });
+  cont.addEventListener("dragend", () => { limpiar(); arrastrada = null; });
+})();
+
 async function cargar() {
   try {
     const corridas = await apiGet("/api/corridas");
@@ -379,7 +482,8 @@ async function cargar() {
     if (corridas.length === 0) {
       cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
     } else {
-      cont.innerHTML = corridas.map(corridaCard).join("");
+      cont.innerHTML = ordenManual(corridas).map(corridaCard).join("");
+      actualizarFlechas();
     }
 
     // "Activa" = literalmente sigue abierta ahora mismo (sin fecha_final).

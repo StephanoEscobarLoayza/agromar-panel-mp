@@ -151,6 +151,26 @@ section{margin-top:40px}
 .empty{color:var(--text-muted);font-size:13.5px;padding:20px 0}
 td.empty{padding:20px}
 .corrida-acciones{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+/* ordenar las corridas a mano: los controles solo aparecen con el botón «Ordenar corridas» */
+.corrida-top > div:first-child{flex:1 1 150px;min-width:0}
+.btn-ordenar{background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:color .15s ease,border-color .15s ease}
+.btn-ordenar:hover{color:var(--citrus);border-color:var(--citrus)}
+.btn-ordenar.activo{background:var(--citrus-tint);color:var(--citrus);border-color:var(--citrus)}
+.corrida-mover{display:none;flex:none;margin-left:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.ordenando .corrida-mover{display:flex}
+.ordenando .corrida:hover{transform:none}
+.corrida-mover button,.mover-asa{display:inline-flex;align-items:center;justify-content:center;width:36px;height:34px;padding:0;border:none;background:none;color:var(--text-2);cursor:pointer;font-family:inherit}
+.corrida-mover > * + *{border-left:1px solid var(--border)}
+.corrida-mover svg{width:16px;height:16px;pointer-events:none}
+.corrida-mover button:hover:not(:disabled),.mover-asa:hover{background:var(--citrus-tint);color:var(--citrus)}
+.corrida-mover button:disabled{opacity:.35;cursor:default}
+.mover-asa{cursor:grab}
+.mover-asa:active{cursor:grabbing}
+.corrida.arrastrando{opacity:.45}
+.corrida.destino-antes{box-shadow:0 -3px 0 0 var(--citrus)}
+.corrida.destino-despues{box-shadow:0 3px 0 0 var(--citrus)}
+.corrida-nota{margin:0 0 12px;font-size:12.5px;color:var(--text-muted)}
+.corrida-nota:empty{display:none}
 .btn-link{background:none;border:none;padding:0;font-size:12.5px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;transition:color .15s ease}
 .btn-link:hover{color:var(--citrus)}
 .btn-link.strong{color:var(--citrus)}
@@ -349,9 +369,15 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
   .pill-btn,.csel-btn,.pill-select{min-height:34px}
   .tag{font-size:11.5px}
   .icon-btn{min-width:36px;min-height:36px}
+  .corrida-mover button{width:44px;height:40px}
   a.lote-link{display:inline-block;padding:8px 2px}
   /* aviso de que una tabla se puede deslizar hacia un lado (lo marca app.js) */
   .table-wrap.desborda::before{content:"Deslice hacia un lado para ver más columnas ›";display:block;position:sticky;left:0;width:max-content;max-width:100%;padding:8px 14px 2px;font-size:11.5px;color:var(--text-muted)}
+}
+
+/* en pantallas táctiles no funciona arrastrar: se mueven con las flechas */
+@media (pointer:coarse){
+  .mover-asa{display:none}
 }
 
 /* Celular */
