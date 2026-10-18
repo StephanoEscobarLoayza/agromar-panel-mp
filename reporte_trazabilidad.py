@@ -123,14 +123,18 @@ def _set(ws, celda, valor, *, fmt=None, bold=False, fill=None, borde=False, cent
     return c
 
 
-def _cuadro_stock(ws, fila0, titulo, filas, nota=None):
+def _cuadro_stock(ws, fila0, titulo, filas, nota=None, con_saldo_anterior=False):
     """Dibuja un cuadrito de stock por lote (Lote / Peso Neto / Peso procesado /
     Peso saldo / Bines saldo / Bines totales + TOTAL) empezando en la col H.
     Devuelve la última fila usada. `filas` = lista de dicts de v_saldo_lotes.
     `nota`, si se pasa, va en una fila aparte entre el título y el encabezado
     (ej. aclarar que Peso Neto/Procesado acá es acumulado de todas las
     corridas, no solo de esta - a diferencia de la tabla de insumos de
-    arriba, donde esos mismos nombres de columna son solo de esta corrida)."""
+    arriba, donde esos mismos nombres de columna son solo de esta corrida).
+    Con `con_saldo_anterior` se agrega la columna «Saldo anterior» (lo que le
+    quedaba al lote al empezar esta corrida): Peso Neto sigue siendo el peso con
+    que ingresó el lote, Peso procesado es solo de esta corrida y
+    Peso saldo = Saldo anterior - Peso procesado."""
     h = 8  # col H
     _set(ws, ws.cell(row=fila0, column=h), titulo, bold=True, fill=_SEC_FILL)
     fila_hdr = fila0 + 1
@@ -138,32 +142,42 @@ def _cuadro_stock(ws, fila0, titulo, filas, nota=None):
         c = _set(ws, ws.cell(row=fila_hdr, column=h), nota)
         c.font = _NOTA_FONT
         fila_hdr += 1
-    hdr = ["Lote", "Peso Neto", "Peso procesado", "Peso saldo", "Bines saldo", "Bines totales"]
+    hdr = ["Lote", "Peso Neto"] + (["Saldo anterior"] if con_saldo_anterior else []) + ["Peso procesado", "Peso saldo", "Bines saldo", "Bines totales"]
     for k, nom in enumerate(hdr):
         c = _set(ws, ws.cell(row=fila_hdr, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
         c.font = _HEAD_FONT
     fila0 = fila_hdr - 1
+    n = len(hdr)
     if not filas:
         _set(ws, ws.cell(row=fila0 + 2, column=h), "Sin lotes.", borde=True)
-        for k in range(1, 6):
+        for k in range(1, n):
             ws.cell(row=fila0 + 2, column=h + k).border = _BORDE
         return fila0 + 2
+    # posición de cada columna dentro del cuadro
+    c_neto, c_ini = 1, (2 if con_saldo_anterior else None)
+    c_proc = 3 if con_saldo_anterior else 2
+    c_saldo, c_bsaldo, c_btot = c_proc + 1, c_proc + 2, c_proc + 3
+    L_ = lambda k: get_column_letter(h + k)
     i = 0
     for i, s in enumerate(filas, start=1):
         rr = fila0 + 1 + i
         _set(ws, ws.cell(row=rr, column=h), _lote_txt(s.get("numero")), borde=True)
-        _set(ws, ws.cell(row=rr, column=h + 1), _f(s.get("peso_neto_kg")), fmt=_FMT_KG, borde=True)
-        _set(ws, ws.cell(row=rr, column=h + 2), _f(s.get("kg_consumidos")), fmt=_FMT_KG, borde=True)
-        _set(ws, ws.cell(row=rr, column=h + 3), f"=I{rr}-J{rr}", fmt=_FMT_KG, borde=True)
-        _set(ws, ws.cell(row=rr, column=h + 4), _f(s.get("bines_saldo")), borde=True, centro=True)
-        _set(ws, ws.cell(row=rr, column=h + 5), _f(s.get("bines_totales")), borde=True, centro=True)
+        _set(ws, ws.cell(row=rr, column=h + c_neto), _f(s.get("peso_neto_kg")), fmt=_FMT_KG, borde=True)
+        if con_saldo_anterior:
+            _set(ws, ws.cell(row=rr, column=h + c_ini), _f(s.get("saldo_inicial_kg")), fmt=_FMT_KG, borde=True)
+        _set(ws, ws.cell(row=rr, column=h + c_proc), _f(s.get("kg_consumidos")), fmt=_FMT_KG, borde=True)
+        base = L_(c_ini) if con_saldo_anterior else L_(c_neto)       # de dónde se resta lo procesado
+        _set(ws, ws.cell(row=rr, column=h + c_saldo), f"={base}{rr}-{L_(c_proc)}{rr}", fmt=_FMT_KG, borde=True)
+        _set(ws, ws.cell(row=rr, column=h + c_bsaldo), _f(s.get("bines_saldo")), borde=True, centro=True)
+        _set(ws, ws.cell(row=rr, column=h + c_btot), _f(s.get("bines_totales")), borde=True, centro=True)
     tr = fila0 + 2 + i
-    _set(ws, ws.cell(row=tr, column=h + 2), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
-    _set(ws, ws.cell(row=tr, column=h + 3), f"=SUM(K{fila0 + 2}:K{tr - 1})",
+    _set(ws, ws.cell(row=tr, column=h + c_proc), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
+    _set(ws, ws.cell(row=tr, column=h + c_saldo), f"=SUM({L_(c_saldo)}{fila0 + 2}:{L_(c_saldo)}{tr - 1})",
          fmt=_FMT_KG, bold=True, fill=_TOTAL_FILL, borde=True)
-    for k in (0, 1, 4, 5):
-        ws.cell(row=tr, column=h + k).fill = _TOTAL_FILL
-        ws.cell(row=tr, column=h + k).border = _BORDE
+    for k in range(n):
+        if k not in (c_proc, c_saldo):
+            ws.cell(row=tr, column=h + k).fill = _TOTAL_FILL
+            ws.cell(row=tr, column=h + k).border = _BORDE
     return tr
 
 
@@ -422,8 +436,8 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
         vistos.add(n)
         parciales.append({
             "numero": n,
-            # con el saldo por secuencia, «Peso Neto» es lo que le quedaba al lote al empezar esta corrida
-            "peso_neto_kg": lo["saldo_inicial_kg"] if lo.get("saldo_inicial_kg") is not None else lo.get("peso_neto_kg"),
+            "peso_neto_kg": lo.get("peso_neto_kg"),
+            "saldo_inicial_kg": lo.get("saldo_inicial_kg"),
             "kg_consumidos": lo.get("kg_consumidos"),
             "kg_saldo": lo.get("kg_saldo"),
             "bines_saldo": lo.get("bines_saldo"),
@@ -438,11 +452,11 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     completos = [s for s in stock if s.get("numero") not in mis_lotes and (s.get("numero") or 0) >= 0]
 
     sec = bool(corrida.get("saldo_por_secuencia"))
-    nota_saldo = ("Peso Neto = lo que tenía el lote al empezar esta corrida (el saldo de la anterior); Peso procesado = lo que usó esta corrida; "
-                  "Peso saldo = lo que queda, y es el stock con el que empieza la siguiente.") if sec else None
+    nota_saldo = ("Peso Neto = peso con que ingresó el lote; Saldo anterior = lo que le quedaba al empezar esta corrida; Peso procesado = lo que usó "
+                  "esta corrida; Peso saldo = lo que queda (el stock con el que empieza la siguiente).") if sec else None
     nota_completos = "Lotes que esta corrida no usó: llegan y salen con el mismo saldo." if sec else None
-    fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales, nota=nota_saldo)
-    fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos, nota=nota_completos)
+    fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales, nota=nota_saldo, con_saldo_anterior=sec)
+    fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos, nota=nota_completos, con_saldo_anterior=sec)
     fin3 = fin2
     if pre_cc:
         fin3 = _cuadro_stock(

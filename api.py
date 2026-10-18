@@ -1262,7 +1262,7 @@ def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte):
         inicial = peso - kg_antes          # lo que le quedaba al lote al empezar esta corrida (el saldo de la anterior)
         res[l.numero] = {
             "numero": l.numero, "proveedor": l.proveedor, "procedencia": l.procedencia, "fecha_ingreso": l.fecha_ingreso,
-            "peso_neto_kg": inicial, "saldo_inicial_kg": inicial, "kg_consumidos": kg_esta, "kg_saldo": inicial - kg_esta,
+            "peso_neto_kg": peso, "saldo_inicial_kg": inicial, "kg_consumidos": kg_esta, "kg_saldo": inicial - kg_esta,
             "bines_totales": l.bines_totales,
             "bines_saldo": (float(l.bines_totales) - bines_antes - bines_esta) if l.bines_totales is not None else None,
             # un lote que la hoja de planta ya dio por procesado pero que en la app conserva un saldo suelto es "ruido": no es stock real
