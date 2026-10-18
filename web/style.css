@@ -413,3 +413,14 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
   table.tabla-tarjetas td[colspan]{display:block;text-align:left}
   table.tabla-tarjetas td[colspan]::before{display:none}
 }
+
+/* lotes de un tanque (Medición de tanques): fichas que se tocan para marcar */
+.chips-lotes{display:flex;flex-wrap:wrap;gap:6px}
+.chips-lotes .chip-lote{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:56px;margin:0;border:1px solid var(--border);border-radius:99px;padding:7px 14px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;cursor:pointer;background:var(--surface);color:var(--text-2);user-select:none;line-height:1.1;font-family:inherit}
+.chips-lotes .chip-lote input{position:absolute;opacity:0;pointer-events:none;width:0;height:0}
+.chips-lotes .chip-lote:has(input:checked){background:var(--citrus);border-color:var(--citrus);color:#fff}
+.chips-lotes .chip-lote:has(input:focus-visible){outline:2px solid var(--citrus);outline-offset:2px}
+.chips-lotes .chip-mas{border-style:dashed;background:transparent;color:var(--text-muted);font-weight:500}
+.chips-lotes .chip-mas:hover{color:var(--citrus);border-color:var(--citrus)}
+.chips-lotes input.chip-entrada{width:74px;padding:6px 10px;border-radius:99px;font-size:14px;text-align:center}
+@media (pointer:coarse){ .chips-lotes .chip-lote{min-height:42px} }

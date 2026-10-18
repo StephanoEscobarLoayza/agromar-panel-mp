@@ -398,3 +398,10 @@ CREATE TABLE IF NOT EXISTS corridas_orden (
     corrida_id INTEGER PRIMARY KEY REFERENCES corridas(id) ON DELETE CASCADE,
     posicion   INTEGER NOT NULL
 );
+
+-- Lotes que alimentaron cada tanque (uno a tres; la API también la crea sola si falta)
+CREATE TABLE IF NOT EXISTS tanque_lotes (
+    medicion_id INTEGER NOT NULL REFERENCES mediciones_tanque(id) ON DELETE CASCADE,
+    lote_numero INTEGER NOT NULL REFERENCES lotes(numero),
+    PRIMARY KEY (medicion_id, lote_numero)
+);

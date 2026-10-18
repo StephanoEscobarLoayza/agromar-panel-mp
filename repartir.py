@@ -195,6 +195,12 @@ def crear_router(engine, sync_pre_cc=None) -> APIRouter:
                 FROM mediciones_tanque m WHERE m.corrida_id = ANY(:ids) ORDER BY m.creado_en, m.id
             """), {"ids": ids}).fetchall()
             tipicos = _rendimientos_tipicos(conn)
+            # lotes que alimentaron cada tanque (se anotan en «Medición de tanques»); la tabla se crea sola al usarla por primera vez
+            lotes_tanque: Dict[int, List[int]] = {}
+            if tanques and conn.execute(text("SELECT to_regclass('public.tanque_lotes')")).scalar():
+                for r in conn.execute(text("SELECT medicion_id, lote_numero FROM tanque_lotes WHERE medicion_id = ANY(:m) ORDER BY lote_numero"),
+                                      {"m": [t.id for t in tanques]}):
+                    lotes_tanque.setdefault(r.medicion_id, []).append(r.lote_numero)
 
             # Un lote con kg en alguna de las corridas marcadas y "pendiente" en otra no bloquea el reparto: el reparto llena
             # la parte pendiente. Un lote sin kg en ninguna de las marcadas se omite si sus kg están en otra corrida
@@ -237,7 +243,8 @@ def crear_router(engine, sync_pre_cc=None) -> APIRouter:
                 "id": c.id, "nombre": c.nombre, "tipo_proceso": c.tipo_proceso, "fecha_inicio": c.fecha_inicio,
                 "pt_kg": float(c.pt), "mp_kg": mp_por_corrida.get(c.id, 0.0), "precc_kg": precc.get(c.id, 0.0),
                 "tipico": tipicos.get(c.tipo_proceso),
-                "tanques": [{"id": t.id, "tanque": t.tanque, "litros": _f(t.litros), "registrado": t.creado_en.isoformat()}
+                "tanques": [{"id": t.id, "tanque": t.tanque, "litros": _f(t.litros), "registrado": t.creado_en.isoformat(),
+                             "lotes": lotes_tanque.get(t.id, [])}
                             for t in tanques if t.corrida_id == c.id],
             } for c in cor],
             "lotes": sorted(lotes.values(), key=lambda x: (x["orden"], x["numero"])),

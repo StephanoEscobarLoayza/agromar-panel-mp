@@ -87,6 +87,11 @@
 
         <div class="hint-line">El Ratio se calcula solo (Brix final ÷ Acidez) — no hace falta escribirlo.</div>
 
+        <div class="field">
+          <label>Lotes de este tanque <span class="hint-line" style="display:inline">(toque hasta 5 · quedan marcados para el siguiente tanque)</span></label>
+          <div id="lotesTanque" class="chips-lotes"><span class="hint-line">Elige una corrida</span></div>
+        </div>
+
         <div id="mensaje"></div>
         <button class="btn" id="btnGuardar">Guardar medición</button>
       </div>
@@ -99,8 +104,8 @@
     <div class="panel">
       <div class="table-wrap">
         <table class="tabla-tarjetas">
-          <thead><tr><th>Tanque</th><th class="right">Litros</th><th class="right">Brix i.</th><th class="right">Brix f.</th><th class="right">Acidez</th><th class="right">pH</th><th class="right">Ratio</th><th></th></tr></thead>
-          <tbody id="lista"><tr><td colspan="8" class="empty">Elige una corrida</td></tr></tbody>
+          <thead><tr><th>Tanque</th><th class="right">Litros</th><th>Lotes</th><th class="right">Brix i.</th><th class="right">Brix f.</th><th class="right">Acidez</th><th class="right">pH</th><th class="right">Ratio</th><th></th></tr></thead>
+          <tbody id="lista"><tr><td colspan="9" class="empty">Elige una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -148,11 +153,78 @@ const lista = document.getElementById("lista");
 const comparacionDiv = document.getElementById("comparacion");
 const hintComparacion = document.getElementById("hintComparacion");
 
+// ---------- lotes que alimentaron cada tanque ----------
+let corridaDeLotes = null;
+let lotesCorrida = [];                 // lotes registrados en la corrida elegida: [{numero, proveedor}]
+const lotesMarcados = new Set();       // selección del formulario «Nueva medición» (se conserva entre tanques)
+const MAX_LOTES = 5;
+
+function htmlChips(lotes, marcados) {
+  return lotes.map((l) => `<label class="chip-lote" title="${escapeHtml(l.proveedor || "")}"><input type="checkbox" value="${l.numero}"${marcados.has(l.numero) ? " checked" : ""}>${l.numero}</label>`).join("");
+}
+function renderChipsNuevo() {
+  document.getElementById("lotesTanque").innerHTML = htmlChips(lotesCorrida, lotesMarcados) +
+    '<button type="button" class="chip-lote chip-mas" id="btnOtroLote" title="Agregar un lote que no está en la lista">+ otro</button>';
+}
+// no deja marcar más de cinco lotes en un mismo tanque
+function limitarLotes(ev) {
+  const cb = ev.target.closest('.chip-lote input[type="checkbox"]');
+  if (!cb) return false;
+  const cont = cb.closest(".chips-lotes");
+  if (cb.checked && cont.querySelectorAll("input:checked").length > MAX_LOTES) {
+    cb.checked = false;
+    alert("Un tanque puede tener como máximo cinco lotes.");
+    return false;
+  }
+  return true;
+}
+document.getElementById("lotesTanque").addEventListener("change", (ev) => {
+  if (!limitarLotes(ev)) return;
+  const n = Number(ev.target.value);
+  if (ev.target.checked) lotesMarcados.add(n); else lotesMarcados.delete(n);
+});
+// «+ otro»: se escribe el número de un lote que no está en la lista (el servidor valida que exista al guardar)
+function agregarOtroLote(entrada) {
+  const n = Math.floor(Number(entrada.value));
+  if (n > 0) {
+    if (!lotesCorrida.some((l) => l.numero === n)) { lotesCorrida.push({ numero: n, proveedor: "" }); lotesCorrida.sort((a, b) => a.numero - b.numero); }
+    if (lotesMarcados.size >= MAX_LOTES && !lotesMarcados.has(n)) alert("Un tanque puede tener como máximo cinco lotes.");
+    else lotesMarcados.add(n);
+  }
+  renderChipsNuevo();
+}
+document.getElementById("lotesTanque").addEventListener("click", (ev) => {
+  const mas = ev.target.closest("#btnOtroLote");
+  if (!mas) return;
+  mas.outerHTML = '<input type="number" id="otroLote" class="chip-entrada" min="1" step="1" placeholder="N.º">';
+  document.getElementById("otroLote").focus();
+});
+document.getElementById("lotesTanque").addEventListener("keydown", (ev) => {
+  if (ev.target.id === "otroLote" && ev.key === "Enter") { ev.preventDefault(); agregarOtroLote(ev.target); }
+  if (ev.target.id === "otroLote" && ev.key === "Escape") renderChipsNuevo();
+});
+document.getElementById("lotesTanque").addEventListener("focusout", (ev) => {
+  if (ev.target.id === "otroLote") agregarOtroLote(ev.target);
+});
+// Lotes que se ofrecen: los de la corrida elegida y los de las demás corridas abiertas, porque las corridas que trabajan en
+// paralelo comparten lotes y un tanque puede haberse alimentado con un lote registrado en la otra corrida.
+async function cargarLotesCorrida(corridaId) {
+  lotesMarcados.clear();
+  const ids = [...new Set([Number(corridaId), ...[...corridaSel.options].map((o) => Number(o.value)).filter(Boolean)])];
+  try {
+    const listas = await Promise.all(ids.map((id) => apiGet(`/api/corridas/${id}/asignaciones`).catch(() => [])));
+    const vistos = new Map();
+    listas.flat().filter((f) => f.lote_numero > 0).forEach((f) => { if (!vistos.has(f.lote_numero)) vistos.set(f.lote_numero, { numero: f.lote_numero, proveedor: f.proveedor }); });
+    lotesCorrida = [...vistos.values()].sort((a, b) => a.numero - b.numero);
+  } catch (e) { lotesCorrida = []; }
+  renderChipsNuevo();
+}
+
 async function cargarCorridas() {
   const corridas = await apiGet("/api/corridas?abiertas=true");
   if (corridas.length === 0) {
     corridaSel.innerHTML = '<option value="">No hay corridas abiertas</option>';
-    lista.innerHTML = '<tr><td colspan="8" class="empty">No hay corridas abiertas</td></tr>';
+    lista.innerHTML = '<tr><td colspan="9" class="empty">No hay corridas abiertas</td></tr>';
     comparacionDiv.innerHTML = '<div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">No hay corridas abiertas.</div></div>';
     return;
   }
@@ -263,6 +335,7 @@ function renderComparacion(estimado, medidas) {
 async function cargarTodo() {
   const corridaId = corridaSel.value;
   if (!corridaId) return;
+  if (corridaId !== corridaDeLotes) { corridaDeLotes = corridaId; cargarLotesCorrida(corridaId); }
   const [estimado, medidas] = await Promise.all([
     apiGet(`/api/corridas/${corridaId}/sugerir-siguiente-bin?brix_min=11&ratio_min=11&acidez_max=999`),
     apiGet(`/api/corridas/${corridaId}/mediciones-tanque`),
@@ -270,14 +343,15 @@ async function cargarTodo() {
   renderComparacion(estimado, medidas);
 
   if (medidas.length === 0) {
-    lista.innerHTML = '<tr><td colspan="8" class="empty">Sin mediciones todavía</td></tr>';
+    lista.innerHTML = '<tr><td colspan="9" class="empty">Sin mediciones todavía</td></tr>';
     return;
   }
   lista.innerHTML = medidas.map(m => `
     <tr data-medicion-id="${m.id}" data-tanque="${escapeHtml(m.tanque)}" data-litros="${m.litros ?? ""}"
-        data-brix-inicial="${m.brix_inicial ?? ""}" data-brix-final="${m.brix_final}" data-acidez="${m.acidez}" data-ph="${m.ph ?? ""}">
+        data-brix-inicial="${m.brix_inicial ?? ""}" data-brix-final="${m.brix_final}" data-acidez="${m.acidez}" data-ph="${m.ph ?? ""}" data-lotes="${(m.lotes || []).join(",")}">
       <td class="strong">${escapeHtml(m.tanque)}</td>
       <td class="right num">${m.litros !== null ? fmtKg(m.litros) : "—"}</td>
+      <td class="num">${(m.lotes || []).length ? (m.lotes || []).join(" · ") : '<span class="hint-line">sin lotes</span>'}</td>
       <td class="right num">${m.brix_inicial !== null ? Number(m.brix_inicial).toFixed(2) : "—"}</td>
       <td class="right num">${Number(m.brix_final).toFixed(2)}</td>
       <td class="right num">${Number(m.acidez).toFixed(3)}</td>
@@ -295,12 +369,18 @@ function filaEdicionMedicion(fila, id) {
   const d = fila.dataset;
   const campo = (label, cls, val, tipo, step, placeholder) =>
     `<div class="field"><label>${label}</label><input type="${tipo}" ${step ? `step="${step}"` : ""} class="${cls}" value="${escapeHtml(val ?? "")}" placeholder="${placeholder || ""}" style="width:100%"></div>`;
-  return `<tr><td colspan="8" style="background:var(--surface-2)">
+  const marcados = new Set((d.lotes || "").split(",").filter(Boolean).map(Number));
+  const lotes = [...lotesCorrida];
+  marcados.forEach((n) => { if (!lotes.some((l) => l.numero === n)) lotes.push({ numero: n, proveedor: "" }); });   // un lote anotado que ya no figura en la corrida
+  lotes.sort((a, b) => a.numero - b.numero);
+  return `<tr><td colspan="9" style="background:var(--surface-2)">
     <div class="form-body" style="padding:14px 4px">
       <div class="two-col">
         ${campo("Tanque", "edit-tanque", d.tanque, "text")}
         ${campo("Litros", "edit-litros", d.litros, "number", 1, "opcional")}
       </div>
+      <div class="field"><label>Lotes de este tanque <span class="hint-line" style="display:inline">(hasta 5)</span></label>
+        <div class="chips-lotes edit-lotes">${htmlChips(lotes, marcados)}<button type="button" class="chip-lote chip-mas" title="Agregar un lote que no está en la lista">+ otro</button></div></div>
       <div class="two-col">
         ${campo("Brix inicial", "edit-brix-inicial", d.brixInicial, "number", 0.01)}
         ${campo("Brix final", "edit-brix-final", d.brixFinal, "number", 0.01)}
@@ -343,6 +423,7 @@ lista.addEventListener("click", async (ev) => {
     const brixFinal = Number(fila.querySelector(".edit-brix-final").value);
     const acidez = Number(fila.querySelector(".edit-acidez").value);
     const ph = fila.querySelector(".edit-ph").value;
+    const lotesEdit = [...fila.querySelectorAll(".edit-lotes input:checked")].map((c) => Number(c.value));
     if (!tanque) { alert("Escribe qué tanque es."); return; }
     if (!brixInicial || brixInicial <= 0) { alert("El Brix inicial debe ser mayor a 0."); return; }
     if (!brixFinal || brixFinal <= 0) { alert("El Brix final debe ser mayor a 0."); return; }
@@ -352,6 +433,7 @@ lista.addEventListener("click", async (ev) => {
         tanque, litros: litros === "" ? null : Number(litros),
         brix_inicial: brixInicial,
         brix_final: brixFinal, acidez, ph: ph === "" ? null : Number(ph),
+        lotes: lotesEdit,
       });
       cargarTodo();
     } catch (e) {
@@ -360,6 +442,39 @@ lista.addEventListener("click", async (ev) => {
   }
 });
 
+lista.addEventListener("change", limitarLotes);
+// «+ otro» al editar un tanque: se escribe el número y Enter; queda agregado y marcado
+function agregarFichaEdicion(entrada) {
+  const cont = entrada.closest(".edit-lotes");
+  const n = Math.floor(Number(entrada.value));
+  if (n > 0) {
+    let cb = [...cont.querySelectorAll("input[type=checkbox]")].find((i) => Number(i.value) === n);
+    if (!cb) {
+      const lab = document.createElement("label");
+      lab.className = "chip-lote";
+      lab.innerHTML = `<input type="checkbox" value="${n}">${n}`;
+      cont.insertBefore(lab, entrada);
+      cb = lab.querySelector("input");
+    }
+    if (!cb.checked) {
+      if (cont.querySelectorAll("input:checked").length >= MAX_LOTES) alert("Un tanque puede tener como máximo cinco lotes.");
+      else cb.checked = true;
+    }
+  }
+  entrada.outerHTML = '<button type="button" class="chip-lote chip-mas" title="Agregar un lote que no está en la lista">+ otro</button>';
+}
+lista.addEventListener("click", (ev) => {
+  const mas = ev.target.closest(".edit-lotes .chip-mas");
+  if (!mas) return;
+  mas.outerHTML = '<input type="number" class="chip-entrada" min="1" step="1" placeholder="N.º">';
+  document.querySelector(".edit-lotes input.chip-entrada").focus();
+});
+lista.addEventListener("keydown", (ev) => {
+  if (ev.target.matches(".edit-lotes input.chip-entrada") && ev.key === "Enter") { ev.preventDefault(); agregarFichaEdicion(ev.target); }
+});
+lista.addEventListener("focusout", (ev) => {
+  if (ev.target.matches(".edit-lotes input.chip-entrada") && ev.target.isConnected) agregarFichaEdicion(ev.target);
+});
 corridaSel.addEventListener("change", cargarTodo);
 
 btnGuardar.addEventListener("click", async () => {
@@ -399,8 +514,9 @@ btnGuardar.addEventListener("click", async () => {
       brix_final: brixFinal,
       acidez,
       ph: phInput.value ? Number(phInput.value) : null,
+      lotes: [...lotesMarcados],
     });
-    mensaje.innerHTML = `<div class="msg ok">Medición de ${tanque} guardada.</div>`;
+    mensaje.innerHTML = `<div class="msg ok">Medición de ${escapeHtml(tanque)} guardada${lotesMarcados.size ? " con " + (lotesMarcados.size === 1 ? "el lote " : "los lotes ") + [...lotesMarcados].join(" · ") : " (sin lotes anotados)"}.</div>`;
     tanqueInput.value = "";
     litrosInput.value = "";
     brixInicialInput.value = "";

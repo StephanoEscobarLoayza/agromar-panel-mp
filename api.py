@@ -1945,8 +1945,51 @@ def eliminar_parada(parada_id: int):
 # ---------------------------------------------------------------------------
 # mediciones de tanque (Brix/Acidez real medido, no el estimado de los lotes)
 # ---------------------------------------------------------------------------
+_tanque_lotes_listo = False
+
+
+def _asegurar_tanque_lotes() -> bool:
+    """Los lotes que alimentaron cada tanque (uno a tres) se guardan en su propia tabla, que se crea sola la primera vez
+    que se usa, así no hace falta correr ningún script en cada PC. Devuelve False si no se pudo crear."""
+    global _tanque_lotes_listo
+    if _tanque_lotes_listo:
+        return True
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS tanque_lotes ("
+                "medicion_id INTEGER NOT NULL REFERENCES mediciones_tanque(id) ON DELETE CASCADE, "
+                "lote_numero INTEGER NOT NULL REFERENCES lotes(numero), "
+                "PRIMARY KEY (medicion_id, lote_numero))"
+            ))
+    except Exception as e:
+        print(f"[lotes por tanque] no se pudo crear la tabla: {e}")
+        return False
+    _tanque_lotes_listo = True
+    return True
+
+
+def _guardar_lotes_tanque(conn, medicion_id: int, lotes: List[int]):
+    """Reemplaza los lotes de un tanque. Un tanque puede llevar hasta cinco lotes (cuando se mezclan)."""
+    nums = list(dict.fromkeys(int(x) for x in lotes))
+    if len(nums) > 5:
+        raise HTTPException(status_code=400, detail="Un tanque puede tener como máximo cinco lotes.")
+    conn.execute(text("DELETE FROM tanque_lotes WHERE medicion_id = :m"), {"m": medicion_id})
+    if not nums:
+        return
+    existentes = {r[0] for r in conn.execute(text("SELECT numero FROM lotes WHERE numero = ANY(:n)"), {"n": nums})}
+    faltan = [n for n in nums if n not in existentes]
+    if faltan:
+        raise HTTPException(status_code=400, detail=f"El lote {faltan[0]} no existe.")
+    conn.execute(
+        text("INSERT INTO tanque_lotes (medicion_id, lote_numero) SELECT :m, x FROM unnest(CAST(:n AS integer[])) AS x"),
+        {"m": medicion_id, "n": nums},
+    )
+
+
 @app.get("/api/corridas/{corrida_id}/mediciones-tanque")
 def listar_mediciones_tanque(corrida_id: int):
+    con_lotes = _asegurar_tanque_lotes()
     with engine.connect() as conn:
         result = conn.execute(
             text(
@@ -1960,7 +2003,17 @@ def listar_mediciones_tanque(corrida_id: int):
             ),
             {"c": corrida_id},
         )
-        return rows(result)
+        filas = rows(result)
+        por_medicion = {}
+        if con_lotes and filas:
+            for r in conn.execute(
+                text("SELECT medicion_id, lote_numero FROM tanque_lotes WHERE medicion_id = ANY(:m) ORDER BY lote_numero"),
+                {"m": [f["id"] for f in filas]},
+            ):
+                por_medicion.setdefault(r.medicion_id, []).append(r.lote_numero)
+        for f in filas:
+            f["lotes"] = por_medicion.get(f["id"], [])
+        return filas
 
 
 class NuevaMedicionTanque(BaseModel):
@@ -1972,6 +2025,7 @@ class NuevaMedicionTanque(BaseModel):
     acidez: float
     ph: Optional[float] = None
     observaciones: Optional[str] = ""
+    lotes: Optional[List[int]] = None  # lotes que alimentaron este tanque (hasta 5); None = no tocar
 
 
 @app.post("/api/mediciones-tanque")
@@ -1985,6 +2039,8 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
         raise HTTPException(status_code=400, detail="El Brix final debe ser mayor a 0.")
     if m.acidez <= 0:
         raise HTTPException(status_code=400, detail="La acidez debe ser mayor a 0.")
+    if m.lotes and not _asegurar_tanque_lotes():
+        raise HTTPException(status_code=500, detail="No se pudieron guardar los lotes del tanque.")
     try:
         with engine.begin() as conn:
             result = conn.execute(
@@ -2009,6 +2065,8 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
                 },
             )
             new_id = result.scalar()
+            if m.lotes:
+                _guardar_lotes_tanque(conn, new_id, m.lotes)
         return {"id": new_id, "ok": True}
     except HTTPException:
         raise
@@ -2024,6 +2082,7 @@ class EditarMedicionTanque(BaseModel):
     acidez: float
     ph: Optional[float] = None
     observaciones: Optional[str] = ""
+    lotes: Optional[List[int]] = None  # None = dejar los lotes como están; [] = quitarlos todos
 
 
 @app.post("/api/mediciones-tanque/{medicion_id}")
@@ -2037,6 +2096,8 @@ def editar_medicion_tanque(medicion_id: int, m: EditarMedicionTanque):
         raise HTTPException(status_code=400, detail="El Brix final debe ser mayor a 0.")
     if m.acidez <= 0:
         raise HTTPException(status_code=400, detail="La acidez debe ser mayor a 0.")
+    if m.lotes is not None and not _asegurar_tanque_lotes():
+        raise HTTPException(status_code=500, detail="No se pudieron guardar los lotes del tanque.")
     try:
         with engine.begin() as conn:
             result = conn.execute(
@@ -2061,6 +2122,8 @@ def editar_medicion_tanque(medicion_id: int, m: EditarMedicionTanque):
             )
             if result.scalar() is None:
                 raise HTTPException(status_code=404, detail="Medición no encontrada.")
+            if m.lotes is not None:
+                _guardar_lotes_tanque(conn, medicion_id, m.lotes)
     except HTTPException:
         raise
     except Exception as e:

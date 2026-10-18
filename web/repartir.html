@@ -15,6 +15,7 @@
   .tarjeta input.tipico{width:78px;padding:4px 8px;font-size:13px;text-align:right}
   input.kg-tramo{width:96px;padding:4px 8px;font-size:13px;text-align:right}
   .btn-tramo{font-size:11px;font-weight:500;padding:2px 0;min-height:0;min-width:0;white-space:nowrap}
+  .modo-tanques [data-sube],.modo-tanques [data-baja],.modo-tanques .btn-tramo{display:none}
   .bar-title{font-size:12.5px;font-weight:600;color:var(--text-2)}
   .barra{display:flex;gap:2px;height:40px;margin-top:6px}
   .barra .seg{display:flex;align-items:center;justify-content:center;min-width:2px;border-radius:4px;overflow:hidden;font-size:11px;font-weight:600;color:#123524}
@@ -104,6 +105,16 @@
   </section>
 
   <div id="contenido" hidden>
+    <div class="panel" id="panelModoTanques" style="margin-top:16px" hidden>
+      <div class="form-body">
+        <label style="display:flex;gap:10px;align-items:center;cursor:pointer;font-size:14px">
+          <input type="checkbox" id="chkLotesTanque" style="width:auto;margin:0">
+          <b>Calcular con los lotes anotados en cada tanque</b>
+        </label>
+        <div class="hint-line" id="notaLotesTanque"></div>
+      </div>
+    </div>
+
     <div class="panel" style="margin-top:16px">
       <div class="panel-head"><h3>Secuencia de tanques</h3><span class="hint-line" id="resumenTanques"></span></div>
       <div class="form-body">
@@ -127,14 +138,14 @@
     </div>
 
     <div class="cards2" id="tarjetas"></div>
-    <div class="hint-line" style="margin-top:10px">El rendimiento estimado es un cálculo del reparto, no una medición: la MP de cada corrida se asigna a partir de su producto terminado y de su rendimiento típico.</div>
+    <div class="hint-line" id="notaRend" style="margin-top:10px">El rendimiento estimado es un cálculo del reparto, no una medición: la MP de cada corrida se asigna a partir de su producto terminado y de su rendimiento típico.</div>
     <div id="avisoTotal" style="margin-top:14px"></div>
 
-    <div class="section-head" style="margin-top:34px">
+    <div class="section-head" id="cabBarras" style="margin-top:34px">
       <h2>Lotes frente a tanques</h2>
       <span class="hint">Cada tanque consume la MP de los lotes que están en su tramo</span>
     </div>
-    <div class="panel" style="margin-top:0">
+    <div class="panel" id="panelBarras" style="margin-top:0">
       <div class="form-body">
         <div class="bar-title">Lotes, en orden de uso <span class="hint-line">(se pueden reordenar en la tabla)</span></div>
         <div class="barra" id="barraLotes"></div>
@@ -215,6 +226,7 @@ const ocultar = (si) => { document.getElementById("contenido").hidden = si; };
 
 let todas = [], candidatas = [], seleccion = new Set(), principal = null;
 let D = null, tanques = [], lotes = [], tipico = {}, sel = -1, arrastrando = -1, calc = null;
+let usarLotesTanque = false;      // true = el reparto sale de los lotes anotados en cada tanque (Medición de tanques)
 
 // ---------------- selección de corridas ----------------
 async function iniciar() {
@@ -299,6 +311,10 @@ async function cargarDatos() {
   if (dud) msgs.push(`${dud} tanques seguidos de una misma línea (marcados con borde discontinuo) probablemente se anotaron por bloques.`);
   aviso("avisoTanques", msgs.length ? msgs.join(" ") + " Confírmelo con su supervisor y corríjalo aquí." : "El orden de los tanques se tomó de la hora en que se registró cada uno.", msgs.length ? "warn" : "ok");
 
+  const tanquesConLotes = tanques.filter((t) => t.lotes && t.lotes.length).length;
+  usarLotesTanque = tanquesConLotes > 0;                      // si hay lotes anotados en los tanques, se usan por defecto
+  document.getElementById("panelModoTanques").hidden = tanquesConLotes === 0;
+  document.getElementById("chkLotesTanque").checked = usarLotesTanque;
   lotes = D.lotes.map((l) => ({ ...l, total: l.kg }));      // `total` = kg del lote; si se divide en tramos, cada fila lleva una parte
   sel = -1;
   // avisos que no bloquean: lotes cuyos kg están en una corrida no marcada, y lotes que aún tienen saldo
@@ -317,6 +333,37 @@ async function cargarDatos() {
 }
 
 // ---------------- cálculo ----------------
+// Reparto con los lotes anotados en cada tanque: cada lote reparte sus kg entre las corridas según los tanques que alimentó
+// (un tanque con varios lotes cuenta en partes iguales para cada uno, y pesa por sus litros). No depende del orden de
+// los tanques ni de los lotes. Un lote que no figura en ningún tanque se queda como está.
+function repartoPorTanques(A, cs) {
+  const aporte = {};                       // número de lote -> peso que aporta cada corrida
+  tanques.forEach((t) => {
+    if (!t.lotes || !t.lotes.length) return;
+    const w = t.w / t.lotes.length;
+    t.lotes.forEach((n) => { (aporte[n] = aporte[n] || cs.map(() => 0))[t.c] += w; });
+  });
+  lotes.forEach((l, i) => {
+    if (l.fijo != null && l.fijo >= 0) return;                // fijado a una corrida: ya va entero a ella
+    const a = aporte[l.numero], suma = a ? a.reduce((x, y) => x + y, 0) : 0;
+    if (suma > 0) { a.forEach((x, k) => { A[i][k] = l.kg * x / suma; }); return; }
+    const act = cs.map((c) => (l.actual && l.actual[String(c.id)]) || 0), sa = act.reduce((x, y) => x + y, 0);
+    act.forEach((x, k) => { A[i][k] = sa > 0 ? l.kg * x / sa : l.kg / cs.length; });
+  });
+}
+// avisos del modo por tanques: tanques sin lotes anotados y lotes que no figuran en ningún tanque
+function notaModoTanques() {
+  const sinLotes = tanques.filter((t) => !(t.lotes && t.lotes.length)).length;
+  const enTanque = new Set(tanques.flatMap((t) => t.lotes || []));
+  const fuera = [...new Set(lotes.map((l) => l.numero))].filter((n) => !enTanque.has(n));
+  const msgs = [];
+  if (!usarLotesTanque) return "Cuando está marcado, cada lote reparte sus kg según los tanques que alimentó y no importa el orden de los tanques ni de los lotes.";
+  msgs.push(`${tanques.length - sinLotes} de ${tanques.length} tanques tienen lotes anotados.`);
+  if (sinLotes) msgs.push(`${sinLotes === 1 ? "Un tanque no tiene" : sinLotes + " tanques no tienen"} lotes anotados y no se ${sinLotes === 1 ? "tiene" : "tienen"} en cuenta.`);
+  if (fuera.length) msgs.push(`${fuera.length === 1 ? "El lote" : "Los lotes"} ${fuera.join(", ")} no ${fuera.length === 1 ? "figura" : "figuran"} en ningún tanque y se ${fuera.length === 1 ? "queda" : "quedan"} como ${fuera.length === 1 ? "está" : "están"}.`);
+  return msgs.join(" ") + " Si algo está mal, corrija los lotes en «Medición de tanques».";
+}
+
 function calcular() {
   const cs = D.corridas;
   const M = lotes.reduce((a, l) => a + l.kg, 0);
@@ -338,16 +385,20 @@ function calcular() {
   tanques.forEach((t) => { t.w = cs[t.c].porLitros ? t.litros : 1; });
   const wTot = cs.map((c, i) => tanques.filter((t) => t.c === i).reduce((a, t) => a + t.w, 0));
   tanques.forEach((t) => { t.mp = mpLibre[t.c] * t.w / wTot[t.c]; });
-  // cada tanque consume, en orden, la MP de los lotes libres que caen en su tramo
-  let pos = 0, resto = libres.length ? lotes[libres[0]].kg : 0;
-  tanques.forEach((t) => {
-    let falta = t.mp;
-    while (falta > 1e-6 && pos < libres.length) {
-      const toma = Math.min(falta, resto);
-      A[libres[pos]][t.c] += toma; falta -= toma; resto -= toma;
-      if (resto <= 1e-6) { pos++; resto = pos < libres.length ? lotes[libres[pos]].kg : 0; }
-    }
-  });
+  if (usarLotesTanque) {
+    repartoPorTanques(A, cs);
+  } else {
+    // cada tanque consume, en orden, la MP de los lotes libres que caen en su tramo
+    let pos = 0, resto = libres.length ? lotes[libres[0]].kg : 0;
+    tanques.forEach((t) => {
+      let falta = t.mp;
+      while (falta > 1e-6 && pos < libres.length) {
+        const toma = Math.min(falta, resto);
+        A[libres[pos]][t.c] += toma; falta -= toma; resto -= toma;
+        if (resto <= 1e-6) { pos++; resto = pos < libres.length ? lotes[libres[pos]].kg : 0; }
+      }
+    });
+  }
   // 2 decimales por celda, conservando exactamente el total de cada lote
   A.forEach((fila, i) => {
     const r = fila.map((x) => Math.round(x * 100) / 100);
@@ -364,16 +415,22 @@ function calcular() {
 // ---------------- pantalla ----------------
 function renderTodo() {
   calc = calcular();
+  document.getElementById("contenido").classList.toggle("modo-tanques", usarLotesTanque);
+  document.getElementById("cabBarras").hidden = document.getElementById("panelBarras").hidden = usarLotesTanque;     // sin orden de tanques no hay barras que mostrar
+  document.getElementById("notaLotesTanque").textContent = notaModoTanques();
+  document.getElementById("notaRend").textContent = usarLotesTanque
+    ? "El rendimiento estimado sale de los lotes anotados en cada tanque: la MP de cada lote se reparte según los tanques que alimentó. Sigue siendo una estimación, porque no se midió cuánta fruta entró a cada línea."
+    : "El rendimiento estimado es un cálculo del reparto, no una medición: la MP de cada corrida se asigna a partir de su producto terminado y de su rendimiento típico.";
   renderTira(); renderTarjetas(); renderBarras(); renderTabla();
   const x = calc.exceso;
   aviso("avisoTotal", Math.abs(x) > 0.05
-    ? `La MP total de estas corridas es ${Math.abs(x * 100).toFixed(1)} % ${x > 0 ? "mayor" : "menor"} que la necesaria para dar sus rendimientos típicos con el producto terminado registrado. Por eso los rendimientos estimados quedan ${x > 0 ? "por debajo" : "por encima"} de lo típico en todas las corridas; conviene revisar la MP o el producto terminado del día.`
+    ? `La MP total de estas corridas es ${Math.abs(x * 100).toFixed(1)} % ${x > 0 ? "mayor" : "menor"} que la necesaria para dar sus rendimientos típicos con el producto terminado registrado. ${usarLotesTanque ? "Conviene" : `Por eso los rendimientos estimados quedan ${x > 0 ? "por debajo" : "por encima"} de lo típico en todas las corridas; conviene`} revisar la MP o el producto terminado del día.`
     : "", "warn");
 }
 function renderTira() {
   document.getElementById("tira").innerHTML = tanques.map((t, i) => `
     <div class="tk-chip${t.dudoso ? " dudoso" : ""}${i === sel ? " sel" : ""}" draggable="true" data-i="${i}" style="background:${D.corridas[t.c].color}"
-         title="${escapeHtml(D.corridas[t.c].nombre)} · ${escapeHtml(t.tanque)}${t.litros ? " · " + fmtKg(t.litros) + " L" : ""}${t.dudoso ? " · orden por confirmar" : ""}">
+         title="${escapeHtml(D.corridas[t.c].nombre)} · ${escapeHtml(t.tanque)}${t.litros ? " · " + fmtKg(t.litros) + " L" : ""}${t.lotes && t.lotes.length ? " · lotes " + t.lotes.join(", ") : ""}${t.dudoso ? " · orden por confirmar" : ""}">
       <small>${i + 1}</small><b>${D.corridas[t.c].letra}</b></div>`).join("");
   document.getElementById("leyenda").innerHTML = D.corridas.map((c) =>
     `<span><i style="background:${c.color}"></i>${c.letra} = <b>${escapeHtml(c.nombre)}</b> (${c.tanques.length} tanques)</span>`).join("");
@@ -534,6 +591,10 @@ document.getElementById("tbLotes").addEventListener("click", (ev) => {
   const j = s ? i - 1 : i + 1;
   if (i < 0 || j < 0 || j >= lotes.length) return;
   [lotes[i], lotes[j]] = [lotes[j], lotes[i]];
+  renderTodo();
+});
+document.getElementById("chkLotesTanque").addEventListener("change", (ev) => {
+  usarLotesTanque = ev.target.checked;
   renderTodo();
 });
 document.getElementById("tbLotes").addEventListener("change", (ev) => {
