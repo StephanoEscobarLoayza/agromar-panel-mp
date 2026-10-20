@@ -45,7 +45,7 @@ CSV_URL = (
 # PESO, ESTADO
 
 # la hoja trae el nombre del proveedor truncado/abreviado para algunos - acá
-# se completa a la razón social real que confirmó Stephano, para que salga
+# se completa a la razón social real confirmada por planta, para que salga
 # bien en reportes/dashboards. Se aplica en cada sync (no en una columna
 # "manual" aparte) porque es la misma corrección siempre para el mismo
 # proveedor, no algo distinto por lote.

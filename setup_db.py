@@ -1,6 +1,6 @@
 """
-Corre esto UNA VEZ, desde tu compu (no desde el sandbox de Claude), para crear
-las tablas en la base de datos de Render:
+Corre esto UNA VEZ, desde el equipo donde se instala el panel, para crear
+las tablas en la base de datos:
 
     pip install -r requirements.txt
     python setup_db.py

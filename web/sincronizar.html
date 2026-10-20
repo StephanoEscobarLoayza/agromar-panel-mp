@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sincronizar · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,7 +44,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Sincronizar</h1>
-    <p class="hero-sub">Trae los lotes nuevos desde el Google Sheet de recepción de camiones.</p>
+    <p class="hero-sub">Importa los lotes nuevos desde la hoja de Google Sheets de recepción de camiones.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -56,11 +56,11 @@
     <div class="panel-head"><h3>Lotes de recepción</h3></div>
     <div class="form-body">
       <p class="hint-line">
-        Trae los lotes nuevos o actualizados desde la hoja de Google Sheets
+        Importa los lotes nuevos o actualizados desde la hoja de Google Sheets
         de recepción de camiones ("NJ ORGANICA VAL"). Los lotes que ya
         existen se actualizan (por ejemplo, uno que estaba "en espera" y
         ya se pesó); nunca se borra nada. <strong>Esto ya corre solo cada
-        20 minutos</strong> — usa el botón solo si no quieres esperar.
+        20 minutos</strong>. Use el botón solo si no desea esperar.
       </p>
       <div class="lookup" id="estadoAuto" style="margin-bottom:14px">
         <div class="lookup-row"><span>Última sincronización</span><span class="num">cargando…</span></div>
@@ -129,7 +129,7 @@ async function cargarEstadoAuto() {
   try {
     const e = await apiGet("/api/sync/estado");
     if (!e.ultima) {
-      estadoAuto.innerHTML = '<div class="lookup-row"><span>Última sincronización</span><span class="num">todavía no corrió — espera unos minutos</span></div>';
+      estadoAuto.innerHTML = '<div class="lookup-row"><span>Última sincronización</span><span class="num">aún no se ha ejecutado; espere unos minutos</span></div>';
       return;
     }
     if (e.error) {
@@ -157,8 +157,8 @@ btn.addEventListener("click", async () => {
     const r = await apiPost("/api/sync/lotes", {});
     resultado.innerHTML = `
       <div class="msg ok">
-        Listo — ${r.insertados} lotes nuevos, ${r.actualizados} actualizados
-        ${r.omitidos ? `, ${r.omitidos} todavía sin pesar (se traen solos cuando ya tengan el peso)` : ""}.
+        Sincronización completada: ${r.insertados} lotes nuevos y ${r.actualizados} actualizados
+        ${r.omitidos ? `, ${r.omitidos} aún sin peso (se incorporan automáticamente cuando se registre el peso)` : ""}.
       </div>`;
     cargarEstadoAuto();
   } catch (e) {

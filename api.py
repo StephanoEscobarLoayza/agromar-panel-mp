@@ -10,7 +10,11 @@ Correr local:
 import asyncio
 import hashlib
 import hmac
+import logging
 import os
+import secrets
+import time
+from collections import defaultdict, deque
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
@@ -19,12 +23,11 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 from db import crear_motor
 from sync_lotes import sincronizar_lotes
@@ -46,15 +49,15 @@ if not DATABASE_URL:
 
 engine = crear_motor(DATABASE_URL, pool_pre_ping=True)
 
-app = FastAPI(title="Panel de cuadre - Agromar")
-app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
-)
+# La documentación automática (/docs, /redoc, /openapi.json) queda apagada: describe todos los endpoints y no la necesita el usuario.
+# Tampoco hay CORS: las páginas y la API salen del mismo servicio, así que ningún otro sitio debe poder llamarla desde un navegador.
+app = FastAPI(title="Panel de cuadre - Agromar", docs_url=None, redoc_url=None, openapi_url=None)
+_log = logging.getLogger("panel")
 
 # ---------------------------------------------------------------------------
 # autenticación - una sola contraseña compartida para todo el equipo.
 # Se activa SOLO si están seteadas APP_PASSWORD y APP_SESSION_SECRET (env vars
-# en Render). Si no están, la app funciona sin login como antes - así se puede
+# del entorno). Si no están, la app funciona sin login como antes - así se puede
 # desplegar el código sin dejar a nadie afuera hasta decidir prender el candado.
 # ---------------------------------------------------------------------------
 APP_USER = (os.environ.get("APP_USER") or "").strip()
@@ -69,8 +72,55 @@ _COOKIE_SECURE = os.environ.get("APP_INSECURE_COOKIE") != "1"  # =1 solo para pr
 _RUTAS_LIBRES = {"/login.html", "/login-bg.jpg", "/login-bg-mobile.jpg", "/api/login", "/api/sesion", "/style.css", "/app.js", "/favicon.svg"}
 
 
-def _token_sesion():
-    return hmac.new(_SESSION_SECRET.encode(), b"agromar-ok", hashlib.sha256).hexdigest()
+_SESION_HORAS = 24            # una sesión vale 24 horas como máximo, aunque no se cierre el navegador
+_sesiones_cerradas = set()    # firmas de sesiones cerradas a mano (se vacía al reiniciar el servidor)
+
+
+def _firma(exp: int, azar: str) -> str:
+    return hmac.new(_SESSION_SECRET.encode(), f"agromar-ok:{exp}:{azar}".encode(), hashlib.sha256).hexdigest()
+
+
+def _token_sesion() -> str:
+    """Token con vencimiento: «<expira>.<azar>.<firma>». El valor al azar hace que cada inicio de sesión genere uno distinto,
+    de modo que cerrar una sesión no cierra la de otra persona."""
+    exp = int(time.time()) + _SESION_HORAS * 3600
+    azar = secrets.token_hex(8)
+    return f"{exp}.{azar}.{_firma(exp, azar)}"
+
+
+def _sesion_valida(token: str) -> bool:
+    try:
+        exp_txt, azar, firma = token.split(".", 2)
+        exp = int(exp_txt)
+    except (ValueError, AttributeError):
+        return False
+    return exp > time.time() and hmac.compare_digest(firma, _firma(exp, azar)) and firma not in _sesiones_cerradas
+
+
+# Seguridad básica del navegador: nada de incrustar la página en otro sitio, nada de adivinar tipos de archivo y solo se
+# cargan scripts, estilos e imágenes propios (más las tipografías de Google Fonts). Los scripts y estilos en línea están
+# permitidos porque las páginas los usan.
+_CABECERAS_SEGURIDAD = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    ),
+}
+
+
+@app.middleware("http")
+async def _cabeceras_seguridad(request, call_next):
+    response = await call_next(request)
+    for k, v in _CABECERAS_SEGURIDAD.items():
+        response.headers.setdefault(k, v)
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
 
 
 @app.middleware("http")
@@ -80,8 +130,7 @@ async def _guardia_auth(request, call_next):
     path = request.url.path
     if path in _RUTAS_LIBRES:
         return await call_next(request)
-    cookie = request.cookies.get(_COOKIE_NAME, "")
-    if cookie and hmac.compare_digest(cookie, _token_sesion()):
+    if _sesion_valida(request.cookies.get(_COOKIE_NAME, "")):
         return await call_next(request)
     if path.startswith("/api/"):
         return JSONResponse({"detail": "No autenticado"}, status_code=401)
@@ -112,14 +161,34 @@ def estado_sesion():
     return {"auth": AUTH_ON}
 
 
+_INTENTOS_MAX, _INTENTOS_VENTANA = 5, 600       # 5 intentos fallidos por dirección cada 10 minutos
+_intentos_fallidos = defaultdict(deque)
+
+
+def _cliente(request: Request) -> str:
+    """Dirección del visitante; detrás del túnel llega en X-Forwarded-For."""
+    adelante = request.headers.get("x-forwarded-for", "")
+    return adelante.split(",")[0].strip() or (request.client.host if request.client else "desconocido")
+
+
 @app.post("/api/login")
-def login(p: LoginPayload):
+def login(p: LoginPayload, request: Request):
     if not AUTH_ON:
         return {"ok": True}
+    quien, ahora = _cliente(request), time.time()
+    fallos = _intentos_fallidos[quien]
+    while fallos and ahora - fallos[0] > _INTENTOS_VENTANA:
+        fallos.popleft()
+    if len(fallos) >= _INTENTOS_MAX:
+        espera = int((_INTENTOS_VENTANA - (ahora - fallos[0])) // 60) + 1
+        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Espere {espera} minuto(s) antes de volver a intentar.")
     ok_usuario = hmac.compare_digest(p.usuario.strip(), APP_USER)
     ok_clave = hmac.compare_digest(p.password.strip(), APP_PASSWORD)
     if not (ok_usuario and ok_clave):
+        fallos.append(ahora)
+        time.sleep(0.6)                              # frena el tanteo de contraseñas
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
+    _intentos_fallidos.pop(quien, None)
     resp = JSONResponse({"ok": True})
     resp.set_cookie(
         _COOKIE_NAME, _token_sesion(),
@@ -129,10 +198,47 @@ def login(p: LoginPayload):
 
 
 @app.post("/api/logout")
-def logout():
+def logout(request: Request):
+    token = request.cookies.get(_COOKIE_NAME, "")
+    if token.count(".") == 2:
+        _sesiones_cerradas.add(token.rsplit(".", 1)[1])     # esa sesión deja de valer aunque alguien conserve la cookie
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(_COOKIE_NAME, path="/")
     return resp
+
+
+def _error_http(e: Exception) -> HTTPException:
+    """Traduce un error de la base de datos a un mensaje claro para el usuario. Las reglas escritas a propósito en la base
+    (como «el lote solo tiene X kg de saldo») ya vienen en español y se muestran tal cual; los demás errores se anotan en el
+    registro del servidor y al usuario solo se le dice qué tipo de problema fue."""
+    orig = getattr(e, "orig", None) or e
+    codigo = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None) or ""
+    mensaje = ""
+    arg0 = orig.args[0] if getattr(orig, "args", None) else None
+    if isinstance(arg0, dict):                          # pg8000 entrega el error como diccionario
+        codigo, mensaje = codigo or arg0.get("C", ""), arg0.get("M", "")
+    if not mensaje:
+        diag = getattr(orig, "diag", None)
+        mensaje = getattr(diag, "message_primary", None) or str(orig).split("\n")[0]
+    if codigo == "P0001":
+        return HTTPException(status_code=400, detail=mensaje)
+    amigables = {
+        "23505": (409, "Ya existe un registro con esos mismos datos."),
+        "23503": (409, "El dato hace referencia a un registro que no existe, o no se puede eliminar porque está en uso."),
+        "23502": (400, "Falta completar un dato obligatorio."),
+        "23514": (400, "Algún dato está fuera de lo permitido. Revise los valores ingresados."),
+        "22007": (400, "La fecha u hora ingresada no es válida."),
+        "22008": (400, "La fecha u hora ingresada no es válida."),
+        "22P02": (400, "Un dato no tiene el formato correcto."),
+        "22003": (400, "Un número está fuera del rango permitido."),
+        "22001": (400, "Un texto es demasiado largo."),
+    }
+    if codigo in amigables:
+        estado, texto = amigables[codigo]
+        _log.warning("Dato rechazado (%s): %s", codigo, mensaje)
+        return HTTPException(status_code=estado, detail=texto)
+    _log.error("Error inesperado de la base de datos (%s): %s", codigo or "sin código", mensaje)
+    return HTTPException(status_code=500, detail="No se pudo completar la operación. Intente nuevamente; si el problema continúa, avise al administrador.")
 
 
 def rows(result):
@@ -235,7 +341,7 @@ def _ajustar_con_bines(bines, kg_acum, brix_pond, acidez_pond, brix_min, ratio_m
     bines a la vez sobre el silo al arrancar una corrida desde cero, sin
     importar si con uno solo ya alcanzaría el mínimo: la prioridad es
     procesar más materia prima, no la mínima posible para llegar al
-    Brix/Ratio (Stephano lo aclaró explícitamente: quedarse corto con un
+    Brix/Ratio (criterio de planta: quedarse corto con un
     bin parcial cuando podría meter más es ineficiente para la producción).
     Pero a media corrida (ver sugerir_siguiente_bin), el caller puede pasar
     max_bines=1 si solo se le acabó UN bin de los dos que tenía corriendo -
@@ -267,7 +373,7 @@ def _ajustar_con_bines_calidad(bines, kg_acum, brix_pond, acidez_pond, brix_min,
     cupos elige - de lo que queda disponible - el bin que deja la MEJOR
     mezcla resultante, probando de verdad cada candidato contra lo que ya se
     lleva acumulado (no solo comparando el brix/ratio propio de cada lote
-    suelto). Stephano pidió esto como alternativa a "el que sigue por
+    suelto). Es la alternativa a "el que sigue por
     fecha" - acá la prioridad es ayudar a mantener o subir el Brix Y el
     Ratio sin pasarse de la Acidez máxima, no solo mirar uno de los tres a
     costa de los otros - por eso se compara qué tan por encima de CADA
@@ -334,10 +440,10 @@ def _paso_ya_alimentado(r, kg_usado, kg_acum, brix_pond, acidez_pond, estimado=F
 
 @app.get("/api/corridas/{corrida_id}/sugerir-siguiente-bin")
 def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, acidez_max: float, modo: str = "fecha", n_bines: int = 1):
-    """Para cuando ya estás a mitad de una corrida y un lote de bines se te
-    acaba: a diferencia del sugeridor general (que arranca de cero asumiendo
-    que vas a usar el lote de Silo completo), este parte de lo que está
-    entrando AHORA MISMO al tanque que se está llenando. La señal de si un
+    """Para cuando una corrida está a mitad de proceso y se acaba un lote de
+    bines: a diferencia del sugeridor general (que arranca de cero asumiendo
+    que se usará el lote de Silo completo), este parte de lo que está
+    entrando EN ESTE MOMENTO al tanque que se está llenando. La señal de si un
     lote sigue ahí no es si su kg está confirmado en 'Registrar consumo'
     (a veces se confirma un "avance" del kg mientras el lote sigue
     metiéndose) sino si todavía le queda SALDO: sin saldo, ya no puede
@@ -359,7 +465,7 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
     ayudan a mantener o subir el Brix/Ratio de la mezcla resultante - esto
     sí hace falta calcularlo, no es solo mirar una fecha."""
     if n_bines not in (1, 2):
-        raise HTTPException(status_code=400, detail="n_bines debe ser 1 o 2.")
+        raise HTTPException(status_code=400, detail="El número de bines debe ser 1 o 2.")
     with engine.connect() as conn:
         corrida = one(conn.execute(text("SELECT id, nombre FROM corridas WHERE id = :id"), {"id": corrida_id}))
         if corrida is None:
@@ -403,12 +509,12 @@ def sugerir_siguiente_bin(corrida_id: int, brix_min: float, ratio_min: float, ac
         }
 
     # La señal de si un lote sigue en el tanque activo NO es si su kg está
-    # confirmado o no en Registrar consumo (Stephano aclaró que a veces
+    # confirmado o no en Registrar consumo (a veces se
     # confirma un "avance" del kg mientras el lote sigue metiéndose todavía,
     # sin que eso signifique que ya terminó) - la señal real es si al lote
     # le queda saldo Y esta es su asignación más reciente. Lo segundo hace
     # falta porque el mismo saldo restante puede ya estar pendiente en OTRA
-    # corrida más nueva (Stephano encontró el caso real: un lote con saldo
+    # corrida más nueva (caso real: un lote con saldo
     # en la corrida 19 porque ese saldo ya estaba metiéndose en la corrida
     # 20) - sin este chequeo, ese saldo se contaría dos veces, una vez en
     # cada corrida. Si no le queda saldo, o si le queda pero ya hay una
@@ -508,7 +614,7 @@ def obtener_lote(numero: int):
         result = conn.execute(text("SELECT * FROM v_saldo_lotes WHERE numero = :n"), {"n": numero})
         lote = one(result)
         if lote is None:
-            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro. Sincronízalo primero.")
+            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro. Sincronícelo primero.")
         return lote
 
 
@@ -525,7 +631,7 @@ def trazabilidad_lote(numero: int):
     with engine.connect() as conn:
         lote = one(conn.execute(text("SELECT * FROM v_saldo_lotes WHERE numero = :n"), {"n": numero}))
         if lote is None:
-            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro. Sincronízalo primero.")
+            raise HTTPException(status_code=404, detail=f"El lote {numero} no está en el maestro. Sincronícelo primero.")
 
         corridas = rows(conn.execute(
             text(
@@ -584,7 +690,7 @@ def actualizar_estado_lote(numero: int, body: ActualizarEstadoLote):
     el valor del Sheet."""
     valor = body.estado.strip().upper() if body.estado else None
     if valor and valor not in ESTADOS_VALIDOS:
-        raise HTTPException(status_code=400, detail=f"Estado inválido. Usa uno de: {', '.join(ESTADOS_VALIDOS)}.")
+        raise HTTPException(status_code=400, detail=f"Estado inválido. Utilice uno de: {', '.join(ESTADOS_VALIDOS)}.")
     with engine.begin() as conn:
         result = conn.execute(
             text("UPDATE lotes SET estado_manual = :v WHERE numero = :n RETURNING numero"),
@@ -604,7 +710,7 @@ def actualizar_ubicacion_lote(numero: int, body: ActualizarUbicacionLote):
     """Override manual de producción sobre la ubicación del lote."""
     valor = body.ubicacion.strip() if body.ubicacion else None
     if valor and not ubicacion_es_valida(valor):
-        raise HTTPException(status_code=400, detail=f"Ubicación inválida. Usa una combinación de: {', '.join(UBICACIONES_BASE)}.")
+        raise HTTPException(status_code=400, detail=f"Ubicación inválida. Utilice una combinación de: {', '.join(UBICACIONES_BASE)}.")
     with engine.begin() as conn:
         result = conn.execute(
             text("UPDATE lotes SET ubicacion_manual = :v WHERE numero = :n RETURNING numero"),
@@ -664,9 +770,10 @@ def _correr_sync(marcar_error_como_502=False):
         return resultado
     except Exception as e:
         _estado_sync["ultima"] = datetime.now(timezone.utc).isoformat()
-        _estado_sync["error"] = str(e)
+        _log.error("Falló la sincronización de lotes: %s", e)
+        _estado_sync["error"] = "No se pudo conectar con la hoja de recepción."
         if marcar_error_como_502:
-            raise HTTPException(status_code=502, detail=f"No se pudo sincronizar: {e}")
+            raise HTTPException(status_code=502, detail="No se pudo sincronizar con la hoja de recepción. Intente nuevamente; si el problema continúa, avise al administrador.")
         raise
 
 
@@ -788,12 +895,12 @@ def _sql_stock_total_asof(fecha_param: str) -> str:
     (solo cuenta asignaciones con creado_en <= fecha+5h, Perú->UTC), pero
     aplicado a TODOS los lotes en vez de a los de una sola corrida.
 
-    Corrige un bug real: antes, stock_inicio_kg/stock_cierre_kg se
+    Corrige un error real: antes, stock_inicio_kg/stock_cierre_kg se
     calculaban con el stock EN VIVO al momento de ejecutar el INSERT/UPDATE
     - si alguien crea o finaliza una corrida con una fecha_inicio/fecha_final
     atrasada (ej. "en realidad empezó/terminó hace unas horas"), el número
     quedaba contaminado con consumo registrado DESPUÉS de esa fecha (incluido
-    el de una corrida nueva que ya estaba corriendo). Stephano lo detectó:
+    el de una corrida nueva que ya estaba corriendo). Se detectó que
     el stock de cierre de una corrida ya cerrada coincidía exacto con el
     stock EN VIVO de ese momento, en vez de quedarse fijo en su propia fecha
     de cierre real.
@@ -805,10 +912,10 @@ def _sql_stock_total_asof(fecha_param: str) -> str:
     (su estado actual sigue siendo EN PROCESO/EN ESPERA). Sin esto, un lote
     que ya está "Procesado" HOY (por consumo real de una corrida posterior)
     quedaba excluido incluso de una fecha de corte anterior a ese consumo -
-    exactamente el bug que reportó Stephano. La segunda condición (estado
+    exactamente el error ya observado. La segunda condición (estado
     actual) sigue haciendo falta para no reintroducir el "ruido" ya conocido
     de lotes que Trazabilidad marca Procesado sin que la app tenga registrado
-    su consumo real (ver nota de #2396 en memoria) - esos nunca cambian entre
+    su consumo real (caso del lote #2396) - esos nunca cambian entre
     la fecha de corte y ahora, así que la primera condición los excluye.
 
     También filtra l.fecha_ingreso <= la fecha de corte - un lote que
@@ -870,7 +977,7 @@ def crear_corrida(c: NuevaCorrida):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
 
 
 class EditarCorrida(BaseModel):
@@ -916,9 +1023,9 @@ class FinalizarCorrida(BaseModel):
 def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
     """fecha_final la manda el navegador (hora local de la planta) - NO se
     usa now() del servidor: fecha_inicio se guarda como hora local "de
-    pared" (viene de un <input datetime-local>, sin zona horaria) y Render
-    corre en UTC, así que un now() del servidor quedaría ~5 horas adelantado
-    frente a fecha_inicio - mismo gotcha ya corregido en paradas/cerrar."""
+    pared" (viene de un <input datetime-local>, sin zona horaria) y un servidor
+    en la nube suele correr en UTC, así que un now() del servidor quedaría ~5
+    horas adelantado frente a fecha_inicio - mismo caso ya resuelto en paradas."""
     with engine.begin() as conn:
         result = conn.execute(
             text(
@@ -969,7 +1076,7 @@ def eliminar_corrida(corrida_id: int):
         if n_asignaciones > 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Esta corrida ya tiene {n_asignaciones} asignación(es) de consumo - no se puede eliminar para no perder ese registro.",
+                detail=f"Esta corrida ya tiene {n_asignaciones} asignación(es) de consumo; no se puede eliminar para no perder ese registro.",
             )
         result = conn.execute(text("DELETE FROM corridas WHERE id = :id RETURNING id"), {"id": corrida_id})
         if result.scalar() is None:
@@ -980,6 +1087,8 @@ def eliminar_corrida(corrida_id: int):
 @app.get("/api/corridas/{corrida_id}/asignaciones")
 def listar_asignaciones(corrida_id: int):
     with engine.connect() as conn:
+        if conn.execute(text("SELECT 1 FROM corridas WHERE id = :c"), {"c": corrida_id}).scalar() is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
         result = conn.execute(
             text(
                 """
@@ -1035,7 +1144,7 @@ def listar_productos_corrida(corrida_id: int):
 # El saldo de un lote (v_saldo_lotes.kg_saldo / bines_saldo) es UN SOLO número
 # global - si una corrida POSTERIOR sigue consumiendo un lote que esta corrida
 # también usó, ese saldo baja para todos, incluido el reporte de una corrida
-# ya cerrada (Stephano lo notó con el lote 2393/2402: el reporte del 9 de
+# ya cerrada (caso real con el lote 2393/2402: el reporte del 9 de
 # setiembre mostraba 0 de saldo porque la corrida del 10 ya se lo había
 # terminado, cuando lo que quería ver era la foto de CUANDO CERRÓ esa corrida).
 # Para una corrida ya cerrada (fecha_final IS NOT NULL), estas expresiones
@@ -1051,7 +1160,7 @@ def listar_productos_corrida(corrida_id: int):
 # consumió pero cuya asignación se guardó/editó DESPUÉS de darle "Finalizar"
 # (flujo normal: cerrar y después terminar de cargar el detalle) se excluía a
 # sí mismo del cálculo, y el reporte mostraba el lote como si nunca lo hubiera
-# tocado (Stephano lo notó con los lotes 2449/2450 de la corrida 94 - salía
+# tocado (caso real con los lotes 2449/2450 de la corrida 94 - salía
 # el saldo completo del lote en vez del que de verdad quedaba).
 _SQL_KG_SALDO_AL_CIERRE = """
     CASE WHEN CAST(:fecha_final AS timestamp) IS NULL THEN v.kg_saldo ELSE
@@ -1167,7 +1276,7 @@ def reporte_periodo_pdf(desde: str, hasta: str):
         d_desde = datetime.strptime(desde, "%Y-%m-%d").date()
         d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Fechas inválidas (usa AAAA-MM-DD).")
+        raise HTTPException(status_code=400, detail="Fechas no válidas. Utilice el formato AAAA-MM-DD.")
     if d_desde > d_hasta:
         raise HTTPException(status_code=400, detail="La fecha 'desde' no puede ser posterior a 'hasta'.")
     p = {"d": d_desde, "h": d_hasta + timedelta(days=1)}
@@ -1384,7 +1493,7 @@ def _normalizar_producto(p: NuevoProductoCorrida):
     if not producto:
         raise HTTPException(status_code=400, detail="El nombre del producto no puede estar vacío.")
     if p.tipo not in ("salida", "entrada"):
-        raise HTTPException(status_code=400, detail="Tipo inválido (debe ser 'salida' o 'entrada').")
+        raise HTTPException(status_code=400, detail="Tipo no válido. Debe ser «salida» o «entrada».")
     pt_kg = p.pt_kg
     if pt_kg is None and p.tambores and p.peso_neto_tambor_kg:
         pt_kg = p.tambores * p.peso_neto_tambor_kg
@@ -1429,7 +1538,7 @@ def guardar_producto_corrida(corrida_id: int, p: NuevoProductoCorrida):
             new_id = result.scalar()
         return {"id": new_id, "ok": True}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
 
 
 @app.post("/api/corridas/{corrida_id}/productos/{producto_id}")
@@ -1470,7 +1579,7 @@ def editar_producto_corrida(corrida_id: int, producto_id: int, p: NuevoProductoC
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
     return {"ok": True}
 
 
@@ -1515,7 +1624,7 @@ def bines_disponibles(conn, lote_numero: int, excluir_asignacion_id: Optional[in
 def _sync_lote_derivado_pre_cc(conn, lote_numero: int):
     """Cuando un lote real (numero positivo) alimenta una corrida de tipo
     "PRE CC", ese kg no se pierde - se puede volver a usar de a poco en
-    otras corridas como MMPP para subir Brix/Ratio (Stephano lo explicó:
+    otras corridas como MMPP para subir Brix/Ratio (según el proceso de planta:
     "se añade con el lote y una cantidad de la corrida del pre cc"). Pero
     para cuando eso pasa, el lote original ya suele estar en 0 de saldo
     (se gastó aparte, en corridas normales) - por eso ese kg necesita su
@@ -1599,7 +1708,7 @@ def _marcar_estado_por_consumo(conn, lote_numero: int):
     estado_manual después. Y como estado_manual TAPA a estado_fuente (el
     Sheet de Trazabilidad), la sincronización automática de cada 20 min no
     lo arreglaba sola aunque el Sheet sí dijera "Procesado" del otro lado -
-    Stephano lo notó ("el sincronizador jala de Drive y lo pone en proceso
+    Se observó ("el sincronizador jala de Drive y lo pone en proceso
     de nuevo"). Ahora se recalcula el saldo real después del cambio y se
     guarda el estado que corresponde de verdad.
 
@@ -1607,8 +1716,8 @@ def _marcar_estado_por_consumo(conn, lote_numero: int):
     tenía), no tiene sentido dejarlo con un override "EN PROCESO" ni
     "PROCESADO" a la fuerza - se le quita el override (estado_manual=NULL)
     para que vuelva a mandar estado_fuente, el de la hoja de Trazabilidad
-    (normalmente "En espera" si nunca se había tocado). Encontrado por
-    Stephano: anotó un lote, lo borró, y se quedó pegado en "En proceso"."""
+    (normalmente "En espera" si nunca se había tocado). Caso real: se anotó
+    un lote, se borró, y se quedó pegado en "En proceso"."""
     tiene_asignaciones = conn.execute(
         text("SELECT 1 FROM asignaciones WHERE lote_numero = :n LIMIT 1"), {"n": lote_numero}
     ).scalar()
@@ -1664,7 +1773,7 @@ def crear_asignacion(a: NuevaAsignacion):
                     detail=(
                         f"El lote {a.lote_numero} ya está registrado en esta corrida "
                         f"({kg_txt}, turno {ya_existe['turno']}) - para agregar más kg, "
-                        'edítalo en "Últimas asignaciones" (✎) en vez de crear otro registro.'
+                        'edítelo en «Últimas asignaciones» (✎) en vez de crear otro registro.'
                     ),
                 )
             if a.tipo_almacen_origen == "BINES" and a.bines_consumidos:
@@ -1680,7 +1789,7 @@ def crear_asignacion(a: NuevaAsignacion):
                     INSERT INTO asignaciones
                         (lote_numero, corrida_id, fecha_proceso, turno, tipo_almacen_origen, kg_asignados, bines_consumidos, porcentaje_descuento, observaciones)
                     VALUES
-                        (:lote_numero, :corrida_id, now(), :turno, :origen, :kg, :bines, :desc, :obs)
+                        (:lote_numero, :corrida_id, (now() AT TIME ZONE 'America/Lima'), :turno, :origen, :kg, :bines, :desc, :obs)
                     RETURNING id
                     """
                 ),
@@ -1701,7 +1810,7 @@ def crear_asignacion(a: NuevaAsignacion):
             # actualizaba solo, pero el estado se quedaba en lo que decía la
             # última sincronización de Trazabilidad (o en nada), así que un
             # lote podía llevar miles de kg ya registrados y seguir viéndose
-            # "En espera", o (el caso real que encontró Stephano) la hoja de
+            # "En espera", o (caso real) la hoja de
             # Google podía marcarlo "Procesado" mientras acá casi no se le
             # había registrado nada. Ahora, apenas se registra CUALQUIER
             # consumo de un lote, se marca su estado a mano - mismo campo
@@ -1712,9 +1821,9 @@ def crear_asignacion(a: NuevaAsignacion):
     except HTTPException:
         raise
     except Exception as e:
-        # el trigger de saldo insuficiente (trg_validar_saldo_lote) llega aqui
-        # como excepcion de la base - se traduce a un 400 con el mensaje tal cual.
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        # el trigger de saldo insuficiente (trg_validar_saldo_lote) llega aquí como una regla de la base,
+        # ya escrita en español: _error_http la muestra tal cual; el resto de errores se traducen.
+        raise _error_http(e)
 
 
 class EditarAsignacion(BaseModel):
@@ -1765,7 +1874,7 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
     return {"ok": True}
 
 
@@ -1870,7 +1979,7 @@ def crear_parada(p: NuevaParada):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
 
 
 class CerrarParada(BaseModel):
@@ -1883,8 +1992,8 @@ def cerrar_parada(parada_id: int, p: CerrarParada):
     al crearla porque todavía no se sabía cuánto iba a durar). hora_fin la
     manda el navegador (hora local de la planta) - NO se usa now() del
     servidor: hora_inicio se guarda como hora local "de pared" (viene de un
-    <input datetime-local>, sin zona horaria) y el servidor de Render corre
-    en UTC, así que un now() del servidor quedaría ~5 horas adelantado
+    <input datetime-local>, sin zona horaria) y un servidor en la nube suele
+    correr en UTC, así que un now() del servidor quedaría ~5 horas adelantado
     frente a hora_inicio y la duración calculada saldría mal."""
     with engine.begin() as conn:
         result = conn.execute(
@@ -1927,7 +2036,7 @@ def editar_parada(parada_id: int, p: DatosParada):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
     return {"ok": True}
 
 
@@ -2032,7 +2141,7 @@ class NuevaMedicionTanque(BaseModel):
 def crear_medicion_tanque(m: NuevaMedicionTanque):
     tanque = m.tanque.strip()
     if not tanque:
-        raise HTTPException(status_code=400, detail="Escribe qué tanque es (ej. TK1).")
+        raise HTTPException(status_code=400, detail="Escriba qué tanque es (por ejemplo, TK1).")
     if m.brix_inicial <= 0:
         raise HTTPException(status_code=400, detail="El Brix inicial debe ser mayor a 0.")
     if m.brix_final <= 0:
@@ -2071,7 +2180,7 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
 
 
 class EditarMedicionTanque(BaseModel):
@@ -2089,7 +2198,7 @@ class EditarMedicionTanque(BaseModel):
 def editar_medicion_tanque(medicion_id: int, m: EditarMedicionTanque):
     tanque = m.tanque.strip()
     if not tanque:
-        raise HTTPException(status_code=400, detail="Escribe qué tanque es (ej. TK1).")
+        raise HTTPException(status_code=400, detail="Escriba qué tanque es (por ejemplo, TK1).")
     if m.brix_inicial <= 0:
         raise HTTPException(status_code=400, detail="El Brix inicial debe ser mayor a 0.")
     if m.brix_final <= 0:
@@ -2127,7 +2236,7 @@ def editar_medicion_tanque(medicion_id: int, m: EditarMedicionTanque):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e).split("\n")[0])
+        raise _error_http(e)
     return {"ok": True}
 
 
@@ -2169,7 +2278,7 @@ def _hoja_xlsx(wb, nombre, result):
     cols = list(result.keys())
     ws.append(cols)
     # columnas de peso (kg) se ven sin decimales, igual que en la app y los
-    # reportes PDF - pedido explícito de Stephano ("ningún kg con decimales,
+    # reportes PDF - criterio de la planta ("ningún kg con decimales,
     # en ningún lado"). Solo cambia el formato de vista, el valor real de la
     # celda no se toca (sigue con su precisión real, por si alguien construye
     # su propia fórmula sobre esta hoja). Brix/Acidez/Ratio/litros/tambores no
@@ -2274,7 +2383,7 @@ def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
         d_desde = datetime.strptime(desde, "%Y-%m-%d").date()
         d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Fechas inválidas (usa AAAA-MM-DD).")
+        raise HTTPException(status_code=400, detail="Fechas no válidas. Utilice el formato AAAA-MM-DD.")
     if d_desde > d_hasta:
         raise HTTPException(status_code=400, detail="La fecha 'desde' no puede ser posterior a 'hasta'.")
     p = {"d": d_desde, "h": d_hasta + timedelta(days=1)}
@@ -2334,7 +2443,7 @@ def _js_sin_cache():
     return FileResponse(BASE_DIR / "web" / "app.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
-# Tablero (no Dashboards) es la página de entrada - pedido de Stephano: es
+# Tablero (no Dashboards) es la página de entrada: es
 # la pantalla "en vivo" que quiere que vea primero quien abra el link (ej.
 # su jefe en una demo), Dashboards sigue accesible desde el menú Registro.
 # Declarada ANTES del mount de StaticFiles para que Starlette la resuelva

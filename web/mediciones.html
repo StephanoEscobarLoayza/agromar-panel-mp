@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Medición de tanques · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,9 +56,9 @@
   <section>
     <div class="section-head">
       <h2>Estimado (de los lotes) vs. medido (tanques)</h2>
-      <span class="hint" id="hintComparacion">elige una corrida</span>
+      <span class="hint" id="hintComparacion">Elija una corrida</span>
     </div>
-    <div id="comparacion"><div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Elige una corrida abajo para comparar.</div></div></div>
+    <div id="comparacion"><div class="panel" style="margin-top:0"><div class="empty" style="padding:20px">Elija una corrida abajo para comparar.</div></div></div>
   </section>
 
   <section style="margin-top:22px">
@@ -71,25 +71,25 @@
         </div>
 
         <div class="two-col">
-          <div class="field"><label for="tanque">Tanque</label><input type="text" id="tanque" placeholder="ej. TK5"></div>
+          <div class="field"><label for="tanque">Tanque</label><input type="text" id="tanque" placeholder="Ej. TK5"></div>
           <div class="field"><label for="litros">Litros</label><input type="number" id="litros" min="0" step="1" placeholder="3000"></div>
         </div>
 
         <div class="two-col">
-          <div class="field"><label for="brixInicial">Brix inicial</label><input type="number" id="brixInicial" step="0.01" placeholder="ej. 11.20"></div>
-          <div class="field"><label for="brixFinal">Brix final</label><input type="number" id="brixFinal" step="0.01" placeholder="ej. 12.01"></div>
+          <div class="field"><label for="brixInicial">Brix inicial</label><input type="number" id="brixInicial" step="0.01" placeholder="Ej. 11.20"></div>
+          <div class="field"><label for="brixFinal">Brix final</label><input type="number" id="brixFinal" step="0.01" placeholder="Ej. 12.01"></div>
         </div>
 
         <div class="two-col">
-          <div class="field"><label for="acidez">Acidez</label><input type="number" id="acidez" step="0.001" placeholder="ej. 0.89"></div>
+          <div class="field"><label for="acidez">Acidez</label><input type="number" id="acidez" step="0.001" placeholder="Ej. 0.89"></div>
           <div class="field"><label for="ph">pH</label><input type="number" id="ph" step="0.01" placeholder="opcional"></div>
         </div>
 
-        <div class="hint-line">El Ratio se calcula solo (Brix final ÷ Acidez) — no hace falta escribirlo.</div>
+        <div class="hint-line">El Ratio se calcula automáticamente (Brix final ÷ Acidez); no es necesario digitarlo.</div>
 
         <div class="field">
           <label>Lotes de este tanque <span class="hint-line" style="display:inline">(toque hasta 5 · quedan marcados para el siguiente tanque)</span></label>
-          <div id="lotesTanque" class="chips-lotes"><span class="hint-line">Elige una corrida</span></div>
+          <div id="lotesTanque" class="chips-lotes"><span class="hint-line">Elija una corrida</span></div>
         </div>
 
         <div id="mensaje"></div>
@@ -105,7 +105,7 @@
       <div class="table-wrap">
         <table class="tabla-tarjetas">
           <thead><tr><th>Tanque</th><th class="right">Litros</th><th>Lotes</th><th class="right">Brix i.</th><th class="right">Brix f.</th><th class="right">Acidez</th><th class="right">pH</th><th class="right">Ratio</th><th></th></tr></thead>
-          <tbody id="lista"><tr><td colspan="9" class="empty">Elige una corrida</td></tr></tbody>
+          <tbody id="lista"><tr><td colspan="9" class="empty">Elija una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -173,7 +173,7 @@ function limitarLotes(ev) {
   const cont = cb.closest(".chips-lotes");
   if (cb.checked && cont.querySelectorAll("input:checked").length > MAX_LOTES) {
     cb.checked = false;
-    alert("Un tanque puede tener como máximo cinco lotes.");
+    avisar("Un tanque puede tener como máximo cinco lotes.");
     return false;
   }
   return true;
@@ -188,7 +188,7 @@ function agregarOtroLote(entrada) {
   const n = Math.floor(Number(entrada.value));
   if (n > 0) {
     if (!lotesCorrida.some((l) => l.numero === n)) { lotesCorrida.push({ numero: n, proveedor: "" }); lotesCorrida.sort((a, b) => a.numero - b.numero); }
-    if (lotesMarcados.size >= MAX_LOTES && !lotesMarcados.has(n)) alert("Un tanque puede tener como máximo cinco lotes.");
+    if (lotesMarcados.size >= MAX_LOTES && !lotesMarcados.has(n)) avisar("Un tanque puede tener como máximo cinco lotes.");
     else lotesMarcados.add(n);
   }
   renderChipsNuevo();
@@ -270,7 +270,7 @@ function renderComparacion(estimado, medidas) {
       <div class="panel" style="margin-top:0">
         <div class="form-body">
           ${bloqueEstimado}
-          <div class="hint-line">Todavía no hay ninguna medición de tanque para esta corrida — agrega una abajo para comparar contra lo real.</div>
+          <div class="hint-line">Todavía no hay ninguna medición de tanque para esta corrida. Agregue una abajo para comparar con lo real.</div>
         </div>
       </div>`;
     return;
@@ -351,7 +351,7 @@ async function cargarTodo() {
         data-brix-inicial="${m.brix_inicial ?? ""}" data-brix-final="${m.brix_final}" data-acidez="${m.acidez}" data-ph="${m.ph ?? ""}" data-lotes="${(m.lotes || []).join(",")}">
       <td class="strong">${escapeHtml(m.tanque)}</td>
       <td class="right num">${m.litros !== null ? fmtKg(m.litros) : "—"}</td>
-      <td class="num">${(m.lotes || []).length ? (m.lotes || []).join(" · ") : '<span class="hint-line">sin lotes</span>'}</td>
+      <td class="num">${(m.lotes || []).length ? (m.lotes || []).join(" · ") : '<span class="hint-line">Sin lotes</span>'}</td>
       <td class="right num">${m.brix_inicial !== null ? Number(m.brix_inicial).toFixed(2) : "—"}</td>
       <td class="right num">${Number(m.brix_final).toFixed(2)}</td>
       <td class="right num">${Number(m.acidez).toFixed(3)}</td>
@@ -409,7 +409,7 @@ lista.addEventListener("click", async (ev) => {
       await apiDelete(`/api/mediciones-tanque/${id}`);
       cargarTodo();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   } else if (btn.dataset.accion === "editar") {
     fila.insertAdjacentHTML("afterend", filaEdicionMedicion(fila, id));
@@ -424,10 +424,10 @@ lista.addEventListener("click", async (ev) => {
     const acidez = Number(fila.querySelector(".edit-acidez").value);
     const ph = fila.querySelector(".edit-ph").value;
     const lotesEdit = [...fila.querySelectorAll(".edit-lotes input:checked")].map((c) => Number(c.value));
-    if (!tanque) { alert("Escribe qué tanque es."); return; }
-    if (!brixInicial || brixInicial <= 0) { alert("El Brix inicial debe ser mayor a 0."); return; }
-    if (!brixFinal || brixFinal <= 0) { alert("El Brix final debe ser mayor a 0."); return; }
-    if (!acidez || acidez <= 0) { alert("La acidez debe ser mayor a 0."); return; }
+    if (!tanque) { avisar("Escriba qué tanque es."); return; }
+    if (!brixInicial || brixInicial <= 0) { avisar("El Brix inicial debe ser mayor a 0."); return; }
+    if (!brixFinal || brixFinal <= 0) { avisar("El Brix final debe ser mayor a 0."); return; }
+    if (!acidez || acidez <= 0) { avisar("La acidez debe ser mayor a 0."); return; }
     try {
       await apiPost(`/api/mediciones-tanque/${id}`, {
         tanque, litros: litros === "" ? null : Number(litros),
@@ -437,7 +437,7 @@ lista.addEventListener("click", async (ev) => {
       });
       cargarTodo();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   }
 });
@@ -457,7 +457,7 @@ function agregarFichaEdicion(entrada) {
       cb = lab.querySelector("input");
     }
     if (!cb.checked) {
-      if (cont.querySelectorAll("input:checked").length >= MAX_LOTES) alert("Un tanque puede tener como máximo cinco lotes.");
+      if (cont.querySelectorAll("input:checked").length >= MAX_LOTES) avisar("Un tanque puede tener como máximo cinco lotes.");
       else cb.checked = true;
     }
   }
@@ -484,23 +484,23 @@ btnGuardar.addEventListener("click", async () => {
   const acidez = Number(acidezInput.value);
 
   if (!corridaSel.value) {
-    mensaje.innerHTML = '<div class="msg bad">Elige una corrida.</div>';
+    mensaje.innerHTML = '<div class="msg bad">Elija una corrida.</div>';
     return;
   }
   if (!tanque) {
-    mensaje.innerHTML = '<div class="msg bad">Escribe qué tanque es (ej. TK1).</div>';
+    mensaje.innerHTML = '<div class="msg bad">Escriba qué tanque es (por ejemplo, TK1).</div>';
     return;
   }
   if (!brixInicial || brixInicial <= 0) {
-    mensaje.innerHTML = '<div class="msg bad">Ingresa el Brix inicial medido.</div>';
+    mensaje.innerHTML = '<div class="msg bad">Ingrese el Brix inicial medido.</div>';
     return;
   }
   if (!brixFinal || brixFinal <= 0) {
-    mensaje.innerHTML = '<div class="msg bad">Ingresa el Brix final medido.</div>';
+    mensaje.innerHTML = '<div class="msg bad">Ingrese el Brix final medido.</div>';
     return;
   }
   if (!acidez || acidez <= 0) {
-    mensaje.innerHTML = '<div class="msg bad">Ingresa la acidez medida.</div>';
+    mensaje.innerHTML = '<div class="msg bad">Ingrese la acidez medida.</div>';
     return;
   }
 

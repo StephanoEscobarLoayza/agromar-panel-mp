@@ -205,7 +205,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # Calidad los cuenta al pesar tambores (registra el bruto tal cual se lo
     # dan, ej. 78 cilindros), Producción no porque no los produjo. El PT real
     # SIEMPRE se calcula restando el bruto de Calidad menos lo que entró de
-    # afuera - no hace falta que Stephano reste a mano antes de registrar.
+    # afuera - no hace falta restar a mano antes de registrar.
     productos_salida = [p for p in productos if _es_salida(p)]
     productos_entrada = [p for p in productos if not _es_salida(p)]
     productos_pt = [p for p in productos_salida if _cuenta_como_pt(p)]
@@ -231,7 +231,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # salió de la corrida no aparecía en ningún lado del PDF (solo el bruto
     # por fila, en la tabla de "Productos de salida"), así que alguien que
     # sumara tambores a ojo se quedaba con el número de Calidad sin descontar
-    # los cilindros de entrada - Stephano reportó justo esta confusión.
+    # los cilindros de entrada (confusión real detectada en planta).
     tambores_bruto_total = sum(float(p["tambores"]) for p in productos_pt if p.get("tambores") is not None)
     entrada_tambores_total = sum(float(p["tambores"]) for p in productos_entrada_desc if p.get("tambores") is not None)
     tambores_total = tambores_bruto_total - entrada_tambores_total
@@ -252,7 +252,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # No hay "objetivo" de MP contra qué cuadrar - una corrida procesa lo que
     # entra, no una meta fijada de antemano (mismo criterio ya aplicado en
     # Corridas: se sacó el pill Cuadra/Incompleto/Excedido y la comparación
-    # contra mp_kg_objetivo de Trazabilidad, ver memoria del proyecto). Solo
+    # contra mp_kg_objetivo de Trazabilidad). Solo
     # se arma una tarjeta cuando de verdad hay un dato real que mostrar - una
     # corrida recién creada (sin productos, sin paradas) no debería mostrar
     # tarjetas en blanco con "—", eso se ve roto. Las que sí aplican se

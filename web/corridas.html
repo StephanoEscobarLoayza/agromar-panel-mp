@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Registro de producción · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,7 +44,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Registro de producción,<br><em>corrida por corrida.</em></h1>
-    <p class="hero-sub">Cada lote se valida al momento de asignarlo — nada de cuadrar a mano al cierre de campaña.</p>
+    <p class="hero-sub">Cada lote se valida al momento de asignarlo — sin cuadres manuales al cierre de campaña.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -102,7 +102,7 @@
         </div>
         <div class="field">
           <label for="ncNombre">Nombre de la corrida</label>
-          <input type="text" id="ncNombre" placeholder="se sugiere solo, puedes cambiarlo">
+          <input type="text" id="ncNombre" placeholder="Se sugiere automáticamente; puede cambiarlo">
         </div>
         <div id="ncMsg"></div>
         <div class="two-col">
@@ -157,8 +157,7 @@ const TIPOS_PROCESO = [
 document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option value="${t.value}">${t.label}</option>`).join("");
 
 // peso neto del tambor "de siempre" según el tipo de proceso de la corrida -
-// solo para no tener que acordarse cada vez (Stephano lo pidió: se le
-// olvida seguido); el campo sigue siendo editable, esto solo precarga el
+// solo para no tener que acordarse cada vez (se olvida con frecuencia); el campo sigue siendo editable, esto solo precarga el
 // valor más común de cada tipo.
 const PESO_TAMBOR_POR_TIPO = { "JCC": 265, "JSA": 220, "ICEGEN": 200 };
 
@@ -198,7 +197,7 @@ function corridaCard(c) {
   if (abierta) {
     acciones.push(`<button class="btn-link" data-accion="finalizar" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Finalizar corrida</button>`);
   } else {
-    acciones.push(`<button class="btn-link" data-accion="reabrir" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}" title="Por si se te olvidó registrar el consumo de algún lote antes de cerrarla">Reabrir corrida</button>`);
+    acciones.push(`<button class="btn-link" data-accion="reabrir" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}" title="Útil si faltó registrar el consumo de algún lote antes de cerrarla">Reabrir corrida</button>`);
   }
   acciones.push(`<button class="btn-link" data-accion="editar-corrida" data-id="${c.id}">Editar</button>`);
   acciones.push(`<button class="btn-link" data-accion="productos" data-id="${c.id}">Productos de salida</button>`);
@@ -278,7 +277,7 @@ function corridaCard(c) {
           </div>
           <label id="prod-cuentapt-label-${c.id}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin:8px 0 4px">
             <input type="checkbox" id="prod-cuentapt-${c.id}" style="width:auto" checked>
-            <span id="prod-cuentapt-texto-${c.id}">Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.</span>
+            <span id="prod-cuentapt-texto-${c.id}">Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares.</span>
           </label>
           <div id="prod-msg-${c.id}"></div>
           <button class="btn-link strong" data-accion="guardar-producto" data-id="${c.id}" style="margin-top:8px">+ Agregar</button>
@@ -325,8 +324,8 @@ function productoFilaEdicion(p, corridaId) {
       <label class="ed-prod-cuentapt-label" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer">
         <input type="checkbox" class="ed-prod-cuentapt" style="width:auto" ${p.cuenta_como_pt === false ? "" : "checked"}>
         ${esEntrada
-          ? "Descontar del total de la corrida (kg, litros, tambores) — desmárcalo si este insumo no debe restarse del total reportado"
-          : "Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc."}
+          ? "Descontar del total de la corrida (kg, litros, tambores) — desmárquelo si este insumo no debe restarse del total reportado"
+          : "Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares."}
       </label>
       <div id="prod-ed-msg-${p.id}"></div>
       <div class="two-col">
@@ -372,8 +371,8 @@ async function cargarChecklistFinalizar(corridaId) {
       ? `<div class="msg ok" style="margin:0 0 6px">✓ ${textoOk}</div>`
       : `<div class="msg warn" style="margin:0 0 6px">⚠ ${textoFalta}</div>`;
     cont.innerHTML =
-      item(nSalida > 0, `${nSalida} producto${nSalida === 1 ? "" : "s"} de salida registrado${nSalida === 1 ? "" : "s"}.`, "Todavía no registraste ningún producto de salida.") +
-      item(mediciones.length > 0, `${mediciones.length} ${mediciones.length === 1 ? "medición" : "mediciones"} de tanque registrada${mediciones.length === 1 ? "" : "s"}.`, "Todavía no registraste ninguna medición de tanque.");
+      item(nSalida > 0, `${nSalida} producto${nSalida === 1 ? "" : "s"} de salida registrado${nSalida === 1 ? "" : "s"}.`, "Todavía no se registró ningún producto de salida.") +
+      item(mediciones.length > 0, `${mediciones.length} ${mediciones.length === 1 ? "medición" : "mediciones"} de tanque registrada${mediciones.length === 1 ? "" : "s"}.`, "Todavía no se registró ninguna medición de tanque.");
   } catch (e) {
     cont.innerHTML = "";
   }
@@ -395,11 +394,11 @@ function actualizarFlechas() {
   });
 }
 // modo «Ordenar corridas»: solo entonces se ven las flechas y el asa de cada tarjeta
-const AYUDA_ORDEN = "Mueva cada corrida con las flechas o arrástrela desde el asa. El orden se guarda solo.";
+const AYUDA_ORDEN = "Mueva cada corrida con las flechas o arrástrela desde el asa. El orden se guarda automáticamente.";
 document.getElementById("btnOrdenar").addEventListener("click", (ev) => {
   const b = ev.currentTarget;
   const activo = document.getElementById("corridas").classList.toggle("ordenando");
-  b.textContent = activo ? "Listo" : "Ordenar corridas";
+  b.textContent = activo ? "Terminar de ordenar" : "Ordenar corridas";
   b.classList.toggle("activo", activo);
   b.setAttribute("aria-pressed", String(activo));
   document.getElementById("ordenNota").textContent = activo ? AYUDA_ORDEN : "";
@@ -489,7 +488,7 @@ async function cargar() {
     // "Activa" = literalmente sigue abierta ahora mismo (sin fecha_final).
     // Antes tambien contaba corridas viejas "incompletas" por inconsistencias
     // de Trazabilidad, lo que inflaba el numero sin que hubiera nada corriendo
-    // de verdad (Stephano lo noto: "si solo hay una corrida ahorita").
+    // de verdad.
     const activas = corridas.filter(c => c.fecha_final === null);
     const enCurso = activas[0];
     const kgHoy = enCurso ? enCurso.kg_asignados_total : (corridas[0] ? corridas[0].kg_asignados_total : 0);
@@ -513,8 +512,8 @@ async function cargar() {
     document.getElementById("kpis").innerHTML = `
       <div class="kpi"><div class="kpi-label">Corridas activas</div><div class="kpi-value num">${activas.length}</div><div class="kpi-note">${activas.length > 0 ? "en curso ahora" : "ninguna en curso"}</div></div>
       <div class="kpi"><div class="kpi-label">${enCurso ? "Kg registrados hoy" : "Kg asignados (última)"}</div><div class="kpi-value num citrus">${fmtKg(kgHoy)}</div><div class="kpi-note">${enCurso ? escapeHtml(enCurso.nombre) : ""}</div></div>
-      <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${enPlanta.length}</div><div class="kpi-note">en proceso o en espera</div></div>
-      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num">${fmtKg(mpProcesada)}</div><div class="kpi-note">kg, todas las corridas</div></div>
+      <div class="kpi"><div class="kpi-label">Lotes con saldo</div><div class="kpi-value num">${enPlanta.length}</div><div class="kpi-note">En proceso o en espera</div></div>
+      <div class="kpi"><div class="kpi-label">MP procesada</div><div class="kpi-value num">${fmtKg(mpProcesada)}</div><div class="kpi-note">Kg, todas las corridas</div></div>
     `;
     ajustarKpiValues(document.getElementById("kpis"));
   } catch (e) {
@@ -551,11 +550,11 @@ ncNombre.addEventListener("input", () => { ncNombre.dataset.tocado = "1"; });
 document.getElementById("btnCrearCorrida").addEventListener("click", async () => {
   const nombre = ncNombre.value.trim();
   if (!nombre) {
-    ncMsg.innerHTML = '<div class="msg bad">Ponle un nombre a la corrida.</div>';
+    ncMsg.innerHTML = '<div class="msg bad">Asigne un nombre a la corrida.</div>';
     return;
   }
   if (!ncFecha.value) {
-    ncMsg.innerHTML = '<div class="msg bad">Elige la fecha y hora de inicio.</div>';
+    ncMsg.innerHTML = '<div class="msg bad">Elija la fecha y hora de inicio.</div>';
     return;
   }
   try {
@@ -589,7 +588,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const tipo = document.getElementById(`ed-tipo-${id}`).value;
     const msg = document.getElementById(`ed-msg-${id}`);
     if (!nombre) {
-      msg.innerHTML = '<div class="msg bad">Ponle un nombre a la corrida.</div>';
+      msg.innerHTML = '<div class="msg bad">Asigne un nombre a la corrida.</div>';
       return;
     }
     try {
@@ -612,7 +611,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const fecha = document.getElementById(`fin-fecha-${id}`).value;
     const msg = document.getElementById(`fin-msg-${id}`);
     if (!fecha) {
-      msg.innerHTML = '<div class="msg bad">Elige la fecha y hora de cierre.</div>';
+      msg.innerHTML = '<div class="msg bad">Elija la fecha y hora de cierre.</div>';
       return;
     }
     if (!(await confirmar(`¿Finalizar "${btn.dataset.nombre}" con cierre el ${fecha.replace("T", " ")}?`))) return;
@@ -623,12 +622,12 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
     }
   } else if (accion === "reabrir") {
-    if (!(await confirmar(`¿Reabrir "${btn.dataset.nombre}"? Vuelve a aparecer como corrida activa en "Registrar consumo" hasta que la finalices de nuevo.`))) return;
+    if (!(await confirmar(`¿Reabrir "${btn.dataset.nombre}"? Volverá a aparecer como corrida activa en «Registrar consumo» hasta que se finalice de nuevo.`))) return;
     try {
       await apiPost(`/api/corridas/${id}/reabrir`, {});
       cargar();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   } else if (accion === "eliminar-corrida") {
     if (!(await confirmar(`¿Eliminar la corrida "${btn.dataset.nombre}"? Esto no se puede deshacer.`))) return;
@@ -636,7 +635,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       await apiDelete(`/api/corridas/${id}`);
       cargar();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   } else if (accion === "productos") {
     const panel = document.getElementById(`prod-panel-${id}`);
@@ -662,7 +661,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const obs = document.getElementById(`prod-obs-${id}`).value.trim();
     const msg = document.getElementById(`prod-msg-${id}`);
     if (!nombre) {
-      msg.innerHTML = '<div class="msg bad">Ponle un nombre.</div>';
+      msg.innerHTML = '<div class="msg bad">Asigne un nombre.</div>';
       return;
     }
     const cuentaComoPt = document.getElementById(`prod-cuentapt-${id}`).checked;
@@ -682,7 +681,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       document.getElementById(`prod-litros-${id}`).value = "";
       document.getElementById(`prod-obs-${id}`).value = "";
       document.getElementById(`prod-cuentapt-${id}`).checked = true;
-      document.getElementById(`prod-cuentapt-texto-${id}`).textContent = "Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.";
+      document.getElementById(`prod-cuentapt-texto-${id}`).textContent = "Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares.";
       document.getElementById(`prod-tipo-${id}`).value = "salida";
       document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
       msg.innerHTML = "";
@@ -697,7 +696,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       await apiDelete(`/api/corridas/${corridaId}/productos/${id}`);
       cargarProductosPanel(corridaId);
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   } else if (accion === "editar-producto") {
     const corridaId = btn.dataset.corrida;
@@ -716,7 +715,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const nombre = v("ed-prod-nombre").value.trim();
     const msg = document.getElementById(`prod-ed-msg-${id}`);
     if (!nombre) {
-      msg.innerHTML = '<div class="msg bad">Ponle un nombre al producto.</div>';
+      msg.innerHTML = '<div class="msg bad">Asigne un nombre al producto.</div>';
       return;
     }
     const tipo = v("ed-prod-tipo").value;
@@ -782,7 +781,7 @@ document.querySelectorAll(".chip-filter[data-preset]").forEach(b => {
 
 document.getElementById("btnReportePeriodo").addEventListener("click", () => {
   if (!repDesde.value || !repHasta.value) {
-    repMsg.innerHTML = '<div class="msg bad">Elige la fecha "desde" y "hasta".</div>';
+    repMsg.innerHTML = '<div class="msg bad">Elija la fecha «desde» y «hasta».</div>';
     return;
   }
   if (repDesde.value > repHasta.value) {
@@ -816,8 +815,8 @@ document.getElementById("corridas").addEventListener("change", (ev) => {
   const id = el.id.split("-").pop();
   const esEntrada = el.value === "entrada";
   document.getElementById(`prod-cuentapt-texto-${id}`).textContent = esEntrada
-    ? "Descontar del total de la corrida (kg, litros, tambores) — desmárcalo si este insumo no debe restarse del total reportado"
-    : "Cuenta como producto terminado (PT) — desmárcalo para enjuague, saldo de tambor sin completar, etc.";
+    ? "Descontar del total de la corrida (kg, litros, tambores) — desmárquelo si este insumo no debe restarse del total reportado"
+    : "Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares.";
 });
 
 cargar();

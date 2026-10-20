@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tablero de planta · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -108,7 +108,7 @@
     .topbar{padding:14px 20px}
     .mark{font-size:19px}
     .clock .hora{font-size:17px}
-    .clock .fecha{font-size:10.5px}
+    .clock .fecha{font-size:11px}
     .hero-corrida{padding:22px 22px;gap:16px}
     .hc-nombre{font-size:34px}
     .hc-desde{font-size:13px;margin-top:8px}
@@ -308,7 +308,7 @@ function renderizar() {
   }
 
   if (!estado.corrida) {
-    contCorrida.innerHTML = '<div class="vacio">No hay ninguna corrida en curso ahora mismo.</div>';
+    contCorrida.innerHTML = '<div class="vacio">No hay ninguna corrida en curso en este momento.</div>';
     contRegistros.innerHTML = '<div class="vacio">—</div>';
     return;
   }

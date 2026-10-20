@@ -9,7 +9,6 @@ los demás endpoints.
 """
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
-from io import BytesIO
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Response

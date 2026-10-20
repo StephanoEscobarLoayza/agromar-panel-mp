@@ -27,20 +27,20 @@ producción.
 |---|---|
 | **Tablero** (`/`, página de entrada) | Vista tipo kiosco de la corrida en curso — kg registrados, últimos lotes — se actualiza sola cada 45s, pensada para quedar abierta en una pantalla fija. |
 | **Dashboards** (`index.html`) | Indicadores generales de producción: corridas activas, kg del día, lotes con saldo, MP procesada total, reporte por período (PDF). |
-| **Corridas** | Crear/editar/finalizar corridas, registrar productos de salida e insumos de entrada (con checkbox para si cuentan como PT o si descuentan del total), descargar el reporte PDF y el Excel de Trazabilidad de cada una. |
+| **Corridas** | Crear/editar/finalizar/reabrir corridas, registrar productos de salida e insumos de entrada (con checkbox para si cuentan como PT o si descuentan del total), descargar el reporte PDF y el Excel de Trazabilidad de cada una. El orden de la lista se puede ajustar a mano («Ordenar») y ese orden define cómo se arrastra el saldo de cada lote de una corrida a la siguiente en el Excel. |
 | **Registrar consumo** | Asignar un lote a una corrida: autocompleta proveedor/procedencia/saldo, calcula el kg a partir de los bines consumidos (con opción de ajustar a mano si el peso real difiere del promedio), o pide el kg directo si es Silo. |
 | **Lotes** | Maestro con saldo en vivo, buscador y filtro por estado. Estado, ubicación y peso neto se pueden corregir a mano ahí mismo, protegidos contra la próxima sincronización. |
 | **Trazabilidad de lote** | Búsqueda en reversa: dado un número de lote, muestra a qué corridas alimentó y qué salió de cada una. |
 | **Calidad → Siguiente bin** | Si se acaba un bin a media corrida, calcula cuál conviene reponer (por fecha o por el que más ayuda a mantener Brix/Ratio) sin pasarse de la Acidez máxima. |
-| **Medición de tanques** | Brix/Acidez/pH medidos de verdad con refractómetro por tanque — manda sobre el estimado de los lotes en los reportes en cuanto hay al menos una medición. |
+| **Medición de tanques** | Brix/Acidez/pH medidos de verdad con refractómetro por tanque — manda sobre el estimado de los lotes en los reportes en cuanto hay al menos una medición. Cada tanque puede anotar hasta 5 lotes de los que se alimentó; con eso «Repartir lotes» reparte los kg de cada lote entre los tanques que lo usaron. |
 | **Paradas** | Registro de paradas de planta durante una corrida (motivo, duración). |
-| **Repartir lotes** (enlace en cada corrida de `Corridas` que comparte día con otra) | Cuando dos corridas trabajan en paralelo con los mismos lotes, reparte cada lote entre ellas según los tanques que llenó cada línea (orden de los tanques por su hora de registro, corregible en la pantalla) y los rendimientos típicos de cada proceso. Muestra el resultado antes de aplicar y conserva los kg y bines de cada lote; el PRE CC no entra al reparto. Lógica en `repartir.py`. |
+| **Repartir lotes** (enlace en cada corrida de `Corridas` que comparte día con otra) | Cuando dos corridas trabajan en paralelo con los mismos lotes, reparte cada lote entre ellas según los tanques que llenó cada línea (orden de los tanques por su hora de registro, corregible en la pantalla) y los rendimientos típicos de cada proceso. Un lote también puede dividirse en tramos (por ejemplo, cuando se usó primero en una corrida y después en otra). Muestra el resultado antes de aplicar y conserva los kg y bines de cada lote; el rendimiento de cada corrida resultante se marca como estimado (solo el combinado es medido); el PRE CC no entra al reparto. Lógica en `repartir.py`. |
 | **Subproductos** | Seguimiento de la emulsión y del aceite de naranja orgánica: cilindros de emulsión (EORG-2026-N), transformación a aceite, barriles de 183 kg con su origen por corrida, ubicación y registro en Nisira, rendimiento de aceite por tonelada de MP y descarga en Excel. Cualquier transformación se puede deshacer: sus cilindros vuelven a precámara y sus barriles quedan con espacio para completarse primero con la siguiente transformación, sin mover el resto. Reemplaza las hojas «Subproductos» del Excel de planta. |
 | **Sincronizar** | Trae los lotes nuevos/actualizados desde el Google Sheet de recepción (además de correr sola cada 20 min), y descarga un respaldo completo en Excel (una hoja por tabla). |
 
 Todas las páginas comparten un login único (usuario/contraseña compartidos
-por el equipo, cookie firmada) y están pensadas para usarse desde tablet
-además de PC/celular.
+por el equipo, cookie firmada con vencimiento de 24 horas) y están pensadas
+para usarse desde tablet además de PC/celular.
 
 ## Reportes
 
@@ -50,7 +50,7 @@ además de PC/celular.
   consumidos y su estado al cierre, insumos de entrada, paradas.
 - **PDF de período** — lo mismo agregado entre dos fechas, con desglose por
   tipo de proceso y por proveedor.
-- **PDF de stock** — foto del stock de MP en piso en un momento dado (Silo +
+- **PDF de stock** — estado del stock de MP en piso en un momento dado (Silo +
   Bines), solo lotes con saldo real disponible.
 - **Excel de Trazabilidad por corrida** — replica el formato físico que ya
   usa producción (una hoja con lotes, fórmulas en vivo, HR de pulpeado,
@@ -77,6 +77,8 @@ Todos los kg se muestran redondeados a entero en toda la app y los reportes
 - **Base de datos**: Postgres en Neon, con vistas (`v_saldo_lotes`,
   `v_cuadre_corridas`) y un trigger de validación de saldo — ver
   `schema.sql`.
+- **Pruebas**: `python -m unittest discover -s tests` ejecuta las pruebas de
+  las funciones puras (sin tocar la base de datos).
 
 ## Modelo de datos (resumen)
 
@@ -93,7 +95,9 @@ Todos los kg se muestran redondeados a entero en toda la app y los reportes
   insumos de entrada (lo que se le metió desde afuera, ej. para subir Brix)
   de cada corrida.
 - **mediciones_tanque** — Brix/Acidez/pH/litros medidos de verdad por tanque
-  al cerrar una corrida.
+  al cerrar una corrida. **tanque_lotes** guarda los lotes (hasta 5) que
+  alimentaron cada tanque; **corridas_orden** guarda el orden manual de la
+  lista de corridas.
 - **paradas** — paradas de planta registradas por corrida.
 - **emulsion_registros / emulsion_registro_corridas / emulsion_cilindros** — cada producción de
   emulsión (un día, vinculada a una o varias corridas del panel) y sus cilindros.
@@ -118,15 +122,19 @@ pruebas separado, así que cualquier prueba local corre contra datos reales
 `sync_lotes.py` trae los lotes desde el Google Sheet de recepción de
 camiones hacia la tabla `lotes` (upsert por número de lote — nunca borra
 nada). Corre sola cada 20 minutos desde un loop en segundo plano dentro de
-la propia app (ver `_sync_loop` en `api.py`), y también se puede disparar a
+la propia app (ver `_sync_periodico` en `api.py`), y también se puede disparar a
 mano desde "Sincronizar".
 
 ## Autenticación
 
-Login único compartido por el equipo (usuario/contraseña + cookie firmada).
-Se activa poniendo las variables de entorno `APP_USER`, `APP_PASSWORD` y
+Login único compartido por el equipo (usuario/contraseña + cookie firmada
+que vence a las 24 horas; al cerrar sesión el token deja de valer). Se activa
+poniendo las variables de entorno `APP_USER`, `APP_PASSWORD` y
 `APP_SESSION_SECRET` — si no están puestas (ej. desarrollo local), la app
-corre sin login.
+corre sin login. Tras 5 intentos fallidos desde una misma dirección, el
+ingreso se bloquea 10 minutos. Las respuestas llevan cabeceras de seguridad
+(CSP, HSTS bajo https, sin incrustación en otros sitios) y la documentación
+automática de FastAPI está desactivada.
 
 ## Cómo correr localmente
 
@@ -141,7 +149,13 @@ y abre `http://localhost:8000`. Hace falta un archivo `.env` con
 
 ## Despliegue
 
-Pensado para correr como un solo servicio (build: `pip install -r
-requirements.txt`, start: `uvicorn api:app --host 0.0.0.0 --port $PORT`).
-Incluye `Dockerfile` para desplegar en cualquier plataforma que soporte
-contenedores.
+Pensado para correr como un solo servicio (instalación: `pip install -r
+requirements.txt`; arranque: `uvicorn api:app --host 0.0.0.0 --port 8000`).
+En la planta se ejecuta en un equipo local y se publica con un túnel HTTPS
+(ngrok), de modo que todos usan el mismo enlace; la base de datos es la misma
+de siempre (Neon). Si el equipo se reinicia, basta volver a iniciar el panel.
+Si hay otra copia del código en otro equipo, esa copia debe actualizarse con
+`git pull` y reiniciarse para ver los cambios.
+
+Incluye también `Dockerfile` para desplegar en cualquier plataforma que
+soporte contenedores.

@@ -29,6 +29,25 @@ function confirmar(mensaje) {
   });
 }
 
+// Aviso que no bloquea la pantalla (reemplaza a alert()): aparece abajo, se cierra solo y también al tocarlo.
+// Uso: avisar("Elija una corrida.") o avisar("Guardado.", "ok").
+function avisar(mensaje, tipo) {
+  let caja = document.getElementById("avisosGlobales");
+  if (!caja) {
+    caja = document.createElement("div");
+    caja.id = "avisosGlobales";
+    caja.setAttribute("aria-live", "assertive");
+    document.body.appendChild(caja);
+  }
+  const el = document.createElement("div");
+  el.className = "aviso-global" + (tipo === "ok" ? " ok" : "");
+  el.setAttribute("role", "alert");
+  el.textContent = String(mensaje);
+  el.addEventListener("click", () => el.remove());
+  caja.appendChild(el);
+  setTimeout(() => el.remove(), Math.max(5000, String(mensaje).length * 70));
+}
+
 // Si la sesión expiró (o nunca se entró), el backend responde 401 - se manda
 // al login sin dejar que la página siga intentando con datos a medias.
 function _siNoAutenticado(res) {
@@ -107,8 +126,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function fmtKg(n) {
-  // Pedido explicito de Stephano: ningun kg se muestra con decimales, nunca
-  // (antes solo se redondeaba el "saldo" - lo corrigio: quiere esto en TODA
+  // Criterio de la planta: ningun kg se muestra con decimales, nunca
+  // (antes solo se redondeaba el "saldo"; ahora aplica en TODA
   // la app). Redondea solo la VISTA, el numero real en la base no se toca.
   if (n === null || n === undefined) return "—";
   return Math.round(Number(n)).toLocaleString("es-PE");
@@ -154,7 +173,7 @@ function fmtFechaSola(iso) {
   // hora se interpreta como medianoche UTC, y en Perú (UTC-5) se muestra
   // como el día ANTERIOR a las 7pm (mismo problema ya documentado con
   // TIMESTAMP vs hora local, pero al revés: acá no hay hora que mezclar,
-  // el bug es que JS igual le inventa una). Se parsean los números
+  // el problema es que JS igual le inventa una). Se parsean los números
   // directo, sin darle a JS la oportunidad de reinterpretar la zona horaria.
   if (!iso) return "—";
   const [anio, mes, dia] = iso.split("-").map(Number);
@@ -169,11 +188,11 @@ function escapeHtml(s) {
 
 // Hora local "de pared" en formato para <input type="datetime-local"> -
 // úsala siempre que el backend necesite "la hora de ahora": el servidor
-// (Render) corre en UTC pero las columnas de fecha de esta app son TIMESTAMP
+// puede correr en UTC pero las columnas de fecha de esta app son TIMESTAMP
 // sin zona, guardadas como hora local de Perú tal cual la escribe el
 // navegador. Si el servidor pusiera su propio now() en vez de esto, quedaría
 // ~5 horas adelantado frente a cualquier otra hora de la misma fila puesta
-// por el usuario (así se descubrió el bug de las paradas - ver memoria).
+// por el usuario (así se detectó el desfase en las paradas).
 function ahoraLocal() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -228,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // mueve de lado a lado mientras el cursor está encima, en vez de tener que
 // bajar hasta el final de una tabla larga para encontrar la barra de scroll
 // horizontal - en una PC sin trackpad no hay gesto de swipe lateral, era la
-// única forma de moverse (Stephano lo notó). Si el gesto ya es horizontal
+// única forma de moverse. Si el gesto ya es horizontal
 // (trackpad/mouse con rueda lateral) se deja pasar tal cual. ----------
 document.addEventListener("wheel", (ev) => {
   const wrap = ev.target.closest(".table-wrap");

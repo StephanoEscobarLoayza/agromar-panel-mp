@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Subproductos · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
   .toolbar .chips{margin:0}
   .btn-ghost{display:inline-block;background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none}
-  .btn-ghost:hover{border-color:var(--citrus);color:var(--citrus)}
+  .btn-ghost:hover{border-color:var(--citrus);color:var(--citrus-text)}
   select.sel-ubic{width:auto;padding:5px 8px;font-size:12.5px}
   .origen-linea{font-size:12.5px;white-space:nowrap}
   .origen-linea .num-sub{display:inline}
@@ -329,7 +329,7 @@ function toast(texto, tipo) {
 function textoError(e) {
   const m = String((e && e.message) || e);
   return /Method Not Allowed|Not Found/i.test(m)
-    ? "El servidor que respondió todavía no tiene esta función. Actualice el servidor (git pull) y reinícielo."
+    ? "El servidor aún no incorpora esta función. Actualice el código del servidor y reinicie el panel."
     : m;
 }
 function aviso(id, texto, tipo) {
@@ -759,7 +759,7 @@ function resumenTransformacion() {
   if (aceite > 0 && marc.length) {
     const { lineas, cap } = planBarriles(aceite);
     const comp = lineas.filter((l) => !l.nuevo), nuevos = lineas.filter((l) => l.nuevo);
-    if (comp.length) filas.push([comp.length === 1 ? "Completa el barril abierto" : "Completa los barriles abiertos", comp.map((l) => `${l.codigo} con ${fmt2(l.kg)} kg`).join(", ")]);
+    if (comp.length) filas.push([comp.length === 1 ? "Barril abierto por completar" : "Barriles abiertos por completar", comp.map((l) => `${l.codigo} con ${fmt2(l.kg)} kg`).join(", ")]);
     if (nuevos.length) filas.push(["Barriles nuevos", nuevos.map((l) => l.codigo).join(", ")]);
     const ult = lineas[lineas.length - 1];
     if (ult) {

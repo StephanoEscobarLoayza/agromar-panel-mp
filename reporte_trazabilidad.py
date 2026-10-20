@@ -5,7 +5,7 @@ dos cuadros de stock por lote (saldos de esta corrida + lotes completos que
 siguen en piso).
 
 Los datos que la app tiene entran como números; TODO lo que se calcula entra
-como fórmula de Excel (referencias a celdas), para que si Stephano corrige un
+como fórmula de Excel (referencias a celdas), para que si el usuario corrige un
 dato de entrada -por ejemplo el % de descuento a brix que le pasa su jefe- o
 llena a mano un campo que la app no guarda, la hoja recalcule sola, igual que
 la de planta. Lo que no está en la app (GRP, N° Guía, % descuento a brix,
@@ -19,7 +19,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-HR_PULPEADO = 9.5            # fijo al generar el Excel (lo confirmó Stephano) - la celda se ve "10" (formato sin decimales) pero MP kg/hr calcula con el 9.5 real
+HR_PULPEADO = 9.5            # fijo al generar el Excel (confirmado por planta) - la celda se ve "10" (formato sin decimales) pero MP kg/hr calcula con el 9.5 real
 DENSIDAD_APARENTE = 1.04332  # kg/l - suele ser siempre este valor
 
 _MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO",
@@ -35,10 +35,10 @@ _NOTA_FONT = Font(italic=True, size=9, color="6B6B6B")
 _THIN = Side("thin", color="9BB08C")
 _BORDE = Border(_THIN, _THIN, _THIN, _THIN)
 _CENTRO = Alignment(horizontal="center", vertical="center", wrap_text=True)
-_FMT_KG = "#,##0"  # sin decimales (pedido de Stephano) - es solo formato de vista, las formulas siguen usando el valor real de la celda
+_FMT_KG = "#,##0"  # sin decimales (criterio de la planta) - es solo formato de vista, las formulas siguen usando el valor real de la celda
 _FMT_BRIX = "0.00"
 _FMT_PCT = "0.0%"
-_FMT_PCT2 = "0.00%"  # Volumen/Rendimiento/Rendimiento de Jugo Simple - pedido de Stephano, a 2 decimales
+_FMT_PCT2 = "0.00%"  # Volumen/Rendimiento/Rendimiento de Jugo Simple, a 2 decimales
 _FMT_FECHA = "DD/MM/YYYY"
 _FMT_FECHAHORA = "DD/MM/YYYY HH:MM"
 

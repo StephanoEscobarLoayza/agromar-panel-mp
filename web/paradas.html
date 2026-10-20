@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Paradas · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -290,11 +290,11 @@ lista.addEventListener("click", async (ev) => {
 
   if (accion === "cerrar") {
     try { await apiPost(`/api/paradas/${id}/cerrar`, { hora_fin: ahoraLocal() }); await cargarParadas(); }
-    catch (e) { alert(e.message); }
+    catch (e) { avisar(e.message); }
   } else if (accion === "eliminar") {
     if (!(await confirmar("¿Eliminar esta parada?"))) return;
     try { await apiDelete(`/api/paradas/${id}`); await cargarParadas(); }
-    catch (e) { alert(e.message); }
+    catch (e) { avisar(e.message); }
   } else if (accion === "editar") {
     const p = lista._paradas[id];
     fila.insertAdjacentHTML("afterend", filaEdicion(p));
@@ -305,7 +305,7 @@ lista.addEventListener("click", async (ev) => {
     const wrap = btn.closest("td");
     const v = c => wrap.querySelector("." + c);
     const inicio = v("ed-inicio").value;
-    if (!inicio) { alert("La hora de inicio es obligatoria."); return; }
+    if (!inicio) { avisar("La hora de inicio es obligatoria."); return; }
     try {
       await apiPost(`/api/paradas/${id}`, {
         turno: v("ed-turno").value, hora_inicio: inicio, hora_fin: v("ed-fin").value || null,
@@ -315,18 +315,18 @@ lista.addEventListener("click", async (ev) => {
         recomendacion: v("ed-rec").value,
       });
       await cargarParadas();
-    } catch (e) { alert(e.message); }
+    } catch (e) { avisar(e.message); }
   }
 });
 
 F.corrida.addEventListener("change", cargarParadas);
 
 btnGuardar.addEventListener("click", async () => {
-  if (!F.corrida.value) { mensaje.innerHTML = '<div class="msg bad">Elige una corrida.</div>'; return; }
-  if (!F.turno.value) { mensaje.innerHTML = '<div class="msg bad">Elige el turno.</div>'; return; }
-  if (!F.inicio.value) { mensaje.innerHTML = '<div class="msg bad">Ingresa la hora de inicio.</div>'; return; }
-  if (!F.area.value) { mensaje.innerHTML = '<div class="msg bad">Elige el área / proceso.</div>'; return; }
-  if (!F.tipo.value) { mensaje.innerHTML = '<div class="msg bad">Elige el tipo de parada.</div>'; return; }
+  if (!F.corrida.value) { mensaje.innerHTML = '<div class="msg bad">Elija una corrida.</div>'; return; }
+  if (!F.turno.value) { mensaje.innerHTML = '<div class="msg bad">Elija el turno.</div>'; return; }
+  if (!F.inicio.value) { mensaje.innerHTML = '<div class="msg bad">Ingrese la hora de inicio.</div>'; return; }
+  if (!F.area.value) { mensaje.innerHTML = '<div class="msg bad">Elija el área o proceso.</div>'; return; }
+  if (!F.tipo.value) { mensaje.innerHTML = '<div class="msg bad">Elija el tipo de parada.</div>'; return; }
 
   btnGuardar.disabled = true;
   try {
@@ -400,7 +400,7 @@ document.querySelectorAll(".chip-filter[data-preset]").forEach(b => {
 
 document.getElementById("btnDescargarParadas").addEventListener("click", () => {
   if (!pDesde.value || !pHasta.value) {
-    pMsg.innerHTML = '<div class="msg bad">Elige la fecha "desde" y "hasta".</div>';
+    pMsg.innerHTML = '<div class="msg bad">Elija la fecha «desde» y «hasta».</div>';
     return;
   }
   if (pDesde.value > pHasta.value) {

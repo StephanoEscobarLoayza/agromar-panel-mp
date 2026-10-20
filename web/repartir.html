@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Repartir lotes · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,10 +31,10 @@
   .tk-chip.sel{border-color:var(--text);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
   .tk-chip.arrastrando{opacity:.4}
   .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px 6px;border-radius:6px;font-size:11px}
-  .icon-btn:hover{color:var(--citrus);background:var(--citrus-tint)}
+  .icon-btn:hover{color:var(--citrus-text);background:var(--citrus-tint)}
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:14px 20px}
   .btn-ghost{display:inline-block;background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none}
-  .btn-ghost:hover{border-color:var(--citrus);color:var(--citrus)}
+  .btn-ghost:hover{border-color:var(--citrus);color:var(--citrus-text)}
   .sub-note{font-size:12.5px;color:var(--text-muted);margin-top:12px;line-height:1.55}
   .lista-check{border:1px solid var(--border);border-radius:10px;max-height:230px;overflow:auto;background:var(--surface)}
   .lista-check .check-fila{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)}
@@ -644,7 +644,7 @@ document.getElementById("btnAplicar").addEventListener("click", async () => {
         </div></div></div>`;
   } catch (e) {
     btn.disabled = false;
-    aviso("avisoGeneral", /Method Not Allowed|Not Found/i.test(e.message) ? "El servidor que respondió todavía no tiene esta función. Actualice el servidor (git pull) y reinícielo." : e.message);
+    aviso("avisoGeneral", /Method Not Allowed|Not Found/i.test(e.message) ? "El servidor aún no incorpora esta función. Actualice el código del servidor y reinicie el panel." : e.message);
     document.getElementById("avisoGeneral").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 });

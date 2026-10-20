@@ -1,7 +1,7 @@
 """Genera el .xlsx de "Paradas por período" (botón en Paradas). Antes se
 armaba con el mismo helper genérico del export de respaldo (`_hoja_xlsx`
 en api.py) - una hoja técnica, con los nombres de columna tal cual la base
-de datos y sin ajustar anchos al contenido, que Stephano vio "poco
+de datos y sin ajustar anchos al contenido, que resultaba "poco
 profesional" (fechas mostrando `#######`, columnas de texto largo cortadas).
 Esta versión sí está pensada para leerse/imprimirse: título con el período,
 resumen arriba, encabezados en español y columnas con ancho + wrap

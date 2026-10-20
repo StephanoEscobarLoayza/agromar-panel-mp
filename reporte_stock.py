@@ -8,7 +8,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, TEXT_2,
+    FOREST_2, CITRUS,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_lote, fmt_fecha, Banda, header_footer, kpi_card, encabezado, seccion, tabla, nuevo_doc,
     ahora_peru,
@@ -96,7 +96,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     # "saldo" en sentido estricto es lo que sobra de un lote YA EMPEZADO -
     # un lote que todavía no se tocó (kg_saldo == su peso neto completo) no
     # tiene ningún sobrante, está completo tal como llegó. Mezclar los dos
-    # en una sola lista de "lotes con saldo" confunde (Stephano lo notó) -
+    # en una sola lista de "lotes con saldo" confunde -
     # se separan en dos tablas.
     lotes_completos = [l for l in lotes if abs(float(l["kg_saldo"]) - float(l["peso_neto_kg"])) < 0.01]
     lotes_parciales = [l for l in lotes if abs(float(l["kg_saldo"]) - float(l["peso_neto_kg"])) >= 0.01]
@@ -106,7 +106,7 @@ def generar_reporte_stock_pdf(lotes: list) -> bytes:
     story = [
         encabezado(
             "Inventario de planta", "Stock de materia prima",
-            f"Foto del sistema al {ahora.strftime('%d/%m/%Y')}, {ahora.strftime('%H:%M')}",
+            f"Estado del sistema al {ahora.strftime('%d/%m/%Y')}, {ahora.strftime('%H:%M')}",
         ),
         Spacer(1, 10 * mm),
         *seccion("Resumen"),

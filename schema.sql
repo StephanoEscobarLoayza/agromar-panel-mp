@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ESQUEMA: Panel de Cuadre de Producción (Agromar - Naranja)
--- Motor: PostgreSQL (Render Postgres, Supabase, o cualquier Postgres 13+)
+-- Motor: PostgreSQL 13 o superior (Neon, Supabase o cualquier otro servicio)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------

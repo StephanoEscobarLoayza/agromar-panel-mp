@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Registrar consumo · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,7 +44,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Registrar consumo</h1>
-    <p class="hero-sub">Elige la corrida, escribe el lote — el resto se completa solo.</p>
+    <p class="hero-sub">Elija la corrida y escriba el lote; el resto se completa automáticamente.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -73,7 +73,7 @@
 
         <div class="field">
           <label for="lote">Número de lote</label>
-          <input type="number" id="lote" min="0" step="1" placeholder="ej. 2291">
+          <input type="number" id="lote" min="0" step="1" placeholder="Ej. 2291">
         </div>
 
         <div id="loteInfo"></div>
@@ -89,7 +89,7 @@
       <div class="table-wrap">
         <table class="tabla-compacta">
           <thead><tr><th>Lote</th><th class="right">Kg</th><th>Turno</th><th class="right">Saldo restante</th><th></th></tr></thead>
-          <tbody id="recientes"><tr><td colspan="5" class="empty">Elige una corrida</td></tr></tbody>
+          <tbody id="recientes"><tr><td colspan="5" class="empty">Elija una corrida</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -190,7 +190,7 @@ recientesBody.addEventListener("click", async (ev) => {
       const quedanActual = Number(fila.dataset.binesSaldo) || 0; // saldo del lote ahora, ya descontando esta fila
       const maxBines = quedanActual + binesActual; // lo máximo que esta fila podría tener (si nadie más lo hubiera tocado)
       const otrasCorridas = binesTotales - maxBines; // lo que YA se fue en otras corridas - no se toca desde aquí
-      // Pide "cuántos bines quedan" (Stephano cuenta el patio y quiere poner
+      // Pide "cuántos bines quedan" (se cuenta el patio y se quiere poner
       // eso directo, no calcular una resta) - pero mostrando bien claro que
       // es el saldo TOTAL del lote, y cuánto de eso ya se fue en otras
       // corridas, porque ahí fue donde se confundió antes con un lote
@@ -213,7 +213,7 @@ recientesBody.addEventListener("click", async (ev) => {
       };
       fila.querySelector('[data-celda="acciones"]').innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:10.5px;white-space:normal;max-width:150px;text-align:right">${hint(quedanActual)}</span>
+          <span class="hint-line" id="edit-kg-hint-${id}" style="font-size:11.5px;white-space:normal;max-width:150px;text-align:right">${hint(quedanActual)}</span>
           <div class="edit-acciones">
             <button class="btn-link strong" data-accion="guardar-asig" data-id="${id}">Guardar</button>
             <button class="btn-link" data-accion="cancelar-asig" data-id="${id}">Cancelar</button>
@@ -253,12 +253,12 @@ recientesBody.addEventListener("click", async (ev) => {
       const maxBines = Number(binesInput.dataset.maxBines);
       const quedan = binesInput.value === "" ? NaN : Number(binesInput.value);
       if (isNaN(quedan) || quedan < 0 || quedan > maxBines) {
-        alert(`Ingresa cuántos bines quedan de este lote ahora (entre 0 y ${maxBines}).`);
+        avisar(`Ingrese cuántos bines quedan de este lote ahora (entre 0 y ${maxBines}).`);
         return;
       }
       bines = maxBines - quedan;
       if (bines <= 0) {
-        alert("Con esos bines que quedan, esta corrida no tendría ningún consumo registrado.");
+        avisar("Con esos bines que quedan, esta corrida no tendría ningún consumo registrado.");
         return;
       }
       const kgPorBin = Number(binesInput.dataset.kgPorBin);
@@ -266,7 +266,7 @@ recientesBody.addEventListener("click", async (ev) => {
     } else {
       kg = Number(fila.querySelector(".edit-kg-input").value);
       if (!kg || kg <= 0) {
-        alert("Ingresa un peso mayor a 0.");
+        avisar("Ingrese un peso mayor a 0.");
         return;
       }
     }
@@ -276,15 +276,15 @@ recientesBody.addEventListener("click", async (ev) => {
       await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg, bines_consumidos: bines, porcentaje_descuento: descuento });
       cargarRecientes();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   } else if (btn.dataset.accion === "marcar-pendiente-asig") {
-    if (!(await confirmar('¿Volver a dejar este lote como "kg pendiente"? El kg confirmado se borra hasta que lo vuelvas a registrar.'))) return;
+    if (!(await confirmar('¿Volver a dejar este lote como "kg pendiente"? El kg confirmado se borra hasta que se vuelva a registrar.'))) return;
     try {
       await apiPost(`/api/asignaciones/${id}`, { kg_asignados: null, bines_consumidos: null });
       cargarRecientes();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   } else if (btn.dataset.accion === "eliminar-asig") {
     if (!(await confirmar("¿Eliminar esta asignación? El saldo del lote se libera de vuelta."))) return;
@@ -292,7 +292,7 @@ recientesBody.addEventListener("click", async (ev) => {
       await apiDelete(`/api/asignaciones/${id}`);
       cargarRecientes();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
   }
 });
@@ -311,7 +311,7 @@ function renderCamposPeso() {
     camposPeso.innerHTML = `
       <div class="msg warn">
         Este lote ya está registrado en esta corrida (${kgTxt}, turno ${escapeHtml(yaAsignado.turno || "—")}).
-        Si necesitas sumarle más kg, edítalo con ✎ en "Asignaciones de esta corrida" en vez de crear otro registro.
+        Si necesita sumarle más kg, edítelo con ✎ en «Asignaciones de esta corrida» en vez de crear otro registro.
       </div>
     `;
     btnGuardar.disabled = true;
@@ -345,7 +345,7 @@ function renderCamposOrigen() {
 
   if (pendiente) {
     cont.innerHTML = `
-      <div class="hint-line" style="margin-bottom:8px">Se registra el lote como iniciado en esta corrida, sin comprometer un kg todavía. Complétalo después con el kg real (✎ en "Asignaciones de esta corrida").</div>
+      <div class="hint-line" style="margin-bottom:8px">Se registra el lote como iniciado en esta corrida, sin comprometer un kg todavía. Complételo después con el kg real (✎ en «Asignaciones de esta corrida»).</div>
       <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
     `;
     btnGuardar.disabled = false;
@@ -354,7 +354,7 @@ function renderCamposOrigen() {
 
   if (origen === "BINES") {
     if (!lote.bines_totales) {
-      cont.innerHTML = '<div class="msg bad">Este lote no tiene bines_totales registrados — no se puede calcular el kg por bin. Corrígelo en Lotes.</div>';
+      cont.innerHTML = '<div class="msg bad">Este lote no tiene bines_totales registrados — no se puede calcular el kg por bin. Corríjalo en «Lotes».</div>';
       btnGuardar.disabled = true;
       return;
     }
@@ -362,10 +362,10 @@ function renderCamposOrigen() {
     const binesSaldo = lote.bines_saldo !== null ? Number(lote.bines_saldo) : null;
     cont.innerHTML = `
       <div class="hint-line" style="margin-bottom:8px">${kgPorBin.toFixed(2)} kg por bin · hay ${binesSaldo !== null ? fmtInt(binesSaldo) : "—"} bines ahora</div>
-      <div class="field"><label>Bines que quedan (cuenta los que ves, después de este consumo)</label><input type="number" id="binesQuedan" min="0" max="${binesSaldo ?? 9999}" step="1" placeholder="ej. 42"></div>
+      <div class="field"><label>Bines que quedan (cuente los que se observan, después de este consumo)</label><input type="number" id="binesQuedan" min="0" max="${binesSaldo ?? 9999}" step="1" placeholder="Ej. 42"></div>
       <div class="suggested" style="margin:8px 0"><b>Consumo calculado:</b> <span id="binesConsumidosCalc">—</span> bines · <span id="pesoSugerido" class="num">—</span> kg</div>
-      <div class="field"><label>Kg a registrar (ajusta si difiere del sugerido)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
-      <div class="field"><label>% Descuento a brix 10.5°B (opcional)</label><input type="number" id="descuento" min="0" max="100" step="0.1" placeholder="ej. 3"></div>
+      <div class="field"><label>Kg a registrar (ajuste si difiere del sugerido)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
+      <div class="field"><label>% Descuento a brix 10.5°B (opcional)</label><input type="number" id="descuento" min="0" max="100" step="0.1" placeholder="Ej. 3"></div>
       <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
     `;
     const binesQuedanInput = document.getElementById("binesQuedan");
@@ -386,7 +386,7 @@ function renderCamposOrigen() {
   } else {
     cont.innerHTML = `
       <div class="field"><label>Kg a asignar (estimado)</label><input type="number" id="kg" min="0" max="${saldo}" step="0.01" value="0"></div>
-      <div class="field"><label>% Descuento a brix 10.5°B (opcional)</label><input type="number" id="descuento" min="0" max="100" step="0.1" placeholder="ej. 3"></div>
+      <div class="field"><label>% Descuento a brix 10.5°B (opcional)</label><input type="number" id="descuento" min="0" max="100" step="0.1" placeholder="Ej. 3"></div>
       <div class="field"><label>Observaciones</label><input type="text" id="obs" placeholder="opcional"></div>
     `;
   }
@@ -424,7 +424,7 @@ async function buscarLote() {
     ]);
     opcionesLote = candidatos.filter(c => c.status === "fulfilled").map(c => c.value);
     if (opcionesLote.length === 0) {
-      throw new Error(candidatos[0].reason?.message || `El lote ${n} no está en el maestro. Sincronízalo primero.`);
+      throw new Error(candidatos[0].reason?.message || `El lote ${n} no está en el maestro. Sincronícelo primero.`);
     }
     // por defecto, el que tiene saldo real (si el normal ya está en 0 y el
     // derivado PRE CC sí tiene, se elige ese solo) - si hay que elegir
@@ -456,7 +456,7 @@ function renderLoteInfo() {
   }
   // hay lote real Y derivado PRE CC a la vez - se deja elegir cuál usar.
   loteInfo.innerHTML = `
-    <div class="hint-line" style="margin-bottom:8px">Este lote tiene dos saldos separados — elige cuál vas a usar:</div>
+    <div class="hint-line" style="margin-bottom:8px">Este lote tiene dos saldos separados; elija cuál va a usar:</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${opcionesLote.map(l => tarjetaLote(l, l.numero === lote.numero)).join("")}
     </div>
@@ -490,7 +490,7 @@ btnGuardar.addEventListener("click", async () => {
     const binesQuedanEl = document.getElementById("binesQuedan");
     if (binesQuedanEl) {
       if (binesQuedanEl.value === "") {
-        mensaje.innerHTML = '<div class="msg bad">Ingresa cuántos bines quedan.</div>';
+        mensaje.innerHTML = '<div class="msg bad">Ingrese cuántos bines quedan.</div>';
         return;
       }
       const quedan = Number(binesQuedanEl.value);
@@ -506,7 +506,7 @@ btnGuardar.addEventListener("click", async () => {
     if (!kg || kg <= 0) {
       mensaje.innerHTML = origen === "BINES"
         ? '<div class="msg bad">Con esos bines que quedan, no hay ningún consumo que registrar.</div>'
-        : '<div class="msg bad">Ingresa un peso mayor a 0.</div>';
+        : '<div class="msg bad">Ingrese un peso mayor a 0.</div>';
       return;
     }
   }

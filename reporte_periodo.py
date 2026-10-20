@@ -8,7 +8,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, OK, BAD, TEXT,
+    FOREST_2, CITRUS, BAD, TEXT,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_fecha, fmt_minutos, Banda, header_footer, kpi_card,
     encabezado, seccion, tabla, nuevo_doc,

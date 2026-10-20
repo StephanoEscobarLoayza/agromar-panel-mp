@@ -35,7 +35,8 @@ from sqlalchemy import create_engine, text
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
 
-DEFAULT_PATH = r"C:\Users\Stephano\OneDrive\Desktop\Trazabilidad Nar 2026 (1).xlsx"
+# Ruta del Excel de trazabilidad: se puede pasar como argumento o definir TRAZABILIDAD_XLSX en el entorno (.env).
+DEFAULT_PATH = os.environ.get("TRAZABILIDAD_XLSX", "Trazabilidad Nar 2026.xlsx")
 
 DATABASE_URL = os.environ.get("DATABASE_URL_POOLED") or os.environ.get("DATABASE_URL")
 if not DATABASE_URL:

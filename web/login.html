@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Entrar · Agromar</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,7 +61,7 @@
   </div>
 
   <div class="login-title">Panel de cuadre de producción</div>
-  <div class="login-hint">Ingresa el usuario y la contraseña del equipo para continuar.</div>
+  <div class="login-hint">Ingrese el usuario y la contraseña del equipo para continuar.</div>
 
   <div class="field">
     <label for="usuario">Usuario</label>
@@ -152,7 +152,7 @@ const msg = document.getElementById("msg");
 form.addEventListener("submit", async (ev) => {
   ev.preventDefault();
   if (!usuario.value || !pass.value) {
-    msg.innerHTML = '<div class="msg bad">Escribe usuario y contraseña.</div>';
+    msg.innerHTML = '<div class="msg bad">Escriba el usuario y la contraseña.</div>';
     return;
   }
   btn.disabled = true;
@@ -171,7 +171,7 @@ form.addEventListener("submit", async (ev) => {
     const body = await res.json().catch(() => ({}));
     msg.innerHTML = `<div class="msg bad">${body.detail || "No se pudo entrar."}</div>`;
   } catch (e) {
-    msg.innerHTML = '<div class="msg bad">Sin conexión. Intenta de nuevo.</div>';
+    msg.innerHTML = '<div class="msg bad">Sin conexión. Intente nuevamente.</div>';
   } finally {
     btn.disabled = false;
   }

@@ -1,9 +1,11 @@
 :root{
   --bg:#FBF7EE; --surface:#FFFFFF; --surface-2:#F3EDE0; --border:#E4DBC7;
-  --text:#1B231D; --text-2:#5B6459; --text-muted:#8B9186;
+  --text:#1B231D; --text-2:#5B6459; --text-muted:#6B7266;
   --forest:#123524; --forest-2:#1E6B45; --forest-tint:#E7EFE9;
   --citrus:#E8890C; --citrus-light:#F2A93C; --citrus-tint:#FBE9CE;
-  --ok:#2F9E5B; --ok-bg:#E4F3EA; --warn:#C77A0E; --warn-bg:#FBEBD6; --bad:#C7433B; --bad-bg:#FBE4E2;
+  /* el naranja de marca no alcanza el contraste mínimo como texto: estas dos versiones más oscuras se usan cuando es texto */
+  --citrus-text:#9A5000; --citrus-big:#C46F00;
+  --ok:#1F7A45; --ok-bg:#E4F3EA; --warn:#8F5800; --warn-bg:#FBEBD6; --bad:#B0342D; --bad-bg:#FBE4E2;
   --foot-accent:#1E6B45;
   --shadow:0 1px 2px rgba(27,35,29,.06), 0 8px 24px rgba(27,35,29,.05);
   --shadow-lg:0 4px 10px rgba(27,35,29,.08), 0 16px 32px rgba(27,35,29,.10);
@@ -16,7 +18,7 @@
     --bg:#101A14; --surface:#16241C; --surface-2:#1C2E22; --border:#2A3E31;
     --text:#EDEEE7; --text-2:#B7C0B5; --text-muted:#7E897F;
     --forest:#1E6B45; --forest-2:#2F8C5C; --forest-tint:#1A2E22;
-    --citrus:#F2A93C; --citrus-light:#F6C177; --citrus-tint:#2E2515;
+    --citrus:#F2A93C; --citrus-light:#F6C177; --citrus-tint:#2E2515; --citrus-text:#F2A93C; --citrus-big:#F2A93C;
     --ok:#4CC787; --ok-bg:#153826; --warn:#E8A93C; --warn-bg:#3A2C12; --bad:#E8685F; --bad-bg:#3B1D1B;
     --foot-accent:#F2A93C;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
@@ -28,7 +30,7 @@
   --bg:#101A14; --surface:#16241C; --surface-2:#1C2E22; --border:#2A3E31;
   --text:#EDEEE7; --text-2:#B7C0B5; --text-muted:#7E897F;
   --forest:#1E6B45; --forest-2:#2F8C5C; --forest-tint:#1A2E22;
-  --citrus:#F2A93C; --citrus-light:#F6C177; --citrus-tint:#2E2515;
+  --citrus:#F2A93C; --citrus-light:#F6C177; --citrus-tint:#2E2515; --citrus-text:#F2A93C; --citrus-big:#F2A93C;
   --ok:#4CC787; --ok-bg:#153826; --warn:#E8A93C; --warn-bg:#3A2C12; --bad:#E8685F; --bad-bg:#3B1D1B;
   --foot-accent:#F2A93C;
   --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
@@ -85,7 +87,7 @@ nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
 .nav-dropdown-menu[hidden]{display:none}
 .nav-dropdown-menu a{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--text-2);text-decoration:none;transition:background .15s,color .15s}
 .nav-dropdown-menu a:hover{background:var(--surface-2)}
-.nav-dropdown-menu a.active{background:var(--citrus-tint);color:var(--citrus);font-weight:600}
+.nav-dropdown-menu a.active{background:var(--citrus-tint);color:var(--citrus-text);font-weight:600}
 .nav-dropdown-menu .nav-icon{opacity:.85;color:inherit}
 .hero-eyebrow{font-family:'Fraunces',Georgia,serif;font-style:italic;font-weight:500;font-size:15px;color:var(--citrus-light);margin-top:32px;letter-spacing:.02em}
 .hero-title{font-size:41px;font-weight:800;line-height:1.06;letter-spacing:-.015em;margin-top:10px;max-width:640px}
@@ -114,7 +116,7 @@ nav.tabs a:hover .nav-icon,nav.tabs a.active .nav-icon{opacity:1}
 .kpi-medal.citrus svg{stroke:var(--citrus)}
 .kpi-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
 .kpi-value{font-size:26px;font-weight:600;margin-top:6px;white-space:nowrap}
-.kpi-value.citrus{color:var(--citrus)}
+.kpi-value.citrus{color:var(--citrus-big)}
 .kpi-note{font-size:12px;color:var(--text-2);margin-top:4px}
 
 /* ---------- sections ---------- */
@@ -154,15 +156,15 @@ td.empty{padding:20px}
 /* ordenar las corridas a mano: los controles solo aparecen con el botón «Ordenar corridas» */
 .corrida-top > div:first-child{flex:1 1 150px;min-width:0}
 .btn-ordenar{background:var(--surface);color:var(--text-2);border:1px solid var(--border);border-radius:99px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:color .15s ease,border-color .15s ease}
-.btn-ordenar:hover{color:var(--citrus);border-color:var(--citrus)}
-.btn-ordenar.activo{background:var(--citrus-tint);color:var(--citrus);border-color:var(--citrus)}
+.btn-ordenar:hover{color:var(--citrus-text);border-color:var(--citrus)}
+.btn-ordenar.activo{background:var(--citrus-tint);color:var(--citrus-text);border-color:var(--citrus)}
 .corrida-mover{display:none;flex:none;margin-left:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);overflow:hidden}
 .ordenando .corrida-mover{display:flex}
 .ordenando .corrida:hover{transform:none}
 .corrida-mover button,.mover-asa{display:inline-flex;align-items:center;justify-content:center;width:36px;height:34px;padding:0;border:none;background:none;color:var(--text-2);cursor:pointer;font-family:inherit}
 .corrida-mover > * + *{border-left:1px solid var(--border)}
 .corrida-mover svg{width:16px;height:16px;pointer-events:none}
-.corrida-mover button:hover:not(:disabled),.mover-asa:hover{background:var(--citrus-tint);color:var(--citrus)}
+.corrida-mover button:hover:not(:disabled),.mover-asa:hover{background:var(--citrus-tint);color:var(--citrus-text)}
 .corrida-mover button:disabled{opacity:.35;cursor:default}
 .mover-asa{cursor:grab}
 .mover-asa:active{cursor:grabbing}
@@ -172,8 +174,8 @@ td.empty{padding:20px}
 .corrida-nota{margin:0 0 12px;font-size:12.5px;color:var(--text-muted)}
 .corrida-nota:empty{display:none}
 .btn-link{background:none;border:none;padding:0;font-size:12.5px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;transition:color .15s ease}
-.btn-link:hover{color:var(--citrus)}
-.btn-link.strong{color:var(--citrus)}
+.btn-link:hover{color:var(--citrus-text)}
+.btn-link.strong{color:var(--citrus-text)}
 .btn-link-bad{color:var(--bad)}
 .btn-link-bad:hover{color:var(--bad)}
 .productos-panel,.finalizar-panel,.editar-panel{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
@@ -207,7 +209,7 @@ tbody tr:hover td{background:var(--surface-2)}
 .table-wrap{overflow-x:auto}
 .saldo-bar{display:inline-block;width:46px;height:5px;border-radius:99px;background:var(--surface-2);vertical-align:middle;margin-right:8px;overflow:hidden}
 .saldo-bar i{display:block;height:100%;background:var(--citrus)}
-.tag{font-size:10.5px;padding:2px 7px;border-radius:6px;background:var(--forest-tint);color:var(--forest-2);font-weight:600}
+.tag{font-size:11.5px;padding:2px 7px;border-radius:6px;background:var(--forest-tint);color:var(--forest-2);font-weight:600}
 .num-sub{font-size:11px;color:var(--text-muted);font-weight:400;margin-top:2px;white-space:nowrap}
 /* edición en línea de una asignación (Registrar consumo): el input global tiene
    padding grande y width:100% (content-box) - dentro de una celda de tabla
@@ -218,7 +220,7 @@ tbody tr:hover td{background:var(--surface-2)}
 .edit-fila.ancho span{width:82px}
 .edit-mini-input{box-sizing:border-box;padding:5px 8px;font-size:13px;text-align:right;flex-shrink:0}
 .edit-acciones{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 10px}
-.lote-link{color:var(--citrus);text-decoration:none}
+.lote-link{color:var(--citrus-text);text-decoration:none}
 .lote-link:hover{text-decoration:underline}
 
 /* ---------- dropdown propio para celdas editables (lotes: estado/ubicación) ---------- */
@@ -247,7 +249,7 @@ tbody tr:hover td{background:var(--surface-2)}
   padding:8px 12px;border-radius:8px;font-size:13px;color:var(--text);cursor:pointer;white-space:nowrap;
 }
 .csel-popup li:hover{background:var(--surface-2)}
-.csel-popup li.csel-selected{background:var(--citrus-tint);color:var(--citrus);font-weight:600}
+.csel-popup li.csel-selected{background:var(--citrus-tint);color:var(--citrus-text);font-weight:600}
 .csel-popup li.csel-check{padding:0}
 .csel-popup li.csel-check label{display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer;width:100%}
 .csel-popup li.csel-check input[type="checkbox"]{width:15px;height:15px;flex-shrink:0;accent-color:var(--citrus)}
@@ -421,6 +423,16 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .chips-lotes .chip-lote:has(input:checked){background:var(--citrus);border-color:var(--citrus);color:#fff}
 .chips-lotes .chip-lote:has(input:focus-visible){outline:2px solid var(--citrus);outline-offset:2px}
 .chips-lotes .chip-mas{border-style:dashed;background:transparent;color:var(--text-muted);font-weight:500}
-.chips-lotes .chip-mas:hover{color:var(--citrus);border-color:var(--citrus)}
+.chips-lotes .chip-mas:hover{color:var(--citrus-text);border-color:var(--citrus)}
 .chips-lotes input.chip-entrada{width:74px;padding:6px 10px;border-radius:99px;font-size:14px;text-align:center}
 @media (pointer:coarse){ .chips-lotes .chip-lote{min-height:42px} }
+
+/* aviso no bloqueante (reemplaza a los cuadros nativos del navegador) */
+#avisosGlobales{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;width:min(92vw,480px);pointer-events:none}
+.aviso-global{pointer-events:auto;cursor:pointer;background:var(--surface);color:var(--text);border:1px solid var(--border);border-left:5px solid var(--bad);border-radius:12px;padding:12px 16px;font-size:14px;line-height:1.45;box-shadow:var(--shadow-lg)}
+.aviso-global.ok{border-left-color:var(--ok)}
+
+/* en pantallas táctiles los campos llevan 16 px para que el celular no acerque la pantalla solo al escribir en ellos */
+@media (pointer:coarse){
+  input:not([type="checkbox"]):not([type="radio"]),select,textarea{font-size:16px}
+}

@@ -2,9 +2,8 @@
 reporte_stock.py, y los que se agreguen después) - paleta, estilos de texto,
 tarjetas KPI, badges y el mini-gráfico de barras. Todo con reportlab (puro
 Python, sin dependencias de sistema como WeasyPrint - instala y corre sin
-problema en Render)."""
+problema en un servidor en la nube)."""
 from datetime import datetime, timedelta, timezone
-from io import BytesIO
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -47,7 +46,7 @@ style_footnote = ParagraphStyle("footnote", parent=styles["Normal"], fontName="H
 
 
 def fmt_kg(n):
-    """Pedido explícito de Stephano: ningún kg se muestra con decimales,
+    """Criterio de la planta: ningún kg se muestra con decimales,
     nunca - solo redondea la vista del reporte, no el número real."""
     if n is None:
         return "—"
@@ -120,9 +119,9 @@ def fmt_minutos(m):
 
 def ahora_peru():
     """Hora local de la planta (Perú, UTC-5, sin horario de verano) para los
-    sellos "Generado el ..." de los reportes. En Render el servidor corre en
-    UTC, así que datetime.now() a secas quedaba ~5 horas adelantado frente al
-    reloj de Stephano - mismo gotcha ya corregido en paradas y en el front."""
+    sellos "Generado el ..." de los reportes. Un servidor en la nube suele correr
+    en UTC, así que datetime.now() a secas quedaría ~5 horas adelantado frente
+    al reloj de la planta - mismo caso ya resuelto en paradas y en el front."""
     return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-5)))
 
 

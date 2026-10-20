@@ -6,8 +6,10 @@ venv/
 
 # scripts locales con claves
 *.vbs
-python
-set
 
 # respaldos locales de la base
 respaldos/
+
+# archivos locales generados
+.claude/scheduled_tasks.lock
+*.xlsx

@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lotes · Agromar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -179,14 +179,14 @@ function estadoBoton(l) {
   const pillClase = pillClaseEstado(actual);
   const label = ESTADO_LABEL[actual] || l.estado_actual || "—";
   const reset = l.estado_manual
-    ? `<button class="btn-link reset-estado" data-lote="${l.numero}" title="Volver al estado del Sheet (${escapeHtml(l.estado_fuente || "—")})">↺</button>`
+    ? `<button class="btn-link reset-estado" data-lote="${l.numero}" title="Volver al estado de la hoja de recepción (${escapeHtml(l.estado_fuente || "—")})">↺</button>`
     : "";
   return `<span class="edit-inline"><button type="button" class="csel-btn pill-select ${pillClase}" data-lote="${l.numero}" data-kind="estado">${escapeHtml(label)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
 }
 
 function pesoBoton(l) {
   const reset = l.peso_congelado
-    ? `<button class="btn-link reset-peso" data-lote="${l.numero}" title="Volver a dejar que el Sheet actualice este peso">↺</button>`
+    ? `<button class="btn-link reset-peso" data-lote="${l.numero}" title="Volver a permitir que la hoja de recepción actualice este peso">↺</button>`
     : "";
   return `<span class="edit-inline"><button type="button" class="csel-btn pill-select neutral" data-lote="${l.numero}" data-kind="peso" title="Corregir el peso neto real">${fmtKg(l.peso_neto_kg)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
 }
@@ -195,7 +195,7 @@ function ubicacionBoton(l) {
   const elegidos = canonicalUbicacion(parseUbicaciones(l.ubicacion_actual));
   const label = elegidos.length ? elegidos.join(" / ") : (l.ubicacion_actual || "—");
   const reset = l.ubicacion_manual
-    ? `<button class="btn-link reset-ubicacion" data-lote="${l.numero}" title="Volver a la ubicación del Sheet (${escapeHtml(l.ubicacion || "—")})">↺</button>`
+    ? `<button class="btn-link reset-ubicacion" data-lote="${l.numero}" title="Volver a la ubicación de la hoja de recepción (${escapeHtml(l.ubicacion || "—")})">↺</button>`
     : "";
   return `<span class="edit-inline"><button type="button" class="csel-btn" data-lote="${l.numero}" data-kind="ubicacion">${escapeHtml(label)}<span class="csel-arrow">▾</span></button>${reset}</span>`;
 }
@@ -255,7 +255,7 @@ function renderPreCC(lista) {
   const cont = document.getElementById("filasPreCC");
   cont.innerHTML = lista.length
     ? lista.map(fila).join("")
-    : '<tr><td colspan="12" class="empty">No hay lotes de PreCC por ahora.</td></tr>';
+    : '<tr><td colspan="12" class="empty">En este momento no hay lotes PRE CC.</td></tr>';
 }
 
 let filtroActual = "todos";
@@ -368,7 +368,7 @@ popup.addEventListener("click", async (ev) => {
     if (!ev.target.closest(".csel-apply")) return;
     const elegidos = Array.from(popup.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
     if (elegidos.length === 0) {
-      alert("Elige al menos una ubicación.");
+      avisar("Elija al menos una ubicación.");
       return;
     }
     cerrarCsel();
@@ -376,7 +376,7 @@ popup.addEventListener("click", async (ev) => {
       await apiPost(`/api/lotes/${numero}/ubicacion`, { ubicacion: elegidos.join(" / ") });
       await cargar();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
     return;
   }
@@ -385,7 +385,7 @@ popup.addEventListener("click", async (ev) => {
     if (!ev.target.closest(".csel-apply")) return;
     const valor = Number(popup.querySelector(".csel-peso-input").value);
     if (!valor || valor <= 0) {
-      alert("Ingresa un peso mayor a 0.");
+      avisar("Ingrese un peso mayor a 0.");
       return;
     }
     cerrarCsel();
@@ -393,7 +393,7 @@ popup.addEventListener("click", async (ev) => {
       await apiPost(`/api/lotes/${numero}/peso`, { peso_neto_kg: valor });
       await cargar();
     } catch (e) {
-      alert(e.message);
+      avisar(e.message);
     }
     return;
   }
@@ -406,7 +406,7 @@ popup.addEventListener("click", async (ev) => {
     await apiPost(`/api/lotes/${numero}/estado`, { estado: valor });
     await cargar();
   } catch (e) {
-    alert(e.message);
+    avisar(e.message);
   }
 });
 
@@ -441,7 +441,7 @@ async function onFilasClick(ev) {
     }
     await cargar();
   } catch (e) {
-    alert(e.message);
+    avisar(e.message);
   }
 }
 filasBody.addEventListener("click", onFilasClick);
