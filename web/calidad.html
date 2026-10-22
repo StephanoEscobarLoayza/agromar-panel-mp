@@ -44,7 +44,7 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Calidad</h1>
-    <p class="hero-sub">Determina qué bin(es) agregar, con base en lo ya registrado, para alcanzar el Brix y el Ratio requeridos sin exceder la acidez máxima.</p>
+    <p class="hero-sub">Determina qué bines agregar, a partir de lo ya registrado, para alcanzar el Brix y el Ratio requeridos sin exceder la acidez máxima.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
@@ -71,7 +71,7 @@
         </div>
         <div class="two-col" style="margin-top:12px">
           <div class="field">
-            <label for="acidezMax">Acidez máximo</label>
+            <label for="acidezMax">Acidez máxima</label>
             <input type="number" id="acidezMax" value="1.00" step="0.01" min="0">
           </div>
           <div></div>
@@ -84,8 +84,8 @@
           <div class="field">
             <label for="modoSiguienteBin">Elegir el siguiente bin por</label>
             <select id="modoSiguienteBin">
-              <option value="fecha">Fecha (el que sigue en la cola)</option>
-              <option value="calidad">Calidad (el que más ayuda al Brix/Ratio)</option>
+              <option value="fecha">Fecha (el siguiente en la cola)</option>
+              <option value="calidad">Calidad (el que más favorece el Brix y el Ratio)</option>
             </select>
           </div>
         </div>
@@ -104,7 +104,7 @@
     </div>
     <div id="resultadoSiguienteBin" style="margin-top:16px"></div>
     <div class="hint-line" style="margin-top:12px">
-      Este cálculo parte solo de los lotes de esta corrida que todavía tienen saldo — esos son los que pueden seguir entrando al tanque que se está llenando en este momento (se usa el kg confirmado si ya se registró, o un estimado con el saldo si sigue pendiente). Los lotes sin saldo ya no pueden aportar más y se muestran aparte como historial. Sugiere el/los bin(es) completos que hacen falta para llegar al mínimo, tantos como elija arriba.
+      El cálculo considera únicamente los lotes de esta corrida que aún tienen saldo, porque son los que pueden seguir ingresando al tanque en llenado (se utiliza el kg confirmado o, si está pendiente, un estimado con el saldo restante). Los lotes sin saldo se muestran aparte, solo como referencia. El sistema sugiere los bines completos necesarios para alcanzar los valores mínimos, en la cantidad elegida arriba.
     </div>
   </section>
 
@@ -118,7 +118,7 @@
         <ol style="margin:0 0 12px;padding-left:20px;font-size:13px;line-height:1.6;color:var(--text-2)">
           <li>Agregue los lotes disponibles que desea considerar (silos y bines).</li>
           <li>Para evaluar una mezcla puntual, indique en la tabla cuántos kg (silos) o cuántos bines tomará de cada lote; el sistema verifica si cumple los parámetros.</li>
-          <li>Para planificar varios tanques, indique los kg de materia prima que entran en cada tanque y pulse «Calcular plan por tanques»: el sistema reparte los lotes agregados en tanques que cumplen los parámetros de forma individual (máximo 4 lotes por tanque).</li>
+          <li>Para obtener una recomendación, pulse «Recomendar combinación»: el sistema propone qué lotes combinar y en qué proporción para cumplir el Brix, el Ratio y la acidez requeridos, con un máximo de 4 lotes. Utiliza el saldo de los lotes agregados o, si no agregó ninguno, de todos los disponibles.</li>
         </ol>
         <div class="hint-line" id="mezObjetivo" style="margin-bottom:12px"></div>
         <div class="two-col">
@@ -127,15 +127,11 @@
             <input type="text" id="mezLote" list="mezLotesLista" placeholder="Número de lote" inputmode="numeric" autocomplete="off">
             <datalist id="mezLotesLista"></datalist>
           </div>
-          <div class="field">
-            <label for="mezKgTotal">Kg de materia prima por tanque</label>
-            <input type="number" id="mezKgTotal" min="0" step="100" placeholder="Ej. 30000">
-            <div class="hint-line" style="margin-top:4px">Solo se utiliza al calcular el plan por tanques.</div>
-          </div>
+          <div></div>
         </div>
         <div id="mezMensaje"></div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;align-items:center">
-          <button class="btn" id="btnMezSugerir" style="width:auto;padding:11px 22px">Calcular plan por tanques</button>
+          <button class="btn" id="btnMezSugerir" style="width:auto;padding:11px 22px">Recomendar combinación</button>
           <button class="btn-link strong" id="btnMezAgregar">+ Agregar lote</button>
           <button class="btn-link" id="btnMezLimpiar">Limpiar mezcla</button>
         </div>
@@ -145,7 +141,7 @@
     </div>
     <div id="mezPlan"></div>
     <div class="hint-line" style="margin-top:12px">
-      Se consideran los lotes en proceso o en espera que tienen saldo y cuentan con Brix y acidez de recepción registrados. Los silos se cargan por kg y los bines por unidades completas. El producto PRE CC no se incluye, porque su Brix real no está registrado. El plan por tanques utiliza el saldo completo de los lotes agregados y asegura que cada tanque cumpla por separado los parámetros requeridos, que son los mismos de la sección anterior.
+      Se consideran los lotes en proceso o en espera que tienen saldo y cuentan con Brix y acidez de recepción registrados. Los silos se cargan por kg y los bines por unidades completas. El producto PRE CC no se incluye, porque su Brix real no está registrado. La combinación recomendada se expresa como proporción de cada lote, cumple los parámetros requeridos (los mismos de la sección anterior) y prefiere la menor cantidad de lotes y los lotes más antiguos.
     </div>
   </section>
 
@@ -232,7 +228,7 @@ function tablaHistorialHtml(historial) {
         <thead>
           <tr>
             <th>Lote</th><th>Proveedor</th><th>Almacén</th><th>Fecha</th>
-            <th class="right">Kg usado</th><th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
+            <th class="right">Kg utilizados</th><th class="right">Brix</th><th class="right">Acidez</th><th class="right">Ratio</th>
           </tr>
         </thead>
         <tbody>${historial.map(filaHistorialHtml).join("")}</tbody>
@@ -279,8 +275,8 @@ function bloqueHistorial(historial) {
   if (!historial || !historial.length) return "";
   return `
     <div class="panel" style="margin-top:16px">
-      <div class="panel-head"><h3>Historial — lotes sin saldo</h3></div>
-      <div class="hint-line" style="margin:0 20px 12px">Ya no les queda saldo, así que no pueden seguir aportando al tanque que se está llenando ahora — se muestran aparte, como referencia.</div>
+      <div class="panel-head"><h3>Lotes sin saldo (referencia)</h3></div>
+      <div class="hint-line" style="margin:0 20px 12px">Estos lotes ya no tienen saldo y no pueden seguir aportando al tanque en llenado; se muestran únicamente como referencia.</div>
       ${tablaHistorialHtml(historial)}
     </div>
   `;
@@ -288,13 +284,13 @@ function bloqueHistorial(historial) {
 
 function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   if (!r.tiene_registros) {
-    return `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px;text-align:center">Todavía no hay consumo registrado para "${escapeHtml(r.corrida_nombre)}" — registre lo ya incorporado en «Registrar consumo» antes de calcular el siguiente bin.</div></div>`;
+    return `<div class="panel" style="margin-top:0"><div class="msg bad" style="margin:16px 20px;text-align:center">Todavía no hay consumo registrado para «${escapeHtml(r.corrida_nombre)}». Registre lo ya incorporado en «Registrar consumo» antes de calcular el siguiente bin.</div></div>`;
   }
 
   if (r.sin_kg_confirmado) {
     return `
       <div class="panel" style="margin-top:0">
-        <div class="msg warn" style="margin:16px 20px;text-align:center">No hay ningún lote con saldo alimentando "${escapeHtml(r.corrida_nombre)}" en este momento. Cuando se registre uno nuevo en «Registrar consumo» (aunque sea con kg pendiente), se podrá calcular aquí.</div>
+        <div class="msg warn" style="margin:16px 20px;text-align:center">No hay ningún lote con saldo alimentando «${escapeHtml(r.corrida_nombre)}» en este momento. Cuando se registre uno nuevo en «Registrar consumo» (aunque sea con kg pendiente), se podrá calcular aquí.</div>
         ${bloqueHistorial(r.historial)}
       </div>
     `;
@@ -319,34 +315,34 @@ function bloqueSiguienteBin(r, brixMin, ratioMin, acidezMax) {
   const metaTexto = `Brix ≥ ${brixMin}, Ratio ≥ ${ratioMin} y Acidez ≤ ${acidezMax}`;
   if (r.cumplido_ya) {
     if (n === 0) {
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Se cumple ${metaTexto} con el tanque actual — no hay bines en espera disponibles para reponer.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Con el tanque actual se cumple ${metaTexto}. No hay bines en espera disponibles para reponer.</div>`;
     } else if (r.cumplido) {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Ya se cumple ${metaTexto}. Al reponer ${refBin}, la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo pedido.</div>`;
+      mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Ya se cumple ${metaTexto}. Al reponer ${refBin}, la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, dentro de lo requerido.</div>`;
     } else {
       const ultimo = r.pasos_bines[n - 1];
-      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px;text-align:center">⚠ Se cumple ${metaTexto} ahora, pero al reponer ${refBin} la mezcla bajaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo pedido${porCalidad ? " — ni eligiendo el mejor disponible se mantiene" : ""}.</div>`;
+      mensajeSiguiente = `<div class="msg warn" style="margin:12px 20px;text-align:center">⚠ Actualmente se cumple ${metaTexto}, pero al reponer ${refBin} la mezcla pasaría a Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}, fuera de lo requerido${porCalidad ? "; ni con el mejor bin disponible se mantiene" : ""}.</div>`;
     }
   } else if (r.cumplido) {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Agregando ${refBin} se alcanza ${metaTexto} — la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
+    mensajeSiguiente = `<div class="msg ok" style="margin:12px 20px;text-align:center">✓ Al agregar ${refBin} se alcanza ${metaTexto}: la mezcla queda en Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   } else if (n === 0) {
-    mensajeSiguiente = '<div class="msg bad" style="margin:12px 20px;text-align:center">No hay lotes de bines en espera disponibles para reponer.</div>';
+    mensajeSiguiente = '<div class="msg warn" style="margin:12px 20px;text-align:center">No hay lotes de bines en espera con saldo disponible para reponer.</div>';
   } else {
     const ultimo = r.pasos_bines[n - 1];
-    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px;text-align:center">✕ No se alcanza ${metaTexto} ni agregando ${refBin} — lo más cerca posible es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
+    mensajeSiguiente = `<div class="msg bad" style="margin:12px 20px;text-align:center">✕ No se alcanza ${metaTexto}, incluso agregando ${refBin}. El valor más cercano posible es Brix ${ultimo.brix_mezcla.toFixed(2)} / Ratio ${ultimo.ratio_mezcla.toFixed(2)} / Acidez ${ultimo.acidez_mezcla.toFixed(3)}.</div>`;
   }
 
   return `
     <div class="panel" style="margin-top:0">
       <div class="panel-head"><h3>Tanque actual (estimado) — ${escapeHtml(r.corrida_nombre)}</h3></div>
-      <div class="hint-line" style="margin:0 20px 12px">Lotes que todavía tienen saldo — el kg confirmado se usa tal cual si ya se registró; si sigue "pendiente", se estima con el saldo que le queda.</div>
+      <div class="hint-line" style="margin:0 20px 12px">Lotes con saldo: se utiliza el kg confirmado cuando ya está registrado; si aún figura como «pendiente», se estima con el saldo restante.</div>
       ${resumen}
       ${tablaHtml(r.actual.map((p) => filaHtml(p, false, true)).join(""), true)}
     </div>
     ${bloqueHistorial(r.historial)}
     <div class="panel" style="margin-top:16px">
-      <div class="panel-head"><h3>El siguiente bin — ${porCalidad ? "por calidad" : "por fecha"}</h3></div>
+      <div class="panel-head"><h3>Siguiente bin sugerido — criterio de ${porCalidad ? "calidad" : "fecha"}</h3></div>
       ${mensajeSiguiente}
       ${filasBines ? tablaHtml(filasBines) : ""}
     </div>
@@ -391,16 +387,16 @@ cargarCorridasAbiertas();
 // acidez de la mezcla). Todo se calcula acá, en el navegador, con los datos
 // de /api/lotes - no hace falta un endpoint nuevo.
 const mezLote = document.getElementById("mezLote");
-const mezKgTotal = document.getElementById("mezKgTotal");
 const mezMensaje = document.getElementById("mezMensaje");
 const mezTabla = document.getElementById("mezTabla");
 const mezResumen = document.getElementById("mezResumen");
 
-const MEZ_MAX_SUGERIR = 8;     // el plan por tanques prueba todas las combinaciones de lotes, que crecen rápido
-const MEZ_MAX_POR_TANQUE = 4;  // lotes distintos que pueden entrar en un mismo tanque
+const MEZ_MAX_SUGERIR = 10;    // lotes que se pueden considerar a la vez al recomendar una combinación
+const MEZ_MAX_LOTES = 4;       // lotes distintos que puede tener la combinación recomendada
 let mezCandidatos = []; // lotes que se pueden mezclar
 let mezcla = [];        // [{ l: lote, cant }] - cant = kg (silo) o bines (bines)
 
+const mezClaveFecha = (l) => `${l.fecha_ingreso || ""}|${String(l.numero).padStart(8, "0")}`;
 const mezEsBines = (l) => l.tipo_almacen === "BINES" && Number(l.bines_totales) > 0;
 const mezKgPorBin = (l) => Number(l.peso_neto_kg) / Number(l.bines_totales);
 const mezSaldoKg = (l) => Math.max(Number(l.kg_saldo), 0);
@@ -566,14 +562,11 @@ function mezActualizarResumen() {
     ${banner}${aviso}`;
 }
 
-// ---- plan por tanques ----
-// Brix, acidez y ratio son lineales en los kg de cada lote, así que armar un
-// tanque que cumpla es un programa lineal chico: se prueban los vértices del
-// conjunto factible. El plan llena los tanques uno tras otro; en cada uno
-// prueba todas las combinaciones de hasta MEZ_MAX_POR_TANQUE lotes y se queda
-// con la que cumple gastando lo menos valioso (así los mejores lotes quedan
-// para los tanques siguientes). Se hace con dos criterios (gastar primero lo
-// menos valioso / lo más valioso) y se conserva el plan que llena más tanques.
+// ---- combinación recomendada ----
+// Brix, acidez y ratio son lineales en los kg de cada lote, así que armar una mezcla que cumpla es un
+// programa lineal chico: se prueban los vértices del conjunto factible. Se buscan combinaciones con la menor
+// cantidad de lotes posible (hasta MEZ_MAX_LOTES) y, entre las que cumplen, se prefieren los lotes más
+// antiguos. Los silos se redondean a 100 kg y los bines siempre son unidades completas.
 function mezResolverSistema(M, v) {
   const n = v.length;
   const A = M.map((fila, i) => fila.concat(v[i]));
@@ -637,135 +630,124 @@ function mezSubconjuntos(n, maxK) {
   return res;
 }
 
-// Devuelve { tanques: [kg por lote], parcial: kg por lote | null, sobrante: kg por lote }
-// o null si no hay lotes. T = kg de materia prima de un tanque.
-function mezPlanTanques(lotes, obj, T) {
+// Devuelve { kgs: [kg por lote], conMargen } si encuentra una combinación que cumple, o { imposible: true, motivos: [...] }.
+// No se pide ninguna cantidad: se usa el saldo de los lotes considerados y la mezcla es la mayor que alcanza con esa proporción.
+function mezRecomendar(lotes, obj) {
   const n = lotes.length;
-  const B = obj.brixMin + 0.001, R = obj.ratioMin + 0.001, A = obj.acidezMax - 0.0001;
   const brix = lotes.map((l) => Number(l.brix_recepcion));
   const acid = lotes.map((l) => Number(l.acidez));
-  const specs = [
-    brix.map((b) => b - B),
-    brix.map((b, i) => b - R * acid[i]),
-    acid.map((a) => A - a),
-  ];
-  // "valor" de un lote = cuánto aporta a cumplir los tres parámetros
-  // (cada uno normalizado), para decidir qué conviene guardar
-  const escala = specs.map((s) => Math.max(...s.map(Math.abs), 1e-9));
-  const valor = lotes.map((_, i) => specs.reduce((acc, s, k) => acc + s[i] / escala[k], 0));
-  const Tt = T / 1000;
-  const tolBines = 0.03 * Tt; // un tanque solo de bines puede quedar un poco arriba o abajo de T
   const paso = lotes.map((l) => (mezEsBines(l) ? mezKgPorBin(l) / 1000 : 0));
-  const tonIni = lotes.map((l, i) => (paso[i] > 0 ? mezMaxCant(l) * paso[i] : mezSaldoKg(l) / 1000));
-  const subs = mezSubconjuntos(n, MEZ_MAX_POR_TANQUE);
-  const suma = (r) => Object.values(r).reduce((a, v) => a + v, 0);
-  const valorDe = (r) => Object.keys(r).reduce((a, j) => a + valor[j] * r[j], 0);
+  const rem = lotes.map((l, i) => (paso[i] > 0 ? mezMaxCant(l) * paso[i] : mezSaldoKg(l) / 1000));   // toneladas disponibles
+  // prioridad: los lotes más antiguos primero
+  const prio = new Array(n);
+  lotes.map((_, i) => i).sort((a, b) => (mezClaveFecha(lotes[a]) < mezClaveFecha(lotes[b]) ? -1 : 1)).forEach((i, k) => { prio[i] = n - k; });
 
-  // los lotes "libres" se resuelven por programación lineal; los "fijos" (bines
-  // ya redondeados a unidades completas) entran como constantes
-  const resolver = (libres, fijos, rem, modo, signo) => {
-    if (!libres.length) return { ...fijos };
-    const fijoSum = suma(fijos);
-    const filas = [], rhs = [];
-    specs.forEach((s) => {
-      filas.push(libres.map((i) => s[i]));
-      rhs.push(-Object.keys(fijos).reduce((a, j) => a + s[j] * fijos[j], 0));
-    });
-    filas.push(libres.map(() => -1)); rhs.push(-(Tt - fijoSum));          // suma <= Tt
-    if (modo === "lleno") { filas.push(libres.map(() => 1)); rhs.push(Tt - fijoSum); } // suma >= Tt
-    const c = modo === "lleno" ? libres.map((i) => -signo * valor[i]) : libres.map(() => 1);
-    const x = mezMaximizar(libres.length, filas, rhs, libres.map((i) => rem[i]), c);
-    if (!x) return null;
-    const r = { ...fijos };
-    libres.forEach((i, k) => { r[i] = x[k]; });
-    return r;
+  const calidad = (kgs) => {
+    let kg = 0, sb = 0, sa = 0;
+    kgs.forEach((k, i) => { kg += k; sb += k * brix[i]; sa += k * acid[i]; });
+    return { kg, brix: sb / kg, acidez: sa / kg, ratio: sa > 0 ? sb / sa : Infinity };
   };
-  const cumple = (r, modo, soloBines) => {
-    const tot = suma(r);
-    if (!specs.every((s) => Object.keys(r).reduce((a, j) => a + s[j] * r[j], 0) >= -1e-7)) return false;
-    if (modo === "lleno") return soloBines ? Math.abs(tot - Tt) <= tolBines : Math.abs(tot - Tt) <= 1e-6;
-    return tot <= Tt + 1e-7 && tot > 1e-9;
+  const cumpleExacto = (kgs) => {
+    const m = calidad(kgs);
+    return m.brix + 1e-9 >= obj.brixMin && m.ratio + 1e-9 >= obj.ratioMin && m.acidez - 1e-9 <= obj.acidezMax;
   };
 
-  const tanqueDe = (S, rem, modo, signo) => {
+  const armar = (S, margen) => {
+    const B = obj.brixMin + margen.b, R = obj.ratioMin + margen.r, A = obj.acidezMax - margen.a;
+    const specs = [brix.map((b) => b - B), brix.map((b, i) => b - R * acid[i]), acid.map((a) => A - a)];
     const iB = S.filter((i) => paso[i] > 0), iS = S.filter((i) => paso[i] === 0);
-    const candidatos = [];
+    // los lotes "libres" se resuelven por programación lineal (maximizando la cantidad total de la mezcla);
+    // los bines, que son unidades completas, entran como constantes
+    const resolver = (libres, fijos) => {
+      if (!libres.length) return { ...fijos };
+      const filas = [], rhs = [];
+      specs.forEach((sp) => {
+        filas.push(libres.map((i) => sp[i]));
+        rhs.push(-Object.keys(fijos).reduce((a, j) => a + sp[j] * fijos[j], 0));
+      });
+      const c = libres.map((i) => 1 + 0.001 * prio[i]);                      // a igualdad de cantidad, favorece los lotes más antiguos
+      const x = mezMaximizar(libres.length, filas, rhs, libres.map((i) => rem[i]), c);
+      if (!x) return null;
+      const r = { ...fijos };
+      libres.forEach((i, k) => { r[i] = x[k]; });
+      return r;
+    };
+    const crudos = [];
     if (!iB.length) {
-      const r = resolver(iS, {}, rem, modo, signo);
-      if (r && cumple(r, modo, false)) candidatos.push(r);
+      const r = resolver(iS, {});
+      if (r) crudos.push(r);
     } else {
-      const cont = resolver(S, {}, rem, modo, signo); // relajación continua
+      const cont = resolver(S, {});                                           // relajación continua
       if (!cont) return null;
       const opciones = iB.map((i) => {
-        const topeBines = Math.floor(rem[i] / paso[i] + 1e-9);
+        const tope = Math.floor(rem[i] / paso[i] + 1e-9);
         const q = cont[i] / paso[i];
-        const f = Math.min(Math.floor(q + 1e-9), topeBines);
-        return (Math.abs(q - f) > 1e-6 && f + 1 <= topeBines) ? [f, f + 1] : [f];
+        const f = Math.min(Math.floor(q + 1e-9), tope);
+        return ((Math.abs(q - f) > 1e-6 && f + 1 <= tope) ? [f, f + 1] : [f]).filter((c) => c >= 1);
       });
+      if (opciones.some((o) => !o.length)) return null;
       const total = opciones.reduce((a, o) => a * o.length, 1);
       for (let c = 0; c < total; c++) {
         let resto = c;
         const fijos = {};
         iB.forEach((i, k) => { const o = opciones[k]; fijos[i] = o[resto % o.length] * paso[i]; resto = Math.floor(resto / o.length); });
-        const r = iS.length ? resolver(iS, fijos, rem, modo, signo) : fijos;
-        if (r && cumple(r, modo, !iS.length)) candidatos.push(r);
+        const r = iS.length ? resolver(iS, fijos) : fijos;
+        if (r) crudos.push(r);
       }
     }
-    if (!candidatos.length) return null;
-    candidatos.sort(modo === "lleno"
-      ? (a, b) => signo * valorDe(a) - signo * valorDe(b)
-      : (a, b) => suma(b) - suma(a));
-    const r = candidatos[0];
-    // los silos se redondean al kg; la diferencia que deja el redondeo se
-    // devuelve a un silo con saldo para que el tanque cierre en cifras exactas
-    const silos = Object.keys(r).filter((i) => paso[i] === 0);
-    silos.forEach((i) => { r[i] = Math.floor(r[i] * 1000 + 1e-6) / 1000; });
-    if (modo === "lleno" && silos.length) {
-      const falta = Math.round(Tt * 1000) - Math.round(suma(r) * 1000);
-      const j = silos.find((i) => Math.round((rem[i] - r[i]) * 1000) >= falta);
-      if (falta > 0 && falta <= silos.length + 1 && j !== undefined) r[j] += falta / 1000;
+    let mejor = null;
+    for (const r of crudos) {
+      // los silos se redondean a 100 kg (al más cercano o hacia abajo, lo que siga cumpliendo)
+      for (const modo of ["cerca", "abajo"]) {
+        const kgs = lotes.map((_, i) => Math.round((r[i] || 0) * 1000));
+        iS.forEach((i) => {
+          const q = kgs[i] / 100;
+          kgs[i] = Math.min((modo === "cerca" ? Math.round(q) : Math.floor(q + 1e-9)) * 100, Math.floor(rem[i] * 10) * 100);
+        });
+        const total = kgs.reduce((a, k) => a + k, 0);
+        if (!(total > 0) || S.some((i) => !(kgs[i] > 0))) continue;          // un lote sin aporte: esa combinación ya existe con menos lotes
+        if (iS.some((i) => kgs[i] / total < 0.05)) continue;                 // aporte demasiado pequeño para ser práctico
+        if (!cumpleExacto(kgs)) continue;
+        const puntaje = total + 0.001 * kgs.reduce((a, k, i) => a + prio[i] * k, 0);
+        if (!mejor || puntaje > mejor.puntaje) mejor = { kgs, total, puntaje };
+        break;
+      }
     }
-    return r;
+    return mejor;
   };
 
-  const planear = (signo) => {
-    const rem = tonIni.slice();
-    const tanques = [];
-    const gastar = (r) => Object.keys(r).forEach((i) => { rem[i] = Math.max(rem[i] - r[i], 0); if (rem[i] < 1e-9) rem[i] = 0; });
-    const candidatos = () => subs.filter((S) => S.every((i) => rem[i] > 1e-9));
-    for (let k = 0; k < 40; k++) {
+  const MARGENES = [{ b: 0.05, r: 0.2, a: 0.02 }, { b: 0.001, r: 0.001, a: 0.0001 }];   // primero con un pequeño margen de seguridad
+  const maxLotes = Math.min(MEZ_MAX_LOTES, n);
+  const subs = mezSubconjuntos(n, maxLotes);
+  for (let m = 0; m < MARGENES.length; m++) {
+    const porTamano = [];
+    for (let tam = 1; tam <= maxLotes; tam++) {
       let mejor = null;
-      for (const S of candidatos()) {
-        if (S.reduce((a, i) => a + rem[i], 0) < Tt - tolBines) continue;
-        const r = tanqueDe(S, rem, "lleno", signo);
-        if (r && (!mejor || signo * valorDe(r) < signo * valorDe(mejor) - 1e-9)) mejor = r;
+      for (const S of subs) {
+        if (S.length !== tam) continue;
+        const r = armar(S, MARGENES[m]);
+        if (r && (!mejor || r.puntaje > mejor.puntaje)) mejor = r;
       }
-      if (!mejor) break;
-      tanques.push(mejor);
-      gastar(mejor);
+      if (mejor) porTamano.push(mejor);
     }
-    let parcial = null;
-    for (const S of candidatos()) {
-      const r = tanqueDe(S, rem, "max", 1);
-      if (r && (!parcial || suma(r) > suma(parcial))) parcial = r;
+    if (porTamano.length) {
+      // la menor cantidad de lotes que permita preparar una cantidad significativa (al menos el 60 % de lo mejor posible)
+      const mayor = Math.max(...porTamano.map((r) => r.total));
+      const elegido = porTamano.find((r) => r.total >= 0.6 * mayor);
+      return { kgs: elegido.kgs, conMargen: m === 0 };
     }
-    if (parcial && suma(parcial) < Math.max(0.1 * Tt, 0.5)) parcial = null;
-    if (parcial) gastar(parcial);
-    return { tanques, parcial, rem };
-  };
+  }
 
-  const puntaje = (p) => p.tanques.length * 1e6 + p.tanques.reduce((a, t) => a + suma(t), 0) + (p.parcial ? suma(p.parcial) : 0);
-  const p1 = planear(1), p2 = planear(-1);
-  const plan = puntaje(p2) > puntaje(p1) ? p2 : p1;
-  const aKg = (r) => lotes.map((_, i) => Math.round((r[i] || 0) * 1000));
-  return {
-    tanques: plan.tanques.map(aKg),
-    parcial: plan.parcial ? aKg(plan.parcial) : null,
-    sobrante: plan.rem.map((v) => Math.round(v * 1000)),
-  };
+  // sin solución: se indica qué impide llegar a los valores pedidos
+  const motivos = [];
+  const mb = Math.max(...brix);
+  if (mb < obj.brixMin) motivos.push(`Brix: el mayor entre estos lotes es ${mb.toFixed(2)} y se requiere ${obj.brixMin}.`);
+  if (Math.max(...brix.map((b, i) => b - obj.ratioMin * acid[i])) < 0) motivos.push(`Ratio: ningún lote permite alcanzar el mínimo de ${obj.ratioMin}.`);
+  const ma = Math.min(...acid);
+  if (ma > obj.acidezMax) motivos.push(`Acidez: la menor entre estos lotes es ${ma.toFixed(3)} y el máximo es ${obj.acidezMax}.`);
+  if (!motivos.length) motivos.push("Cada parámetro se alcanza con algún lote, pero no los tres a la vez con estos lotes.");
+  return { imposible: true, motivos };
 }
-
-let mezPlanActual = null; // { lotes, tanques, parcial, sobrante, T }
 
 function mezMetricasHtml(items, obj) {
   const m = mezCalcular(items);
@@ -776,111 +758,79 @@ function mezMetricasHtml(items, obj) {
   return `Brix ${m.brix.toFixed(2)} ${marca(okB)} · Ratio ${m.ratio !== null ? m.ratio.toFixed(2) : "—"} ${marca(okR)} · Acidez ${m.acidez.toFixed(3)} ${marca(okA)}`;
 }
 
-function mezTanqueHtml(titulo, kgs, lotes, obj, indice) {
-  const items = lotes.map((l, i) => ({ l, cant: mezEsBines(l) ? Math.round(kgs[i] / mezKgPorBin(l)) : kgs[i] })).filter((it) => it.cant > 0);
+// carga la combinación recomendada en la tabla de arriba (agrega los lotes que falten y deja en 0 los que no se usan)
+function mezCargarRecomendacion(lotes, kgs) {
+  lotes.forEach((l, j) => {
+    let it = mezcla.find((x) => x.l.numero === l.numero);
+    if (!it) {
+      if (!(kgs[j] > 0)) return;
+      it = { l, cant: 0 };
+      mezcla.push(it);
+    }
+    it.cant = mezEsBines(l) ? Math.round(kgs[j] / mezKgPorBin(l)) : kgs[j];
+  });
+  mezRenderTabla();
+}
+
+function mezRenderRecomendacion(lotes, res, obj) {
+  const cont = document.getElementById("mezPlan");
+  if (res.imposible) {
+    cont.innerHTML = `
+      <div class="msg bad" style="text-align:center">No se encontró una combinación de estos lotes que cumpla Brix ≥ ${obj.brixMin}, Ratio ≥ ${obj.ratioMin} y Acidez ≤ ${obj.acidezMax}.</div>
+      <div class="hint-line" style="margin:12px 4px 0">${res.motivos.map(escapeHtml).join("<br>")}</div>`;
+    return;
+  }
+  const items = lotes.map((l, i) => ({ l, saldo: mezSaldoKg(l), cant: mezEsBines(l) ? Math.round(res.kgs[i] / mezKgPorBin(l)) : res.kgs[i] })).filter((it) => it.cant > 0);
   const total = items.reduce((a, it) => a + mezKgDe(it), 0);
   const filas = items.map((it) => {
     const bines = mezEsBines(it.l);
+    const completo = mezKgDe(it) >= it.saldo - (bines ? mezKgPorBin(it.l) : 100);
     return `
       <tr>
         <td class="strong num">#${it.l.numero}</td>
         <td>${escapeHtml(it.l.proveedor)}</td>
         <td><span class="tag">${tagAlmacen(it.l.tipo_almacen)}</span></td>
-        <td class="right num">${bines ? `${fmtInt(it.cant)} bines` : `${fmtKg(it.cant)} kg`}</td>
-        <td class="right num">${fmtKg(mezKgDe(it))}</td>
-        <td class="right num">${(mezKgDe(it) / total * 100).toFixed(1)} %</td>
+        <td class="right num strong">${(mezKgDe(it) / total * 100).toFixed(1)} %</td>
+        <td class="right num">${bines ? `${fmtInt(it.cant)} bines` : `${fmtKg(it.cant)} kg`}${completo ? '<div class="num-sub">saldo completo</div>' : ""}</td>
       </tr>`;
   }).join("");
-  return `
+  const n = items.length;
+  const meta = `Brix ≥ ${obj.brixMin}, Ratio ≥ ${obj.ratioMin} y Acidez ≤ ${obj.acidezMax}`;
+  const nota = res.conMargen
+    ? "Cumple con un pequeño margen de seguridad sobre los mínimos requeridos."
+    : "Cumple, pero queda muy cerca de los valores mínimos requeridos.";
+  cont.innerHTML = `
+    <div class="msg ${res.conMargen ? "ok" : "warn"}" style="text-align:center">Se recomienda combinar ${n} ${n === 1 ? "lote" : "lotes"} en esta proporción: cumple ${meta}. ${nota}</div>
     <div class="panel" style="margin-top:16px">
-      <div class="panel-head">
-        <h3>${escapeHtml(titulo)} — ${fmtKg(total)} kg</h3>
-        <button class="btn-link strong" data-accion="cargar-tanque" data-i="${indice}">Cargar en la tabla de arriba</button>
-      </div>
+      <div class="panel-head"><h3>Combinación recomendada</h3></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">Cantidad</th><th class="right">Kg</th><th class="right">% del tanque</th></tr></thead>
+          <thead><tr><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">% de la mezcla</th><th class="right">Cantidad que alcanza</th></tr></thead>
           <tbody>${filas}</tbody>
         </table>
       </div>
-      <div class="hint-line" style="margin:12px 20px 16px">${mezMetricasHtml(items, obj)}</div>
+      <div class="hint-line" style="margin:12px 20px 4px">${mezMetricasHtml(items, obj)}</div>
+      <div class="hint-line" style="margin:0 20px 16px">Con el saldo actual de estos lotes se pueden preparar hasta ${fmtKg(total)} kg de esta mezcla. Se prefirieron la menor cantidad de lotes y los lotes más antiguos. Las cantidades ya se cargaron en la tabla de arriba, donde puede ajustarlas.</div>
     </div>`;
 }
 
-function mezRenderPlan() {
-  const p = mezPlanActual;
-  const cont = document.getElementById("mezPlan");
-  if (!p) { cont.innerHTML = ""; return; }
-  const obj = mezObjetivo();
-  const n = p.tanques.length;
-  const suma = (kgs) => kgs.reduce((a, v) => a + v, 0);
-  const usado = p.tanques.reduce((a, t) => a + suma(t), 0) + (p.parcial ? suma(p.parcial) : 0);
-  const disponible = usado + suma(p.sobrante);
-  let texto, tipo = "ok";
-  if (n === 0 && !p.parcial) {
-    tipo = "bad";
-    texto = `Con los lotes elegidos no es posible llenar un tanque de ${fmtKg(p.T)} kg cumpliendo los parámetros, con un máximo de ${MEZ_MAX_POR_TANQUE} lotes por tanque.`;
-  } else if (n === 0) {
-    tipo = "warn";
-    texto = `Los lotes elegidos no alcanzan para un tanque completo de ${fmtKg(p.T)} kg que cumpla los parámetros; con lo disponible se puede preparar un tanque parcial de ${fmtKg(suma(p.parcial))} kg.`;
-  } else {
-    texto = `Con los lotes elegidos se pueden llenar ${n} ${n === 1 ? "tanque" : "tanques"} de ${fmtKg(p.T)} kg que cumplen los parámetros${p.parcial ? `, más un tanque parcial de ${fmtKg(suma(p.parcial))} kg` : ""}. Se utilizan ${fmtKg(usado)} kg de los ${fmtKg(disponible)} kg disponibles.`;
-  }
-  let html = `<div class="msg ${tipo}" style="text-align:center">${escapeHtml(texto)}</div>`;
-  p.tanques.forEach((t, i) => { html += mezTanqueHtml(`Tanque ${i + 1}`, t, p.lotes, obj, i); });
-  if (p.parcial) html += mezTanqueHtml(`Tanque ${n + 1} (parcial)`, p.parcial, p.lotes, obj, n);
-  const sobrantes = p.lotes.map((l, i) => ({ l, kg: p.sobrante[i] })).filter((s) => s.kg > 0);
-  if (sobrantes.length) {
-    html += `
-      <div class="panel" style="margin-top:16px">
-        <div class="panel-head"><h3>Saldo que no se utiliza en el plan</h3></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Lote</th><th>Proveedor</th><th>Almacén</th><th class="right">Sobrante</th></tr></thead>
-            <tbody>${sobrantes.map((s) => `
-              <tr>
-                <td class="strong num">#${s.l.numero}</td>
-                <td>${escapeHtml(s.l.proveedor)}</td>
-                <td><span class="tag">${tagAlmacen(s.l.tipo_almacen)}</span></td>
-                <td class="right num">${fmtKg(s.kg)} kg${mezEsBines(s.l) ? `<div class="num-sub">${fmtInt(Math.round(s.kg / mezKgPorBin(s.l)))} bines</div>` : ""}</td>
-              </tr>`).join("")}</tbody>
-          </table>
-        </div>
-      </div>`;
-  }
-  cont.innerHTML = html;
-}
-
 function mezLimpiarPlan() {
-  mezPlanActual = null;
   document.getElementById("mezPlan").innerHTML = "";
 }
 
-function mezCargarTanque(indice) {
-  const p = mezPlanActual;
-  if (!p) return;
-  const kgs = indice < p.tanques.length ? p.tanques[indice] : p.parcial;
-  if (!kgs) return;
-  mezcla.forEach((it) => {
-    const j = p.lotes.findIndex((l) => l.numero === it.l.numero);
-    const kg = j >= 0 ? kgs[j] : 0;
-    it.cant = mezEsBines(it.l) ? Math.round(kg / mezKgPorBin(it.l)) : kg;
-  });
-  mezRenderTabla();
-  mezTabla.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-function mezCalcularPlan() {
+function mezRecomendarCombinacion() {
   mezAviso("");
   const o = mezObjetivo();
   if (!(o.brixMin > 0 && o.ratioMin > 0 && o.acidezMax > 0)) {
     mezAviso("Ingrese el Brix mínimo, el Ratio mínimo y la acidez máxima en la sección anterior.");
     return;
   }
-  if (!mezcla.length) { mezAviso("Agregue al menos un lote para calcular el plan."); return; }
-  if (mezcla.length > MEZ_MAX_SUGERIR) { mezAviso(`Para calcular el plan elija como máximo ${MEZ_MAX_SUGERIR} lotes.`); return; }
-  const T = Number(mezKgTotal.value);
-  if (!(T > 0)) { mezAviso("Indique cuántos kg de materia prima entran en un tanque."); return; }
+  // si no se agregó ningún lote, se consideran todos los disponibles (los más antiguos, hasta el máximo permitido)
+  const lotes = mezcla.length
+    ? mezcla.map((it) => it.l)
+    : mezCandidatos.slice().sort((a, b) => (mezClaveFecha(a) < mezClaveFecha(b) ? -1 : 1)).slice(0, MEZ_MAX_SUGERIR);
+  if (!lotes.length) { mezAviso("No hay lotes disponibles para recomendar una combinación."); return; }
+  if (lotes.length > MEZ_MAX_SUGERIR) { mezAviso(`Para recomendar una combinación elija como máximo ${MEZ_MAX_SUGERIR} lotes.`); return; }
 
   const btn = document.getElementById("btnMezSugerir");
   btn.disabled = true;
@@ -888,13 +838,12 @@ function mezCalcularPlan() {
   // se cede el hilo un instante para que se pinte el "Calculando…"
   setTimeout(() => {
     try {
-      const lotes = mezcla.map((it) => it.l);
-      const plan = mezPlanTanques(lotes, o, T);
-      mezPlanActual = { lotes, ...plan, T };
-      mezRenderPlan();
+      const res = mezRecomendar(lotes, o);
+      if (!res.imposible) mezCargarRecomendacion(lotes, res.kgs);
+      mezRenderRecomendacion(lotes, res, o);
     } catch (e) {
       document.getElementById("mezPlan").innerHTML = "";
-      mezAviso(`No se pudo calcular el plan: ${e.message}`);
+      mezAviso(`No se pudo calcular la combinación: ${e.message}`);
     } finally {
       btn.disabled = false;
     }
@@ -902,11 +851,7 @@ function mezCalcularPlan() {
 }
 
 document.getElementById("btnMezAgregar").addEventListener("click", mezAgregar);
-document.getElementById("btnMezSugerir").addEventListener("click", mezCalcularPlan);
-document.getElementById("mezPlan").addEventListener("click", (ev) => {
-  const btn = ev.target.closest('button[data-accion="cargar-tanque"]');
-  if (btn) mezCargarTanque(Number(btn.dataset.i));
-});
+document.getElementById("btnMezSugerir").addEventListener("click", mezRecomendarCombinacion);
 document.getElementById("btnMezLimpiar").addEventListener("click", () => {
   mezcla = [];
   mezAviso("");
