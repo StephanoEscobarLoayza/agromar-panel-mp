@@ -118,6 +118,51 @@ class ExcelConVariasCorridas(unittest.TestCase):
         self.assertTrue(all(any("está en la hoja «17-Octubre JCC»" in t for t in hoja) for hoja in textos[:2]))
 
 
+class TanqueOlvidado(unittest.TestCase):
+    def test_numero_de_tanque(self):
+        self.assertEqual(api._numero_tanque("TK12"), 12)
+        self.assertEqual(api._numero_tanque(" tk 07 "), 7)
+        for nombre in ("Tanque 1", "TK12-B", "", None):
+            self.assertIsNone(api._numero_tanque(nombre), nombre)
+
+    def test_queda_entre_el_anterior_y_el_siguiente(self):
+        from datetime import datetime, timezone
+        h = lambda hh, mm: datetime(2026, 10, 24, hh, mm, tzinfo=timezone.utc)
+        vecinos = [("TK10", h(2, 0)), ("TK11", h(2, 10)), ("TK13", h(2, 40)), ("TK14", h(3, 0))]
+        hora = api._instante_para_tanque(12, vecinos)
+        self.assertTrue(h(2, 10) < hora < h(2, 40))
+
+    def test_el_ultimo_tanque_usa_la_hora_de_ahora(self):
+        from datetime import datetime, timezone
+        vecinos = [("TK1", datetime(2026, 10, 24, 2, 0, tzinfo=timezone.utc))]
+        self.assertIsNone(api._instante_para_tanque(2, vecinos))
+        self.assertIsNone(api._instante_para_tanque(1, []))
+
+    def test_el_primero_que_falta_queda_antes_del_siguiente(self):
+        from datetime import datetime, timezone
+        h = datetime(2026, 10, 24, 2, 0, tzinfo=timezone.utc)
+        self.assertTrue(api._instante_para_tanque(1, [("TK2", h)]) < h)
+
+
+class OrdenDeUnReparto(unittest.TestCase):
+    def test_la_jsa_jcc_queda_al_final_en_los_mismos_lugares(self):
+        seq = [160, 171, 172, 173, 174]                      # 171 ICEGEN, 172 JCC, 173 ICEGEN
+        tipos = {171: "ICEGEN", 172: "JCC", 173: "ICEGEN"}
+        orden, nueva = api._secuencia_con_principal_al_final(seq, [172, 171, 173], tipos)
+        self.assertEqual(orden, [171, 173, 172])
+        self.assertEqual(nueva, [160, 171, 173, 172, 174])
+
+    def test_si_ya_estaba_ordenado_no_cambia(self):
+        seq = [1, 2, 3]
+        orden, nueva = api._secuencia_con_principal_al_final(seq, [2, 3], {2: "ICEGEN", 3: "JSA"})
+        self.assertEqual((orden, nueva), ([2, 3], seq))
+
+    def test_con_dos_principales_se_respeta_el_orden_de_la_lista(self):
+        seq = [10, 11, 12]
+        orden, _ = api._secuencia_con_principal_al_final(seq, [12, 11], {11: "JSA", 12: "JCC"})
+        self.assertEqual(orden, [11, 12])
+
+
 class ListaDeCorridasParaRepartir(unittest.TestCase):
     def test_ids_validos(self):
         self.assertEqual(repartir._ids("3,1,3"), [1, 3])

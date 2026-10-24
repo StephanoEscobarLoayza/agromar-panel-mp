@@ -9,7 +9,7 @@ exactamente los mismos kg y bines en total (el saldo del lote no cambia).
 El PRE CC (lotes derivados, número negativo) no pasa por extracción: no entra al
 reparto y se queda en la corrida donde está.
 
-Se monta desde api.py con `app.include_router(crear_router(engine, sync_pre_cc))`.
+Se monta desde api.py con `app.include_router(crear_router(engine, sync_pre_cc, ordenar_grupo))`.
 """
 import statistics
 from decimal import Decimal, ROUND_HALF_UP
@@ -171,7 +171,7 @@ class AplicarReparto(BaseModel):
     reparto: Dict[str, Dict[str, float]]          # {"2506": {"117": 11180.5, "119": 4019.5}}
 
 
-def crear_router(engine, sync_pre_cc=None) -> APIRouter:
+def crear_router(engine, sync_pre_cc=None, ordenar_grupo=None) -> APIRouter:
     router = APIRouter()
 
     @router.get("/api/repartir/datos")
@@ -264,6 +264,8 @@ def crear_router(engine, sync_pre_cc=None) -> APIRouter:
             raise HTTPException(status_code=400, detail="El reparto enviado no es válido.")
         with engine.begin() as conn:
             res = aplicar_reparto(conn, ids, reparto, sync_pre_cc)
+            if ordenar_grupo:       # las corridas quedan en la lista con la JSA/JCC al final (misma secuencia para el Excel y el PDF)
+                ordenar_grupo(conn, ids)
         return {"ok": True, **res}
 
     return router

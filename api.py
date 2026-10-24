@@ -1221,6 +1221,15 @@ def reporte_corrida_pdf(corrida_id: int):
             ),
             {"c": corrida_id, "fecha_final": corrida.get("fecha_final")},
         ))
+        # el saldo de cada lote es el que queda DESPUÉS de esta corrida según la secuencia de corridas (el mismo cálculo del Excel de
+        # Trazabilidad), no el de la hora de cierre: así, cuando varias corridas trabajaron en paralelo, lo que una deja de un lote
+        # es justo lo que recibe la siguiente. Los lotes derivados de PRE CC conservan su saldo actual.
+        ff = corrida.get("fecha_final")
+        tras = _saldo_tras_corrida(conn, corrida_id, ff.date() if hasattr(ff, "date") else date.today())
+        for lo in lotes:
+            t = tras.get(lo.get("lote_numero"))
+            if t is not None:
+                lo["kg_saldo"], lo["bines_saldo"] = t["kg_saldo"], t["bines_saldo"]
         productos = rows(conn.execute(
             text(
                 "SELECT producto, tipo, tambores, peso_neto_tambor_kg, pt_kg, volumen_litros, cuenta_como_pt "
@@ -1344,6 +1353,43 @@ def _secuencia_corridas(conn) -> list:
     con = sorted((f for f in filas if f[2] is not None), key=lambda f: -f[2])
     sin = sorted((f for f in filas if f[2] is None), key=lambda f: (f[1], f[0]))
     return [f[0] for f in con] + [f[0] for f in sin]
+
+
+def _secuencia_con_principal_al_final(seq, ids, tipos):
+    """Reordena las corridas `ids` dentro de la secuencia `seq`: primero las que no son JSA/JCC (p. ej. ICEGEN) y al final la
+    JSA/JCC, ocupando los mismos lugares que tenían. `tipos` = {id: tipo de proceso}. Devuelve (ids en el nuevo orden, secuencia nueva)."""
+    posicion = lambda i: seq.index(i) if i in seq else len(seq)
+    es_principal = lambda i: (tipos.get(i) or "").strip().upper().startswith(("JSA", "JCC"))
+    orden = sorted(ids, key=lambda i: (es_principal(i), posicion(i)))
+    nueva = list(seq)
+    for lugar, i in zip(sorted(posicion(i) for i in ids), orden):
+        if lugar < len(nueva):
+            nueva[lugar] = i
+    return orden, nueva
+
+
+def _ordenar_corridas_del_reparto(conn, ids):
+    """Al aplicar un reparto deja sus corridas en ese orden dentro de la lista de «Corridas» (las que no son JSA/JCC primero y la
+    JSA/JCC al final), para que el saldo de los lotes y el cuadro de stock final sean los mismos en el Excel, el PDF y la lista.
+    Si el orden ya era ese, no se toca nada."""
+    if not _asegurar_orden_corridas():
+        return
+    seq = _secuencia_corridas(conn)
+    tipos = {f.id: f.tipo_proceso for f in conn.execute(
+        text("SELECT id, tipo_proceso FROM corridas WHERE id = ANY(:ids)"), {"ids": list(ids)}).fetchall()}
+    _, nueva = _secuencia_con_principal_al_final(seq, list(ids), tipos)
+    if nueva == seq:
+        return
+    de_arriba_a_abajo = nueva[::-1]          # la lista se guarda de arriba (la más reciente) hacia abajo (la más antigua)
+    conn.execute(text("DELETE FROM corridas_orden"))
+    conn.execute(
+        text(
+            "INSERT INTO corridas_orden (corrida_id, posicion) "
+            "SELECT t.i, t.p FROM unnest(CAST(:ids AS integer[]), CAST(:ps AS integer[])) AS t(i, p) "
+            "WHERE EXISTS (SELECT 1 FROM corridas c WHERE c.id = t.i)"
+        ),
+        {"ids": de_arriba_a_abajo, "ps": list(range(1, len(de_arriba_a_abajo) + 1))},
+    )
 
 
 def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte, seq=None):
@@ -1501,18 +1547,9 @@ def trazabilidad_varias_corridas_xlsx(corridas: str):
     faltan = [i for i in ids if i not in tipos]
     if faltan:
         raise HTTPException(status_code=404, detail="Corrida no encontrada.")
-    posicion = lambda i: seq.index(i) if i in seq else len(seq)
     # las líneas que no son JSA/JCC (p. ej. ICEGEN) van primero y la JSA/JCC al final: así el cuadro de stock final queda en la
-    # última hoja. Dentro de cada grupo se respeta el orden de la lista de «Corridas».
-    es_principal = lambda i: tipos[i].startswith(("JSA", "JCC"))
-    ids.sort(key=lambda i: (es_principal(i), posicion(i)))
-    # el saldo de cada lote se arrastra en el orden de las hojas: las corridas del grupo ocupan, en orden, los mismos lugares
-    # que tenían en la secuencia general
-    lugares = sorted(posicion(i) for i in ids)
-    seq_grupo = list(seq)
-    for lugar, i in zip(lugares, ids):
-        if lugar < len(seq_grupo):
-            seq_grupo[lugar] = i
+    # última hoja; el saldo de cada lote se arrastra en ese orden de hojas
+    ids, seq_grupo = _secuencia_con_principal_al_final(seq, ids, tipos)
     hojas = [_datos_trazabilidad(i, seq_grupo) for i in ids]
     contenido = generar_trazabilidad_grupo_xlsx(hojas)
     primera, ultima = hojas[0]["corrida"]["nombre"], hojas[-1]["corrida"]["nombre"]
@@ -2185,6 +2222,32 @@ class NuevaMedicionTanque(BaseModel):
     lotes: Optional[List[int]] = None  # lotes que alimentaron este tanque (hasta 5); None = no tocar
 
 
+def _numero_tanque(nombre):
+    """Número de un tanque escrito como «TK12» o «tk 12»; None si el nombre no tiene ese formato."""
+    m = re.fullmatch(r"\s*TK\s*0*(\d+)\s*", str(nombre or ""), re.IGNORECASE)
+    return int(m.group(1)) if m else None
+
+
+def _instante_para_tanque(numero, vecinos):
+    """Hora de registro con la que un tanque olvidado queda ORDENADO por número entre los de su corrida: a mitad de camino entre
+    el tanque anterior y el siguiente. `vecinos` = [(nombre del tanque, hora de registro)] de los tanques ya registrados.
+    Devuelve None si no hay ningún tanque con número mayor (el tanque es el último y se registra con la hora de ahora)."""
+    previo = siguiente = None
+    for nombre, hora in vecinos:
+        n = _numero_tanque(nombre)
+        if n is None or n == numero:
+            continue
+        if n < numero and (previo is None or n > previo[0]):
+            previo = (n, hora)
+        if n > numero and (siguiente is None or n < siguiente[0]):
+            siguiente = (n, hora)
+    if siguiente is None:
+        return None
+    if previo is not None and previo[1] < siguiente[1]:
+        return previo[1] + (siguiente[1] - previo[1]) / 2
+    return siguiente[1] - timedelta(minutes=1)
+
+
 @app.post("/api/mediciones-tanque")
 def crear_medicion_tanque(m: NuevaMedicionTanque):
     tanque = m.tanque.strip()
@@ -2200,13 +2263,20 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
         raise HTTPException(status_code=500, detail="No se pudieron guardar los lotes del tanque.")
     try:
         with engine.begin() as conn:
+            # un tanque que se registra tarde (p. ej. el TK12 cuando ya están el TK11 y el TK13) queda en su lugar por número
+            numero = _numero_tanque(tanque)
+            hora = None
+            if numero is not None:
+                vecinos = [(v.tanque, v.creado_en) for v in conn.execute(
+                    text("SELECT tanque, creado_en FROM mediciones_tanque WHERE corrida_id = :c"), {"c": m.corrida_id}).fetchall()]
+                hora = _instante_para_tanque(numero, vecinos)
             result = conn.execute(
                 text(
                     """
                     INSERT INTO mediciones_tanque
-                        (corrida_id, tanque, litros, brix_inicial, brix_final, acidez, ph, observaciones)
+                        (corrida_id, tanque, litros, brix_inicial, brix_final, acidez, ph, observaciones, creado_en)
                     VALUES
-                        (:corrida_id, :tanque, :litros, :brix_inicial, :brix_final, :acidez, :ph, :obs)
+                        (:corrida_id, :tanque, :litros, :brix_inicial, :brix_final, :acidez, :ph, :obs, COALESCE(CAST(:hora AS timestamptz), now()))
                     RETURNING id
                     """
                 ),
@@ -2219,6 +2289,7 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
                     "acidez": m.acidez,
                     "ph": m.ph,
                     "obs": m.observaciones,
+                    "hora": hora,
                 },
             )
             new_id = result.scalar()
@@ -2468,7 +2539,7 @@ def exportar_paradas_periodo_xlsx(desde: str, hasta: str):
 app.include_router(crear_router_subproductos(engine))
 
 # reparto de lotes entre corridas en paralelo - endpoints en repartir.py
-app.include_router(crear_router_repartir(engine, _sync_lote_derivado_pre_cc))
+app.include_router(crear_router_repartir(engine, _sync_lote_derivado_pre_cc, _ordenar_corridas_del_reparto))
 
 
 # ---------------------------------------------------------------------------
