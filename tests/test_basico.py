@@ -89,6 +89,35 @@ class FechaEnElNombreDeLaCorrida(unittest.TestCase):
             self.assertIsNone(_dia_mes_del_nombre(nombre), nombre)
 
 
+class ExcelConVariasCorridas(unittest.TestCase):
+    def _hoja(self, nombre, tipo):
+        from datetime import datetime
+        corrida = {"nombre": nombre, "tipo_proceso": tipo, "fecha_inicio": datetime(2026, 10, 17, 8, 0), "fecha_final": None, "saldo_por_secuencia": True}
+        return {"corrida": corrida, "lotes": [], "productos": [], "mediciones": [], "stock": []}
+
+    def test_nombres_de_hoja_validos_y_unicos(self):
+        from reporte_trazabilidad import _nombres_de_hoja
+        res = _nombres_de_hoja(["17-Octubre JCC", "17-Octubre JCC", "A/B:C*D?[E]", "", "X" * 50])
+        self.assertEqual(res[0], "17-Octubre JCC")
+        self.assertEqual(res[1], "17-Octubre JCC (2)")
+        self.assertNotRegex(res[2], r"[\[\]:*?/\\]")
+        self.assertEqual(res[3], "Corrida")
+        self.assertTrue(all(len(n) <= 31 for n in res))
+        self.assertEqual(len({n.lower() for n in res}), len(res))
+
+    def test_solo_la_ultima_hoja_lleva_el_cuadro_de_stock(self):
+        import io
+        import openpyxl
+        from reporte_trazabilidad import generar_trazabilidad_grupo_xlsx
+        libro = generar_trazabilidad_grupo_xlsx([self._hoja("16-Octubre ICEGEN", "ICEGEN"), self._hoja("17-Octubre ICEGEN", "ICEGEN"), self._hoja("17-Octubre JCC", "JCC")])
+        wb = openpyxl.load_workbook(io.BytesIO(libro))
+        self.assertEqual(wb.sheetnames, ["16-Octubre ICEGEN", "17-Octubre ICEGEN", "17-Octubre JCC"])
+        textos = [{str(c.value) for fila in ws.iter_rows() for c in fila if isinstance(c.value, str)} for ws in wb.worksheets]
+        con_cuadro = [any(t.startswith("Stock inicial") for t in hoja) for hoja in textos]
+        self.assertEqual(con_cuadro, [False, False, True])
+        self.assertTrue(all(any("está en la hoja «17-Octubre JCC»" in t for t in hoja) for hoja in textos[:2]))
+
+
 class ListaDeCorridasParaRepartir(unittest.TestCase):
     def test_ids_validos(self):
         self.assertEqual(repartir._ids("3,1,3"), [1, 3])

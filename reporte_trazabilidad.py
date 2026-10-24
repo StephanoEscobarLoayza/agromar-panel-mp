@@ -221,16 +221,17 @@ def _cuadro_insumos_entrada(ws, fila0, insumos):
     return tr
 
 
-def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None) -> bytes:
-    """corrida: fila de v_cuadre_corridas + corridas. lotes: una fila por
+def _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock=None, con_stock_final=True, hoja_final=None):
+    """Dibuja UNA corrida en la hoja `ws`.
+    corrida: fila de v_cuadre_corridas + corridas. lotes: una fila por
     asignación (join a lotes + v_saldo_lotes). productos: corrida_productos.
     mediciones: mediciones_tanque. stock: lotes de v_saldo_lotes con saldo
     disponible (EN PROCESO / EN ESPERA) - se parte en los que tocó esta corrida
-    y los demás."""
+    y los demás.
+    Con `con_stock_final=False` (hojas que no son la última de un libro con varias
+    corridas) no se dibujan los cuadros de stock: en su lugar queda una nota que
+    indica en qué hoja (`hoja_final`) está el stock con el que termina el grupo."""
     stock = stock or []
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Trazabilidad"
     ws.sheet_view.showGridLines = False
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
@@ -455,16 +456,23 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
     nota_saldo = ("Peso Neto = peso con que ingresó el lote; Saldo anterior = lo que le quedaba al empezar esta corrida; Peso procesado = lo que usó "
                   "esta corrida; Peso saldo = lo que queda (el stock con el que empieza la siguiente).") if sec else None
     nota_completos = "Lotes que esta corrida no usó: llegan y salen con el mismo saldo." if sec else None
-    fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales, nota=nota_saldo, con_saldo_anterior=sec)
-    fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos, nota=nota_completos, con_saldo_anterior=sec)
-    fin3 = fin2
-    if pre_cc:
-        fin3 = _cuadro_stock(
-            ws, fin2 + 3, "Producto derivado de PRE CC", pre_cc,
-            nota="Incluye los lotes derivados con saldo disponible y los que esta corrida dejó en cero. Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
-        )
-    if productos_entrada:
-        _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
+    if con_stock_final:
+        fin1 = _cuadro_stock(ws, SEC, "Stock inicial al siguiente proceso  —  saldos de esta corrida", parciales, nota=nota_saldo, con_saldo_anterior=sec)
+        fin2 = _cuadro_stock(ws, fin1 + 3, "Lotes completos que siguen en stock", completos, nota=nota_completos, con_saldo_anterior=sec)
+        fin3 = fin2
+        if pre_cc:
+            fin3 = _cuadro_stock(
+                ws, fin2 + 3, "Producto derivado de PRE CC", pre_cc,
+                nota="Incluye los lotes derivados con saldo disponible y los que esta corrida dejó en cero. Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
+            )
+        if productos_entrada:
+            _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
+    else:
+        # hoja intermedia: sin cuadros de stock, para que el único cuadro final sea el de la última hoja
+        nota = _set(ws, ws.cell(row=SEC, column=8), f"El stock final de los lotes (saldos) está en la hoja «{hoja_final}».")
+        nota.font = _NOTA_FONT
+        if productos_entrada:
+            _cuadro_insumos_entrada(ws, SEC + 2, productos_entrada)
 
     # ---------- anchos de columna ----------
     anchos = {1: 3, 2: 12, 3: 15, 4: 18, 5: 18, 6: 13, 7: 13, 8: 26, 9: 34, 10: 14,
@@ -473,6 +481,44 @@ def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None)
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.freeze_panes = "B8"
 
+
+def generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock=None) -> bytes:
+    """Excel de UNA corrida (una hoja, con sus cuadros de stock)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Trazabilidad"
+    _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock)
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _nombres_de_hoja(nombres):
+    """Nombres válidos y únicos para las hojas de Excel (máx. 31 caracteres, sin []:*?/\\)."""
+    usados, res = set(), []
+    for n in nombres:
+        base = re.sub(r"[\[\]:*?/\\]", "-", str(n or "").strip())[:31].strip() or "Corrida"
+        nombre, k = base, 2
+        while nombre.lower() in usados:
+            sufijo = f" ({k})"
+            nombre, k = base[: 31 - len(sufijo)] + sufijo, k + 1
+        usados.add(nombre.lower())
+        res.append(nombre)
+    return res
+
+
+def generar_trazabilidad_grupo_xlsx(hojas) -> bytes:
+    """Un solo libro de Excel con las corridas de un reparto, una por hoja, en el orden de la secuencia de corridas
+    (el mismo con el que se arrastra el saldo de un lote de una corrida a la siguiente). Solo la ÚLTIMA hoja lleva los
+    cuadros de stock: así hay un único cuadro final y no se confunde con los saldos intermedios.
+    hojas: lista de dicts {corrida, lotes, productos, mediciones, stock} (los mismos datos que generar_trazabilidad_xlsx)."""
+    nombres = _nombres_de_hoja([h["corrida"].get("nombre") for h in hojas])
+    wb = Workbook()
+    wb.remove(wb.active)
+    for i, (h, nombre) in enumerate(zip(hojas, nombres)):
+        ws = wb.create_sheet(nombre)
+        _escribir_hoja(ws, h["corrida"], h["lotes"], h["productos"], h["mediciones"], h.get("stock"),
+                       con_stock_final=(i == len(hojas) - 1), hoja_final=nombres[-1])
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()

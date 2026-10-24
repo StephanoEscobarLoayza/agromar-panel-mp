@@ -637,10 +637,10 @@ document.getElementById("btnAplicar").addEventListener("click", async () => {
     ocultar(true);
     document.getElementById("resultado").innerHTML = `
       <div class="panel" style="margin-top:24px"><div class="form-body">
-        <div class="msg ok" style="line-height:1.5">El reparto fue aplicado: ${r.lotes} lotes, ${r.lotes_partidos} de ellos repartidos entre más de una corrida.</div>
+        <div class="msg ok" style="line-height:1.5">El reparto fue aplicado: ${r.lotes} lotes, ${r.lotes_partidos} de ellos repartidos entre más de una corrida. El Excel reúne las corridas en un solo archivo, una por hoja; el cuadro de stock final está únicamente en la última hoja.</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap">
           <a class="btn-link strong" href="corridas.html" style="text-decoration:none">Volver a Corridas</a>
-          ${cs.map((c) => `<a class="btn-link" href="/api/corridas/${c.id}/trazabilidad.xlsx" style="text-decoration:none">Trazabilidad (Excel) de ${escapeHtml(c.nombre)}</a>`).join("")}
+          <a class="btn-link strong" href="/api/trazabilidad.xlsx?corridas=${cs.map((c) => c.id).join(",")}" style="text-decoration:none">Descargar Trazabilidad (Excel) de las ${cs.length} corridas</a>
         </div></div></div>`;
   } catch (e) {
     btn.disabled = false;

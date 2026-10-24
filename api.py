@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import secrets
 import time
 from collections import defaultdict, deque
@@ -35,7 +36,7 @@ from reporte_base import ahora_peru
 from reporte_corrida import generar_reporte_pdf
 from reporte_periodo import generar_reporte_periodo_pdf
 from reporte_stock import generar_reporte_stock_pdf
-from reporte_trazabilidad import generar_trazabilidad_xlsx
+from reporte_trazabilidad import generar_trazabilidad_xlsx, generar_trazabilidad_grupo_xlsx
 from reporte_paradas import generar_paradas_periodo_xlsx
 from subproductos import crear_router as crear_router_subproductos
 from repartir import crear_router as crear_router_repartir
@@ -1345,12 +1346,13 @@ def _secuencia_corridas(conn) -> list:
     return [f[0] for f in con] + [f[0] for f in sin]
 
 
-def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte):
+def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte, seq=None):
     """Saldo de cada lote DESPUÉS de esta corrida, siguiendo la secuencia de corridas: peso neto menos lo que consumieron
     esta corrida y todas las anteriores (las posteriores todavía no lo habían consumido). Así lo que una corrida deja
     de un lote es justo el stock con el que empieza la siguiente, también cuando varias corridas trabajaron en paralelo.
-    Devuelve {numero: {...}} de los lotes de MP (número positivo) que ya habían llegado a `fecha_corte`."""
-    seq = _secuencia_corridas(conn)
+    Devuelve {numero: {...}} de los lotes de MP (número positivo) que ya habían llegado a `fecha_corte`.
+    `seq` permite pasar otra secuencia (la del libro de Excel de un reparto); por defecto, la de la lista de «Corridas»."""
+    seq = seq if seq is not None else _secuencia_corridas(conn)
     previas = seq[: seq.index(corrida_id) + 1] if corrida_id in seq else [corrida_id]
     # lo consumido antes de esta corrida (las anteriores en la secuencia) y lo consumido por esta corrida, por separado
     antes, esta = {}, {}
@@ -1380,9 +1382,8 @@ def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte):
     return res
 
 
-@app.get("/api/corridas/{corrida_id}/trazabilidad.xlsx")
-def trazabilidad_corrida_xlsx(corrida_id: int):
-    """Exporta UNA corrida al formato de la hoja de Trazabilidad de planta:
+def _datos_trazabilidad(corrida_id: int, seq=None) -> dict:
+    """Reúne los datos de UNA corrida para el Excel de Trazabilidad de planta:
     encabezado de fechas, tabla de lotes de MP con totales, bloque de resumen
     (MP kg, rendimiento, masa de jugo simple, ratio...) y saldos por lote.
     Lo que la app no guarda (GRP, N° Guía, descuentos por brix, cáscara/semilla,
@@ -1448,7 +1449,7 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
         )))
         ff = corrida.get("fecha_final")
         fecha_corte = ff.date() if hasattr(ff, "date") else date.today()
-        tras = _saldo_tras_corrida(conn, corrida_id, fecha_corte)
+        tras = _saldo_tras_corrida(conn, corrida_id, fecha_corte, seq)
 
     for lo in lotes:                        # los lotes de esta corrida: saldo y procesado hasta esta corrida
         t = tras.get(lo.get("lote_numero"))
@@ -1458,17 +1459,64 @@ def trazabilidad_corrida_xlsx(corrida_id: int):
     stock += [t for t in tras.values() if t["kg_saldo"] > 0.01 and t["es_stock"]]
     stock.sort(key=lambda s: s["numero"])
     corrida["saldo_por_secuencia"] = True
+    return {"corrida": corrida, "lotes": lotes, "productos": productos, "mediciones": mediciones, "stock": stock}
 
-    xlsx_bytes = generar_trazabilidad_xlsx(corrida, lotes, productos, mediciones, stock)
-    nombre = f"trazabilidad-{corrida['nombre']}.xlsx".replace(" ", "-").replace("/", "-")
+
+def _respuesta_xlsx(contenido: bytes, nombre: str) -> Response:
+    nombre = re.sub(r'[\\/:*?"<>|\s]+', "-", nombre)
     return Response(
-        content=xlsx_bytes,
+        content=contenido,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{nombre}"',
             "Cache-Control": "no-store",
         },
     )
+
+
+@app.get("/api/corridas/{corrida_id}/trazabilidad.xlsx")
+def trazabilidad_corrida_xlsx(corrida_id: int):
+    """Excel de Trazabilidad de UNA corrida (una hoja, con sus cuadros de stock)."""
+    d = _datos_trazabilidad(corrida_id)
+    contenido = generar_trazabilidad_xlsx(d["corrida"], d["lotes"], d["productos"], d["mediciones"], d["stock"])
+    return _respuesta_xlsx(contenido, f"trazabilidad-{d['corrida']['nombre']}.xlsx")
+
+
+@app.get("/api/trazabilidad.xlsx")
+def trazabilidad_varias_corridas_xlsx(corridas: str):
+    """UN solo Excel con varias corridas (por ejemplo, las de un reparto de lotes), una por hoja. La JSA/JCC va en la última
+    hoja y es la única que lleva los cuadros de stock final; el saldo de los lotes se arrastra de una hoja a la siguiente."""
+    try:
+        ids = sorted({int(x) for x in corridas.split(",") if x.strip()})
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Las corridas indicadas no son válidas.")
+    if not ids:
+        raise HTTPException(status_code=400, detail="Indique al menos una corrida.")
+    if len(ids) > 12:
+        raise HTTPException(status_code=400, detail="Se pueden exportar hasta 12 corridas a la vez.")
+    with engine.connect() as conn:
+        seq = _secuencia_corridas(conn)
+        tipos = {f.id: (f.tipo_proceso or "").strip().upper() for f in conn.execute(
+            text("SELECT id, tipo_proceso FROM corridas WHERE id = ANY(:ids)"), {"ids": ids}).fetchall()}
+    faltan = [i for i in ids if i not in tipos]
+    if faltan:
+        raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+    posicion = lambda i: seq.index(i) if i in seq else len(seq)
+    # las líneas que no son JSA/JCC (p. ej. ICEGEN) van primero y la JSA/JCC al final: así el cuadro de stock final queda en la
+    # última hoja. Dentro de cada grupo se respeta el orden de la lista de «Corridas».
+    es_principal = lambda i: tipos[i].startswith(("JSA", "JCC"))
+    ids.sort(key=lambda i: (es_principal(i), posicion(i)))
+    # el saldo de cada lote se arrastra en el orden de las hojas: las corridas del grupo ocupan, en orden, los mismos lugares
+    # que tenían en la secuencia general
+    lugares = sorted(posicion(i) for i in ids)
+    seq_grupo = list(seq)
+    for lugar, i in zip(lugares, ids):
+        if lugar < len(seq_grupo):
+            seq_grupo[lugar] = i
+    hojas = [_datos_trazabilidad(i, seq_grupo) for i in ids]
+    contenido = generar_trazabilidad_grupo_xlsx(hojas)
+    primera, ultima = hojas[0]["corrida"]["nombre"], hojas[-1]["corrida"]["nombre"]
+    return _respuesta_xlsx(contenido, f"trazabilidad-{primera}.xlsx" if len(hojas) == 1 else f"trazabilidad-{primera}-a-{ultima}.xlsx")
 
 
 class NuevoProductoCorrida(BaseModel):
