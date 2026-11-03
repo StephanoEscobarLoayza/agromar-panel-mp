@@ -226,6 +226,37 @@ def _cuadro_insumos_entrada(ws, fila0, insumos):
     return tr
 
 
+def _es_reproceso(lo):
+    """Fila de consumo de un lote derivado de REPROCESO (jugo que se vuelve a procesar): no es materia prima nueva."""
+    return (lo.get("lote_numero") or 0) < 0 and _etiqueta_derivado(lo.get("proveedor")) == "REPROCESO"
+
+
+def _cuadro_reproceso(ws, fila0, filas):
+    """Cuadrito informativo con el jugo de REPROCESO que se echó a la corrida (p. ej. cilindros observados de otra
+    campaña). No va en la tabla de lotes ni se suma al Peso Neto, la MP ni el rendimiento: solo se informa. Col H.
+    `filas` = filas de consumo (asignaciones) de esos lotes. Devuelve la última fila usada."""
+    h = 8  # col H
+    _set(ws, ws.cell(row=fila0, column=h), "Reproceso (informativo)", bold=True, fill=_SEC_FILL)
+    c = _set(ws, ws.cell(row=fila0 + 1, column=h), "Jugo que se volvió a procesar en esta corrida. No está sumado en el Peso Neto, la MP ni el rendimiento de esta hoja.")
+    c.font = _NOTA_FONT
+    for k, nom in enumerate(["Lote", "Descripción", "Kg"]):
+        c = _set(ws, ws.cell(row=fila0 + 2, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
+        c.font = _HEAD_FONT
+    i = 0
+    for i, lo in enumerate(filas, start=1):
+        rr = fila0 + 2 + i
+        _set(ws, ws.cell(row=rr, column=h), _lote_txt(lo.get("lote_numero"), lo.get("proveedor")), borde=True)
+        _set(ws, ws.cell(row=rr, column=h + 1), lo.get("proveedor") or "", borde=True)
+        _set(ws, ws.cell(row=rr, column=h + 2), _f(lo.get("kg_asignados")), fmt=_FMT_KG, borde=True)
+    tr = fila0 + 3 + i
+    _set(ws, ws.cell(row=tr, column=h + 1), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
+    _set(ws, ws.cell(row=tr, column=h + 2), f"=SUM({get_column_letter(h + 2)}{fila0 + 3}:{get_column_letter(h + 2)}{tr - 1})",
+         fmt=_FMT_KG, bold=True, fill=_TOTAL_FILL, borde=True)
+    ws.cell(row=tr, column=h).fill = _TOTAL_FILL
+    ws.cell(row=tr, column=h).border = _BORDE
+    return tr
+
+
 def _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock=None, con_stock_final=True, hoja_final=None):
     """Dibuja UNA corrida en la hoja `ws`.
     corrida: fila de v_cuadre_corridas + corridas. lotes: una fila por
@@ -237,6 +268,9 @@ def _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock=None, con_st
     corridas) no se dibujan los cuadros de stock: en su lugar queda una nota que
     indica en qué hoja (`hoja_final`) está el stock con el que termina el grupo."""
     stock = stock or []
+    # el reproceso (jugo que se vuelve a procesar) no va en la tabla de lotes ni cuenta en la MP: se informa en un cuadro aparte
+    reproceso = [lo for lo in lotes if _es_reproceso(lo)]
+    lotes = [lo for lo in lotes if not _es_reproceso(lo)]
     ws.sheet_view.showGridLines = False
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
@@ -472,14 +506,16 @@ def _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock=None, con_st
                 ws, fin2 + 3, "Producto derivado de PRE CC", pre_cc,
                 nota="Incluye los lotes derivados con saldo disponible y los que esta corrida dejó en cero. Peso Neto y Peso procesado son el acumulado de todas las corridas, no solo de esta.",
             )
-        if productos_entrada:
-            _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada)
+        fin_cuadros = _cuadro_insumos_entrada(ws, fin3 + 3, productos_entrada) if productos_entrada else fin3
+        if reproceso:
+            _cuadro_reproceso(ws, fin_cuadros + 3, reproceso)
     else:
         # hoja intermedia: sin cuadros de stock, para que el único cuadro final sea el de la última hoja
         nota = _set(ws, ws.cell(row=SEC, column=8), f"El stock final de los lotes (saldos) está en la hoja «{hoja_final}».")
         nota.font = _NOTA_FONT
-        if productos_entrada:
-            _cuadro_insumos_entrada(ws, SEC + 2, productos_entrada)
+        fin_cuadros = _cuadro_insumos_entrada(ws, SEC + 2, productos_entrada) if productos_entrada else None
+        if reproceso:
+            _cuadro_reproceso(ws, fin_cuadros + 3 if fin_cuadros else SEC + 2, reproceso)
 
     # ---------- anchos de columna ----------
     anchos = {1: 3, 2: 12, 3: 15, 4: 18, 5: 18, 6: 13, 7: 13, 8: 26, 9: 34, 10: 14,

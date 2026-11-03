@@ -117,6 +117,24 @@ class ExcelConVariasCorridas(unittest.TestCase):
         self.assertEqual(con_cuadro, [False, False, True])
         self.assertTrue(all(any("está en la hoja «17-Octubre JCC»" in t for t in hoja) for hoja in textos[:2]))
 
+    def test_el_reproceso_va_en_un_cuadro_aparte_y_no_en_la_tabla_de_lotes(self):
+        import io
+        import openpyxl
+        from reporte_trazabilidad import generar_trazabilidad_grupo_xlsx
+        hoja = self._hoja("02-Noviembre JCC", "JCC")
+        hoja["lotes"] = [
+            {"lote_numero": 2840, "proveedor": "AGRONEGOCIOS", "kg_asignados": 1450, "tipo_almacen_origen": "SILO"},
+            {"lote_numero": -1857, "proveedor": "REPROCESO (JUGO OBSERVADO ENE-2025)", "kg_asignados": 8100, "tipo_almacen_origen": "SILO"},
+            {"lote_numero": -2597, "proveedor": "COOPERATIVA X", "kg_asignados": 500, "tipo_almacen_origen": "SILO"},   # un PRE CC sigue en la tabla
+        ]
+        ws = openpyxl.load_workbook(io.BytesIO(generar_trazabilidad_grupo_xlsx([hoja]))).worksheets[0]
+        tabla = [ws.cell(fila, 3).value for fila in range(8, 11)]
+        self.assertEqual(tabla, [2840, "2597 PRE CC", None])
+        textos = {str(c.value) for fila in ws.iter_rows() for c in fila if c.value is not None}
+        self.assertIn("Reproceso (informativo)", textos)
+        self.assertIn("1857 REPROCESO", textos)
+        self.assertNotIn("1857 REPROCESO", {str(ws.cell(fila, 3).value) for fila in range(8, 11)})
+
 
 class TanqueOlvidado(unittest.TestCase):
     def test_numero_de_tanque(self):
