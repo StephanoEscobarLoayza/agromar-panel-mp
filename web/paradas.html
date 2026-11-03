@@ -14,6 +14,11 @@
   .tabla-paradas td:not(.celda-edicion) div { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* la fila de edición ocupa todo el ancho de la tabla (y, en el celular, de la tarjeta) */
   .tabla-paradas td.celda-edicion { padding-left: 0; padding-right: 0; }
+  .tabla-paradas td.celda-edicion textarea { resize: vertical; }
+  .tabla-paradas.editando thead { display: none; }
+  @media (min-width: 761px) {
+    .tabla-paradas td:not(.celda-edicion):nth-child(-n+2) { white-space: nowrap; }
+  }
   @media (max-width: 760px) {
     table.tabla-tarjetas.tabla-paradas tbody tr td.celda-edicion { display: block; padding: 0; text-align: left; background: var(--surface-2); }
     table.tabla-tarjetas.tabla-paradas tbody tr td.celda-edicion::before { display: none; }
@@ -220,6 +225,7 @@ async function cargarCorridas() {
 }
 
 async function cargarParadas() {
+  lista.closest("table").classList.remove("editando");
   const corridaId = F.corrida.value;
   if (!corridaId) return;
   const paradas = await apiGet(`/api/corridas/${corridaId}/paradas`);
@@ -260,9 +266,10 @@ function filaEdicion(p) {
     vals.map(v => `<option value="${escapeHtml(v)}"${v === val ? " selected" : ""}>${escapeHtml(v === "DÍA" ? "Día" : v === "NOCHE" ? "Noche" : v)}</option>`).join("") +
     `</select>`;
   const inp = (id, val, tipo) => `<input type="${tipo || "text"}" class="ed-${id}" value="${escapeHtml(val || "")}" style="width:100%">`;
-  const ta = (id, val) => `<textarea class="ed-${id}" rows="2" style="width:100%">${escapeHtml(val || "")}</textarea>`;
+  const ta = (id, val) => `<textarea class="ed-${id}" rows="3" style="width:100%">${escapeHtml(val || "")}</textarea>`;
   return `<tr><td colspan="9" class="celda-edicion" style="background:var(--surface-2)">
     <div class="form-body" style="padding:14px 4px">
+      <div style="font-family:'Fraunces',serif;font-size:17px;font-weight:600;color:var(--text)">Editar parada · ${escapeHtml(fmtHora(p.hora_inicio))}</div>
       <div class="two-col">
         <div class="field"><label>Turno</label>${sel("turno", TURNOS, p.turno, "Seleccionar")}</div>
         <div class="field"><label>Área / proceso</label>${sel("area", AREAS, p.area_proceso, "Seleccionar")}</div>
@@ -281,7 +288,7 @@ function filaEdicion(p) {
       <div class="field"><label>Recomendación</label>${ta("rec", p.recomendacion)}</div>
       <div class="two-col">
         <button class="btn" data-accion="guardar" data-id="${p.id}">Guardar cambios</button>
-        <button class="btn" data-accion="cancelar" style="background:var(--surface-2);color:var(--text)">Cancelar</button>
+        <button class="btn" data-accion="cancelar" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border)">Cancelar</button>
       </div>
     </div>
   </td></tr>`;
@@ -305,6 +312,7 @@ lista.addEventListener("click", async (ev) => {
     const p = lista._paradas[id];
     fila.insertAdjacentHTML("afterend", filaEdicion(p));
     fila.style.display = "none";
+    lista.closest("table").classList.add("editando");
   } else if (accion === "cancelar") {
     await cargarParadas();
   } else if (accion === "guardar") {
