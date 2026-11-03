@@ -61,7 +61,7 @@
           <button type="button" class="chip-filter" data-estado="EN PROCESO">En proceso</button>
           <button type="button" class="chip-filter" data-estado="EN ESPERA">En espera</button>
           <button type="button" class="chip-filter" data-estado="PROCESADO">Procesado</button>
-          <button type="button" class="chip-filter" data-estado="PRE_CC">PRE CC</button>
+          <button type="button" class="chip-filter" data-estado="PRE_CC">PRE CC / Reproceso</button>
         </div>
         <a class="btn-link" href="/api/lotes/reporte-stock.pdf" target="_blank" rel="noopener" style="text-decoration:none;margin-left:auto"
            onclick="this.href='/api/lotes/reporte-stock.pdf?t='+Date.now()">Reporte de stock (PDF)</a>
@@ -90,8 +90,8 @@
 
   <div class="panel" style="margin-top:22px" id="panelPreCC" hidden>
     <div class="panel-body">
-      <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PreCC</h2>
-      <p style="margin:0;font-size:13px;color:var(--text-muted)">Producto derivado de un proceso PRE CC, pendiente de incorporarse como materia prima en otra corrida.</p>
+      <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PRE CC y reproceso</h2>
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">PRE CC: producto derivado de un proceso PRE CC, pendiente de incorporarse como materia prima en otra corrida. Reproceso: jugo que se volvió a procesar en una corrida.</p>
     </div>
     <div class="table-wrap">
       <table class="tabla-tarjetas">
@@ -221,10 +221,11 @@ function fila(l) {
   // chocar con el lote real, que sigue existiendo aparte con su propio
   // saldo) pero nunca se muestra así: mismo número que el lote real, con
   // una etiqueta al lado para no confundirlo.
-  const esDerivado = l.lote_origen_numero != null;
+  const esDerivado = l.numero < 0;
+  const etiqueta = etiquetaDerivado(l.proveedor);
   const numeroMostrado = esDerivado ? Math.abs(l.numero) : l.numero;
   const preCcTag = esDerivado
-    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap;font-family:\'Public Sans\',system-ui,sans-serif;font-variant-numeric:normal" title="Producto derivado de un proceso PRE CC, disponible como materia prima para otra corrida">PRE CC</span>'
+    ? '<span class="tag" style="background:var(--warn-bg);color:var(--warn);white-space:nowrap;font-family:\'Public Sans\',system-ui,sans-serif;font-variant-numeric:normal" title="' + (etiqueta === "REPROCESO" ? "Jugo que se volvió a procesar en una corrida" : "Producto derivado de un proceso PRE CC, disponible como materia prima para otra corrida") + '">' + etiqueta + '</span>'
     : "";
   return `
     <tr>
@@ -255,7 +256,7 @@ function renderPreCC(lista) {
   const cont = document.getElementById("filasPreCC");
   cont.innerHTML = lista.length
     ? lista.map(fila).join("")
-    : '<tr><td colspan="12" class="empty">En este momento no hay lotes PRE CC.</td></tr>';
+    : '<tr><td colspan="12" class="empty">En este momento no hay lotes de PRE CC ni de reproceso.</td></tr>';
 }
 
 let filtroActual = "todos";
@@ -272,8 +273,8 @@ function aplicarFiltros() {
     (l.procedencia || "").toLowerCase().includes(q)
   );
 
-  let regulares = base.filter(l => l.lote_origen_numero == null);
-  const derivados = base.filter(l => l.lote_origen_numero != null);
+  let regulares = base.filter(l => l.numero >= 0);
+  const derivados = base.filter(l => l.numero < 0);
 
   if (filtroActual !== "todos") {
     regulares = regulares.filter(l => normEstado(l.estado_actual) === filtroActual);

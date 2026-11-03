@@ -77,14 +77,19 @@ def _dia_mes_del_nombre(nombre):
     return dia, _MESES.index(mes) + 1
 
 
-def _lote_txt(numero):
+def _etiqueta_derivado(proveedor):
+    """Un lote derivado es PRE CC, salvo que su proveedor empiece por "REPROCESO" (jugo que se vuelve a procesar)."""
+    return "REPROCESO" if str(proveedor or "").strip().upper().startswith("REPROCESO") else "PRE CC"
+
+
+def _lote_txt(numero, proveedor=None):
     """Un lote "derivado" (kg que salió de una corrida PRE CC, disponible
     para reusar como MMPP) se guarda con el número real en negativo, para no
     chocar con el lote de verdad - pero nunca se muestra así en la hoja:
-    mismo número que el lote real, con "PRE CC" al lado."""
+    mismo número que el lote real, con "PRE CC" (o "REPROCESO") al lado."""
     if numero is None:
         return None
-    return f"{abs(numero)} PRE CC" if numero < 0 else numero
+    return f"{abs(numero)} {_etiqueta_derivado(proveedor)}" if numero < 0 else numero
 
 
 def _es_pt(producto: dict) -> bool:
@@ -161,7 +166,7 @@ def _cuadro_stock(ws, fila0, titulo, filas, nota=None, con_saldo_anterior=False)
     i = 0
     for i, s in enumerate(filas, start=1):
         rr = fila0 + 1 + i
-        _set(ws, ws.cell(row=rr, column=h), _lote_txt(s.get("numero")), borde=True)
+        _set(ws, ws.cell(row=rr, column=h), _lote_txt(s.get("numero"), s.get("proveedor")), borde=True)
         _set(ws, ws.cell(row=rr, column=h + c_neto), _f(s.get("peso_neto_kg")), fmt=_FMT_KG, borde=True)
         if con_saldo_anterior:
             _set(ws, ws.cell(row=rr, column=h + c_ini), _f(s.get("saldo_inicial_kg")), fmt=_FMT_KG, borde=True)
@@ -297,7 +302,7 @@ def _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock=None, con_st
         pct_dto = (float(pct_dto) / 100) if pct_dto is not None else None
         fila = [
             proceso,
-            _lote_txt(lo.get("lote_numero")),
+            _lote_txt(lo.get("lote_numero"), lo.get("proveedor")),
             None,                              # GRP
             lo.get("guia"),                    # N° Guía
             _f(lo.get("fecha_ingreso")),
@@ -443,12 +448,14 @@ def _escribir_hoja(ws, corrida, lotes, productos, mediciones, stock=None, con_st
             "kg_saldo": lo.get("kg_saldo"),
             "bines_saldo": lo.get("bines_saldo"),
             "bines_totales": lo.get("bines_totales"),
+            "proveedor": lo.get("proveedor"),
         })
     # producto de PreCC (numero negativo) no es materia prima - va en su
     # propio cuadro, nunca mezclado con los lotes de MP de arriba (mismo
     # criterio que en Lotes y en el reporte de stock).
-    pre_cc = [p for p in parciales if p["numero"] < 0] + \
-        [s for s in stock if (s.get("numero") or 0) < 0 and s.get("numero") not in mis_lotes]
+    # (el jugo de REPROCESO no es producto de PRE CC: ya figura en la tabla de lotes de la corrida y no va en este cuadro)
+    pre_cc = [p for p in parciales if p["numero"] < 0 and _etiqueta_derivado(p.get("proveedor")) == "PRE CC"] + \
+        [s for s in stock if (s.get("numero") or 0) < 0 and s.get("numero") not in mis_lotes and _etiqueta_derivado(s.get("proveedor")) == "PRE CC"]
     parciales = [p for p in parciales if p["numero"] >= 0]
     completos = [s for s in stock if s.get("numero") not in mis_lotes and (s.get("numero") or 0) >= 0]
 

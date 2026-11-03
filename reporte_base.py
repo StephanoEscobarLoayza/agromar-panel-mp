@@ -69,14 +69,19 @@ def fmt_tambores(n):
     return f"{n:,.0f}" if n == int(n) else f"{n:,.1f}"
 
 
-def fmt_lote(numero):
+def etiqueta_derivado(proveedor):
+    """Un lote derivado es PRE CC, salvo que su proveedor empiece por "REPROCESO" (jugo que se vuelve a procesar)."""
+    return "REPROCESO" if str(proveedor or "").strip().upper().startswith("REPROCESO") else "PRE CC"
+
+
+def fmt_lote(numero, proveedor=None):
     """Un lote "derivado" (el kg que sale disponible de una corrida PRE CC
     para reusar como MMPP) se guarda con el número real en negativo, para no
     chocar con el lote de verdad - pero nunca se muestra así: mismo número
-    que el lote real, con "PRE CC" al lado para no confundirlo."""
+    que el lote real, con "PRE CC" (o "REPROCESO") al lado para no confundirlo."""
     if numero is None:
         return "—"
-    return f"#{abs(numero)} PRE CC" if numero < 0 else f"#{numero}"
+    return f"#{abs(numero)} {etiqueta_derivado(proveedor)}" if numero < 0 else f"#{numero}"
 
 
 MESES_ES = {

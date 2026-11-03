@@ -23,7 +23,7 @@ def _tabla_stock(lotes):
     """Lotes con saldo PARCIAL de verdad - ya se les asignó algo a alguna
     corrida y todavía les queda un resto."""
     filas = [[
-        fmt_lote(l["numero"]),
+        fmt_lote(l["numero"], l.get("proveedor")),
         l.get("proveedor") or "—",
         _tag_almacen(l.get("tipo_almacen")),
         fmt_fecha(l.get("fecha_ingreso")),
@@ -44,7 +44,7 @@ def _tabla_pre_cc(lotes):
     completo o si nunca se registró. Por eso siempre se muestra Procesado
     junto con Saldo, no solo el saldo."""
     filas = [[
-        fmt_lote(l["numero"]),
+        fmt_lote(l["numero"], l.get("proveedor")),
         l.get("proveedor") or "—",
         (l.get("estado_actual") or "—").title(),
         fmt_kg(l.get("peso_neto_kg")),
@@ -62,7 +62,7 @@ def _tabla_completos(lotes):
     como llegó, no el resto de haber usado algo. No es lo mismo que un
     saldo parcial, por eso van en su propia tabla."""
     filas = [[
-        fmt_lote(l["numero"]),
+        fmt_lote(l["numero"], l.get("proveedor")),
         l.get("proveedor") or "—",
         _tag_almacen(l.get("tipo_almacen")),
         fmt_fecha(l.get("fecha_ingreso")),

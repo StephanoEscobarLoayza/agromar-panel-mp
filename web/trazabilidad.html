@@ -103,9 +103,9 @@ function panelLote(lote) {
   const saldoTxt = esBines
     ? `${fmtSaldo(lote.kg_saldo)} kg · ${fmtInt(lote.bines_saldo ?? 0)} bines`
     : `${fmtSaldo(lote.kg_saldo)} kg`;
-  const esDerivado = lote.lote_origen_numero != null;
+  const esDerivado = lote.numero < 0;
   const preCcTag = esDerivado
-    ? ' <span class="tag" style="background:var(--warn-bg);color:var(--warn)">PRE CC</span>'
+    ? ` <span class="tag" style="background:var(--warn-bg);color:var(--warn)">${etiquetaDerivado(lote.proveedor)}</span>`
     : "";
   return `
     <div class="panel">

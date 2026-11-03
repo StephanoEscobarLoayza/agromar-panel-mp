@@ -25,7 +25,7 @@ def _tabla_lotes(lotes):
         if l.get("porcentaje_descuento") is not None:
             kg_txt += f" (-{fmt_num(l['porcentaje_descuento'], 1)}% brix)"
         filas.append([
-            fmt_lote(l["lote_numero"]),
+            fmt_lote(l["lote_numero"], l.get("proveedor")),
             l.get("proveedor") or "—",
             "Bines" if es_bines else "Silo" if l.get("tipo_almacen_origen") == "SILO" else "—",
             kg_txt,
@@ -51,10 +51,10 @@ def _tabla_lotes_simple(lotes, con_saldo=False, cerrada=False):
             # es lo que de verdad se cuenta en el patio.
             if l.get("tipo_almacen_origen") == "BINES" and l.get("bines_saldo") is not None:
                 saldo_txt += f" · {fmt_num(l['bines_saldo'], 0)} bines"
-            filas.append([fmt_lote(l["lote_numero"]), l.get("proveedor") or "—", saldo_txt])
+            filas.append([fmt_lote(l["lote_numero"], l.get("proveedor")), l.get("proveedor") or "—", saldo_txt])
         encabezado_saldo = "Saldo al cierre" if cerrada else "Saldo hoy"
         return tabla(["Lote", "Proveedor", encabezado_saldo], filas, [22 * mm, 79 * mm, 72 * mm], align_derecha_desde=2)
-    filas = [[fmt_lote(l["lote_numero"]), l.get("proveedor") or "—"] for l in lotes]
+    filas = [[fmt_lote(l["lote_numero"], l.get("proveedor")), l.get("proveedor") or "—"] for l in lotes]
     return tabla(["Lote", "Proveedor"], filas, [22 * mm, 151 * mm])
 
 

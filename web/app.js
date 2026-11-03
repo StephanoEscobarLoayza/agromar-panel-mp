@@ -180,6 +180,12 @@ function fmtFechaSola(iso) {
   return `${String(dia).padStart(2, "0")}-${MESES_CORTOS[mes - 1]}`;
 }
 
+// Un lote derivado (número negativo) es, por defecto, producto de una corrida PRE CC. Si su proveedor empieza por
+// "REPROCESO", es jugo (p. ej. cilindros observados) que se vuelve a procesar: se rotula REPROCESO.
+function etiquetaDerivado(proveedor) {
+  return /^\s*reproceso/i.test(proveedor || "") ? "REPROCESO" : "PRE CC";
+}
+
 function escapeHtml(s) {
   const div = document.createElement("div");
   div.textContent = s ?? "";
