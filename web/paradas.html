@@ -11,7 +11,13 @@
 <link rel="stylesheet" href="style.css">
 <style>
   .tabla-paradas th, .tabla-paradas td { padding-left: 12px; padding-right: 12px; }
-  .tabla-paradas td div { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabla-paradas td:not(.celda-edicion) div { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* la fila de edición ocupa todo el ancho de la tabla (y, en el celular, de la tarjeta) */
+  .tabla-paradas td.celda-edicion { padding-left: 0; padding-right: 0; }
+  @media (max-width: 760px) {
+    table.tabla-tarjetas.tabla-paradas tbody tr td.celda-edicion { display: block; padding: 0; text-align: left; background: var(--surface-2); }
+    table.tabla-tarjetas.tabla-paradas tbody tr td.celda-edicion::before { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -255,7 +261,7 @@ function filaEdicion(p) {
     `</select>`;
   const inp = (id, val, tipo) => `<input type="${tipo || "text"}" class="ed-${id}" value="${escapeHtml(val || "")}" style="width:100%">`;
   const ta = (id, val) => `<textarea class="ed-${id}" rows="2" style="width:100%">${escapeHtml(val || "")}</textarea>`;
-  return `<tr><td colspan="9" style="background:var(--surface-2)">
+  return `<tr><td colspan="9" class="celda-edicion" style="background:var(--surface-2)">
     <div class="form-body" style="padding:14px 4px">
       <div class="two-col">
         <div class="field"><label>Turno</label>${sel("turno", TURNOS, p.turno, "Seleccionar")}</div>
