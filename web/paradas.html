@@ -321,13 +321,14 @@ lista.addEventListener("click", async (ev) => {
     const inicio = v("ed-inicio").value;
     if (!inicio) { avisar("La hora de inicio es obligatoria."); return; }
     try {
-      await apiPost(`/api/paradas/${id}`, {
+      const guardada = await apiPostConfirmando(`/api/paradas/${id}`, {
         turno: v("ed-turno").value, hora_inicio: inicio, hora_fin: v("ed-fin").value || null,
         area_proceso: v("ed-area").value, tipo_parada: v("ed-tipo").value,
         equipo_afectado: v("ed-equipo").value, descripcion_falla: v("ed-desc").value,
         responsable_solucion: v("ed-resp").value, solucion_obs: v("ed-sol").value,
         recomendacion: v("ed-rec").value,
       });
+      if (guardada === null) return;          // la persona prefirió no registrarla (se cruzaba con otra parada)
       await cargarParadas();
     } catch (e) { avisar(e.message); }
   }
@@ -344,7 +345,7 @@ btnGuardar.addEventListener("click", async () => {
 
   btnGuardar.disabled = true;
   try {
-    await apiPost("/api/paradas", {
+    const guardada = await apiPostConfirmando("/api/paradas", {
       corrida_id: Number(F.corrida.value),
       turno: F.turno.value,
       hora_inicio: F.inicio.value,
@@ -357,6 +358,7 @@ btnGuardar.addEventListener("click", async () => {
       solucion_obs: F.solucion.value,
       recomendacion: F.recomendacion.value,
     });
+    if (guardada === null) { mensaje.innerHTML = ""; return; }          // la persona prefirió no registrarla (se cruzaba con otra parada)
     mensaje.innerHTML = '<div class="msg ok">Parada registrada.</div>';
     ["equipo", "descFalla", "solucion", "recomendacion"].forEach(k => F[k].value = "");
     F.fin.value = "";

@@ -216,6 +216,83 @@ class LoteDeReproceso(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 409)
 
 
+class ConexionConLaBase(unittest.TestCase):
+    def test_una_conexion_cortada_responde_503_en_español_y_marcada_para_reintentar(self):
+        from sqlalchemy.exc import OperationalError
+        e = OperationalError("SELECT 1", {}, Exception("server closed the connection unexpectedly"))
+        r = api._error_http(e)
+        self.assertEqual(r.status_code, 503)
+        self.assertIn("conexión", r.detail.lower())
+        self.assertEqual(r.headers.get("X-Reintentable"), "1")
+
+    def _llamar(self, metodo, respuestas):
+        """Pasa una petición por el reintento de lecturas con una app falsa que contesta, en orden, lo de `respuestas`."""
+        import asyncio
+        llamadas = []
+
+        async def app_falsa(scope, receive, send):
+            estado, cabeceras = respuestas[min(len(llamadas), len(respuestas) - 1)]
+            llamadas.append(1)
+            await send({"type": "http.response.start", "status": estado, "headers": cabeceras})
+            await send({"type": "http.response.body", "body": b"{}"})
+
+        enviados = []
+
+        async def enviar(mensaje):
+            enviados.append(mensaje)
+
+        async def recibir():
+            return {"type": "http.request", "body": b""}
+
+        scope = {"type": "http", "method": metodo, "path": "/api/x", "headers": []}
+        asyncio.run(api._ReintentoLecturas(app_falsa)(scope, recibir, enviar))
+        return len(llamadas), [m["status"] for m in enviados if m["type"] == "http.response.start"]
+
+    def test_una_lectura_se_repite_una_vez_si_la_base_cortó_la_conexion(self):
+        reintentable = [(b"x-reintentable", b"1")]
+        self.assertEqual(self._llamar("GET", [(503, reintentable), (200, [])]), (2, [200]))
+        self.assertEqual(self._llamar("GET", [(503, reintentable)]), (2, [503]))          # si sigue fallando, se muestra el error (una sola vez)
+        self.assertEqual(self._llamar("GET", [(500, [])]), (1, [500]))                     # un error de otro tipo no se repite
+
+    def test_una_escritura_nunca_se_repite_sola(self):
+        self.assertEqual(self._llamar("POST", [(503, [(b"x-reintentable", b"1")]), (200, [])]), (1, [503]))
+
+    def test_la_hora_de_fin_no_puede_ser_anterior_a_la_de_inicio(self):
+        api._validar_horas_parada("2026-11-03T13:53", "2026-11-03T15:07")
+        api._validar_horas_parada("2026-11-03T13:53", None)
+        with self.assertRaises(api.HTTPException) as e:
+            api._validar_horas_parada("2026-11-03T13:53", "2026-11-03T12:00")
+        self.assertEqual(e.exception.status_code, 400)
+        with self.assertRaises(api.HTTPException):
+            api._instante("no es una fecha", "hora de inicio")
+
+    def test_el_aviso_de_posible_repetido_pide_confirmacion(self):
+        import json
+        r = api._pedir_confirmacion("Ya hay un TK3 en esta corrida.")
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(json.loads(r.body), {"detail": "Ya hay un TK3 en esta corrida.", "requiere_confirmacion": True})
+
+
+class ReprocesoFueraDeLaMP(unittest.TestCase):
+    """El jugo de REPROCESO no es materia prima: el PDF lo informa aparte y no lo suma a la MP."""
+
+    def test_se_reconoce_el_lote_de_reproceso(self):
+        import reporte_corrida
+        self.assertTrue(reporte_corrida._es_reproceso({"lote_numero": -1857, "proveedor": "REPROCESO (JUGO)"}))
+        self.assertFalse(reporte_corrida._es_reproceso({"lote_numero": -2593, "proveedor": "AGRONEGOCIOS"}))     # PRE CC: sí es MP
+        self.assertFalse(reporte_corrida._es_reproceso({"lote_numero": 1857, "proveedor": "REPROCESO"}))         # un lote real nunca es reproceso
+
+    def test_el_pdf_se_genera_con_un_lote_de_reproceso(self):
+        import reporte_corrida
+        corrida = {"nombre": "02-Noviembre JCC", "fecha_inicio": None, "fecha_final": None, "kg_asignados_total": 1000}
+        lotes = [
+            {"lote_numero": 2835, "proveedor": "COOPERATIVA", "tipo_almacen_origen": "SILO", "kg_asignados": 1000, "kg_saldo": 0, "brix_recepcion": 11, "acidez": 0.7, "ratio": 15},
+            {"lote_numero": -1857, "proveedor": "REPROCESO (JUGO OBSERVADO)", "tipo_almacen_origen": "SILO", "kg_asignados": 8100, "kg_saldo": 0, "brix_recepcion": 11, "acidez": 0.5, "ratio": 20},
+        ]
+        pdf = reporte_corrida.generar_reporte_pdf(corrida, lotes, [], [], [])
+        self.assertTrue(pdf.startswith(b"%PDF"))
+
+
 class TanqueOlvidado(unittest.TestCase):
     def test_numero_de_tanque(self):
         self.assertEqual(api._numero_tanque("TK12"), 12)

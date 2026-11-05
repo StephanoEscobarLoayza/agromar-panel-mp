@@ -44,64 +44,43 @@
     </div>
     <p class="hero-eyebrow">Panel de cuadre — planta de jugos</p>
     <h1 class="hero-title">Dashboards</h1>
-    <p class="hero-sub">Toda la campaña, de un vistazo.</p>
+    <p class="hero-sub">Producción, stock y lotes: elija el período y el tipo de proceso.</p>
   </div>
   <div class="wave">
     <svg viewBox="0 0 1080 90" preserveAspectRatio="none"><path d="M0,40 C 220,90 420,0 620,30 C 820,60 960,10 1080,35 L1080,90 L0,90 Z" fill="var(--bg)"/></svg>
   </div>
 </div>
 
-<div class="wrap" style="margin-top:-36px;position:relative;z-index:2">
-  <div class="kpis-3" id="kpis"><div class="empty">Cargando…</div></div>
-
-  <section>
-    <div class="section-head">
-      <h2>MP procesada por corrida</h2>
-      <span class="hint">Más reciente primero</span>
-    </div>
-    <div class="panel">
-      <div class="panel-body">
-        <div class="stat-row scroll-y" id="chartCorridas"><div class="empty">Cargando…</div></div>
-        <div class="viz-legend" id="legendTipo">
-          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-1)"></span>JSA Aseptic</div>
-          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-2)"></span>JCC</div>
-          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-5)"></span>JCC TASTE</div>
-          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-3)"></span>JSC</div>
-          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--series-4)"></span>ICEGEN</div>
-          <div class="viz-legend-item"><span class="viz-legend-dot" style="background:var(--text-muted)"></span>Otro</div>
-        </div>
+<div class="wrap dv" style="margin-top:-36px;position:relative;z-index:2">
+  <div class="dv-filtros" id="filtros">
+    <div class="dv-fila">
+      <div class="dv-vistas" id="vistas" role="group" aria-label="Pantalla">
+        <button type="button" data-vista="produccion" aria-pressed="true">Producción</button>
+        <button type="button" data-vista="stock" aria-pressed="false">Stock y lotes</button>
       </div>
     </div>
-  </section>
-
-  <section class="split split-stretch split-proveedores">
-    <div class="panel">
-      <div class="panel-head"><h3>Promedio de MP por tipo de proceso</h3></div>
-      <div class="panel-body">
-        <div class="stat-row" id="porTipo"><div class="empty">Cargando…</div></div>
-      </div>
+    <div class="dv-fila">
+      <span class="dv-fila-etq">Período</span>
+      <div class="dv-chips" id="gPeriodo" role="group" aria-label="Período"></div>
     </div>
-
-    <div class="panel">
-      <div class="panel-head"><h3>Top proveedores</h3></div>
-      <div class="panel-body">
-        <div class="stat-row scroll-y" id="porProveedor" style="max-height:280px"><div class="empty">Cargando…</div></div>
-      </div>
+    <div class="dv-custom" id="custom" hidden>
+      <label>Desde<input type="date" id="fDesde"></label>
+      <label>Hasta<input type="date" id="fHasta"></label>
+      <button type="button" class="dv-btn primario" id="bAplicar">Aplicar</button>
     </div>
-  </section>
-
-  <section>
-    <div class="panel">
-      <div class="panel-head"><h3>Lotes por estado</h3></div>
-      <div class="panel-body">
-        <div class="stat-row" id="porEstado"><div class="empty">Cargando…</div></div>
-        <div class="mini-subhead">Lotes con saldo disponible</div>
-        <div class="stat-row scroll-y" id="listaSaldo" style="max-height:260px"><div class="empty">Cargando…</div></div>
-      </div>
+    <div class="dv-fila" id="filaTipos">
+      <span class="dv-fila-etq">Tipo de proceso</span>
+      <div class="dv-chips" id="gTipos" role="group" aria-label="Tipo de proceso"></div>
     </div>
-  </section>
-  <!-- "Producto terminado" no se muestra aquí: litros y rendimiento solo son
-       confiables en algunas corridas y engañarían como total de campaña. -->
+    <div class="dv-meta">
+      <span id="metaPeriodo"></span>
+      <span id="metaComparacion"></span>
+      <span id="metaHora"></span>
+      <button type="button" class="dv-btn" id="bActualizar">Actualizar</button>
+    </div>
+  </div>
+
+  <div class="dv-contenido" id="contenido" aria-live="polite"><div class="empty">Cargando…</div></div>
 
   <div class="foot">
     <div class="foot-rule"></div>
@@ -132,224 +111,707 @@
 
 <script src="app.js"></script>
 <script>
-const TIPO_ORDEN = [
-  { key: "JSA", label: "JSA Aseptic", clase: "series-1" },
-  { key: "JCC", label: "JCC", clase: "series-2" },
-  { key: "JCC TASTE", label: "JCC TASTE", clase: "series-5" },
-  { key: "JSC", label: "JSC", clase: "series-3" },
-  { key: "ICEGEN", label: "ICEGEN", clase: "series-4" },
-  { key: "OTRO", label: "Otro", clase: "series-otro" },
+"use strict";
+
+// ====================================================================================================
+// Dashboards. El servidor entrega los números ya agregados (/api/dashboard/produccion y /stock); aquí solo se dibujan.
+// Todo el texto que viene de la base se inserta con textContent (nunca como HTML).
+// ====================================================================================================
+
+// ---------- tipos de proceso: el color sigue a la entidad, no a su posición ----------
+const TIPOS = [
+  { id: "JSA", color: "var(--series-1)" },
+  { id: "JCC", color: "var(--series-2)" },
+  { id: "JCC TASTE", color: "var(--series-5)" },
+  { id: "JSC", color: "var(--series-3)" },
+  { id: "ICEGEN", color: "var(--series-4)" },
+  { id: "PRE CC", color: "var(--series-6)" },
 ];
+const COLOR_OTRO = "var(--text-muted)";
+const colorTipo = (id) => (TIPOS.find((t) => t.id === id) || { color: COLOR_OTRO }).color;
 
-const ESTADO_ORDEN = [
-  { key: "EN ESPERA", label: "En espera", var: "--warn" },
-  { key: "EN PROCESO", label: "En proceso", var: "--ok" },
-  { key: "PROCESADO", label: "Procesado", var: "--text-muted" },
+// ---------- constructores de DOM ----------
+function el(tag, attrs, ...hijos) {
+  const n = document.createElement(tag);
+  poner(n, attrs);
+  for (const h of hijos.flat(Infinity)) if (h !== null && h !== undefined && h !== false) n.append(h.nodeType ? h : document.createTextNode(String(h)));
+  return n;
+}
+const NS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, ...hijos) {
+  const n = document.createElementNS(NS, tag);
+  poner(n, attrs);
+  for (const h of hijos.flat(Infinity)) if (h !== null && h !== undefined && h !== false) n.append(h.nodeType ? h : document.createTextNode(String(h)));
+  return n;
+}
+function poner(n, attrs) {
+  if (!attrs) return;
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") n.setAttribute("class", v);
+    else if (k === "style") n.style.cssText = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+}
+
+// ---------- formatos (misma convención del resto de la app: kg sin decimales, punto decimal) ----------
+const dec = (n, d) => Number(n).toLocaleString("es-PE", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtPct = (x, d = 1) => (x === null || x === undefined ? "—" : dec(x * 100, d) + " %");
+function compacto(v) {
+  if (v >= 1e6) return dec(v / 1e6, v % 1e6 === 0 ? 0 : 1) + " M";
+  if (v >= 1e3) return dec(v / 1e3, v % 1e3 === 0 ? 0 : 1) + " mil";
+  return dec(v, 0);
+}
+function fmtMin(m) {
+  if (m === null || m === undefined) return "—";
+  const t = Math.round(m);
+  const h = Math.floor(t / 60), r = t % 60;
+  if (h === 0) return `${r} min`;
+  return r === 0 ? `${h} h` : `${h} h ${r} min`;
+}
+const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
+const MES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre"];
+const DIA_SEM = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const parteIso = (iso) => iso.slice(0, 10).split("-").map(Number);
+function fmtDia(iso, conAnio) {
+  const [a, m, d] = parteIso(iso);
+  return `${String(d).padStart(2, "0")} ${MES[m - 1]}${conAnio ? " " + a : ""}`;
+}
+function fmtRango(desde, hasta) {
+  const [a1] = parteIso(desde), [a2] = parteIso(hasta);
+  return desde === hasta ? fmtDia(desde, true) : `${fmtDia(desde, a1 !== a2)} – ${fmtDia(hasta, true)}`;
+}
+const aIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const desdeIso = (iso) => { const [a, m, d] = parteIso(iso); return new Date(a, m - 1, d); };
+function sumarDias(iso, n) { const d = desdeIso(iso); d.setDate(d.getDate() + n); return aIso(d); }
+function tituloBloque(b, gran) {
+  const [a, m, d] = parteIso(b.clave);
+  if (gran === "mes") return `${MES_LARGO[m - 1]} ${a}`;
+  if (gran === "semana") return b.hasta === b.clave ? fmtDia(b.clave, true) : `Semana del ${fmtDia(b.clave)} al ${fmtDia(b.hasta, true)}`;
+  return `${DIA_SEM[desdeIso(b.clave).getDay()]} ${fmtDia(b.clave, true)}`;
+}
+function etiquetaEje(b, gran) {
+  const [a, m] = parteIso(b.clave);
+  return gran === "mes" ? `${MES[m - 1]} ${String(a).slice(2)}` : fmtDia(b.clave);
+}
+
+// ---------- tooltip único ----------
+const tipEl = el("div", { class: "dv-tip", role: "tooltip", hidden: true });
+document.body.append(tipEl);
+function ubicarTip(x, y) {
+  const r = tipEl.getBoundingClientRect();
+  let left = x + 16, top = y + 16;
+  if (left + r.width > window.innerWidth - 8) left = Math.max(8, x - r.width - 16);
+  if (top + r.height > window.innerHeight - 8) top = Math.max(8, y - r.height - 16);
+  tipEl.style.left = left + "px";
+  tipEl.style.top = top + "px";
+}
+function mostrarTip(contenido, x, y) { tipEl.replaceChildren(contenido); tipEl.hidden = false; ubicarTip(x, y); }
+function ocultarTip() { tipEl.hidden = true; }
+function conTip(nodo, construir) {
+  nodo.setAttribute("data-tip", "1");
+  nodo.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") mostrarTip(construir(), e.clientX, e.clientY); });
+  nodo.addEventListener("pointermove", (e) => { if (!tipEl.hidden && e.pointerType !== "touch") ubicarTip(e.clientX, e.clientY); });
+  nodo.addEventListener("pointerleave", ocultarTip);
+  nodo.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") mostrarTip(construir(), e.clientX, e.clientY); });
+  nodo.addEventListener("focus", () => { const r = nodo.getBoundingClientRect(); mostrarTip(construir(), r.left + r.width / 2, r.top); });
+  nodo.addEventListener("blur", ocultarTip);
+}
+document.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" && !e.target.closest("[data-tip]")) ocultarTip(); });
+window.addEventListener("scroll", ocultarTip, { passive: true });
+function tipFila(color, nombre, valor) {
+  return el("div", { class: "dv-tip-fila" },
+    color ? el("span", { class: "dv-tip-clave", style: `background:${color}` }) : null,
+    el("span", { class: "dv-tip-nom" }, nombre),
+    el("strong", { class: "dv-tip-val" }, valor));
+}
+
+// ---------- estado y filtros ----------
+const PRESETS = [
+  { id: "7d", etq: "7 días" },
+  { id: "30d", etq: "30 días" },
+  { id: "mes", etq: "Este mes" },
+  { id: "mes_ant", etq: "Mes anterior" },
+  { id: "campana", etq: "Campaña" },
+  { id: "custom", etq: "Personalizado" },
 ];
+const estado = { vista: "produccion", preset: "30d", desde: null, hasta: null, tipo: null };
+try {
+  const g = JSON.parse(localStorage.getItem("dv_estado") || "null");
+  if (g && ["produccion", "stock"].includes(g.vista)) estado.vista = g.vista;
+  if (g && PRESETS.some((p) => p.id === g.preset)) estado.preset = g.preset;
+  if (g && g.preset === "custom" && /^\d{4}-\d{2}-\d{2}$/.test(g.desde || "") && /^\d{4}-\d{2}-\d{2}$/.test(g.hasta || "")) { estado.desde = g.desde; estado.hasta = g.hasta; }
+  else if (estado.preset === "custom") estado.preset = "30d";
+  if (g && (g.tipo === null || TIPOS.some((t) => t.id === g.tipo) || g.tipo === "Otro")) estado.tipo = g.tipo;
+} catch (e) { /* sin almacenamiento: se usan los valores por defecto */ }
+function guardarEstado() { try { localStorage.setItem("dv_estado", JSON.stringify(estado)); } catch (e) { /* no pasa nada */ } }
 
-function normEstado(e) { return (e || "").trim().toUpperCase(); }
-
-function mpDeCorrida(c) {
-  return Number(c.mp_kg_objetivo ?? c.kg_asignados_total ?? 0);
+function rangoDelPreset() {
+  const hoy = ahoraLocal().slice(0, 10);
+  switch (estado.preset) {
+    case "7d": return { desde: sumarDias(hoy, -6), hasta: hoy };
+    case "30d": return { desde: sumarDias(hoy, -29), hasta: hoy };
+    case "mes": return { desde: hoy.slice(0, 8) + "01", hasta: hoy };
+    case "mes_ant": {
+      const [a, m] = parteIso(hoy);
+      const ini = new Date(a, m - 2, 1), fin = new Date(a, m - 1, 0);
+      return { desde: aIso(ini), hasta: aIso(fin) };
+    }
+    case "campana": return {};
+    default: return { desde: estado.desde, hasta: estado.hasta };
+  }
 }
 
-// ---------- color por tipo de proceso (misma paleta categorica de "Promedio de MP por tipo de proceso") ----------
-function colorDeTipo(tipo) {
-  const t = TIPO_ORDEN.find(t => t.key === tipo) || TIPO_ORDEN[TIPO_ORDEN.length - 1];
-  return `var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`;
+// ---------- regiones fijas de la página ----------
+const contenido = document.getElementById("contenido");
+const metaPeriodo = document.getElementById("metaPeriodo");
+const metaComp = document.getElementById("metaComparacion");
+const metaHora = document.getElementById("metaHora");
+let ticket = 0;
+let dibujables = [];
+let ultimoDato = null;
+
+function pintarFiltros() {
+  document.querySelectorAll("#vistas button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vista === estado.vista)));
+  const gp = document.getElementById("gPeriodo");
+  gp.replaceChildren(...PRESETS.map((p) => el("button", {
+    type: "button", class: "dv-chip", "aria-pressed": String(p.id === estado.preset),
+    onclick: () => elegirPreset(p.id),
+  }, p.etq)));
+  const hayTipos = estado.vista === "produccion";
+  document.getElementById("filaTipos").hidden = !hayTipos;
+  const gt = document.getElementById("gTipos");
+  const opciones = [{ id: null, etq: "Todos" }, ...TIPOS.map((t) => ({ id: t.id, etq: t.id, color: t.color }))];
+  if (estado.tipo === "Otro") opciones.push({ id: "Otro", etq: "Otro", color: COLOR_OTRO });
+  gt.replaceChildren(...opciones.map((o) => el("button", {
+    type: "button", class: "dv-chip", "aria-pressed": String(o.id === estado.tipo),
+    onclick: () => elegirTipo(o.id),
+  }, o.color ? el("span", { class: "dv-punto", style: `background:${o.color}` }) : null, o.etq)));
+  document.getElementById("custom").hidden = estado.preset !== "custom";
+  if (estado.preset === "custom") {
+    document.getElementById("fDesde").value = estado.desde || "";
+    document.getElementById("fHasta").value = estado.hasta || "";
+  }
 }
-
-const ICON_MP = '<svg viewBox="0 0 20 20" fill="none"><path d="M4 16V10M10 16V4M16 16V11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-const ICON_CORRIDAS = '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 8h14" stroke="currentColor" stroke-width="1.8"/></svg>';
-const ICON_PROMEDIO = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 14 L8 8 L11.5 11 L17 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 5H17V9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-// ---------- barras horizontales (categoria + valor), etiqueta y numero siempre visibles ----------
-// La etiqueta nunca envuelve a 2 lineas (se veia mal, cada fila quedaba de
-// alto distinto) - se recorta con "..." si no entra, y el nombre completo
-// queda en el title (tooltip al pasar el mouse / mantener tocado).
-function statBarRow(label, valorTexto, pct, colorStyle, labelWidth, tituloCompleto) {
-  return `
-    <div class="stat-bar-row">
-      <div class="stat-bar-label" style="${labelWidth ? `width:${labelWidth}` : ""}" title="${escapeHtml(tituloCompleto || "")}">${label}</div>
-      <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
-      <div class="stat-bar-value num">${valorTexto}</div>
-    </div>
-  `;
-}
-
-// nombre completo arriba, barra + kg debajo - a diferencia de statBarRow(),
-// esto es para etiquetas largas (razón social) donde ponerlas al lado de la
-// barra deja la barra flotando con un montón de espacio vacío alrededor.
-function statBarRowStacked(label, valorTexto, pct, colorStyle) {
-  return `
-    <div class="stat-bar-row-stacked">
-      <div class="stat-bar-name">${label}</div>
-      <div class="stat-bar-row">
-        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;${colorStyle}"></div></div>
-        <div class="stat-bar-value num">${valorTexto}</div>
-      </div>
-    </div>
-  `;
-}
-
-// ---------- MP procesada por corrida: lista (mas reciente primero), no un grafico mudo ----------
-function renderListaCorridas(corridas) {
-  const cont = document.getElementById("chartCorridas");
-  const datos = corridas
-    .slice()
-    .sort((a, b) => new Date(b.fecha_inicio) - new Date(a.fecha_inicio))
-    .map(c => ({ nombre: c.nombre, valor: mpDeCorrida(c), tipo: c.tipo_proceso }));
-
-  if (datos.length === 0) {
-    cont.innerHTML = '<div class="empty">Todavía no hay corridas registradas.</div>';
+function elegirPreset(id) {
+  estado.preset = id;
+  if (id === "custom") {
+    const r = ultimoDato ? { desde: ultimoDato.periodo.desde, hasta: ultimoDato.periodo.hasta } : {};
+    estado.desde = estado.desde || r.desde || null;
+    estado.hasta = estado.hasta || r.hasta || null;
+    pintarFiltros();
     return;
   }
-  const max = Math.max(...datos.map(d => d.valor), 1);
-  cont.innerHTML = datos.map(d => {
-    const color = colorDeTipo(d.tipo);
-    const dot = `<span class="viz-legend-dot" style="background:${color};margin-right:8px"></span>`;
-    return statBarRow(
-      `${dot}${escapeHtml(d.nombre)}`,
-      `${fmtKg(d.valor)} kg`,
-      Math.max(2, (d.valor / max) * 100),
-      `background:${color}`,
-      "190px",
-      d.nombre
-    );
-  }).join("");
+  guardarEstado();
+  pintarFiltros();
+  cargar();
 }
-
-// ---------- MP por tipo de proceso: PROMEDIO por corrida (no el total, que solo refleja cuantas corridas hubo de cada tipo) ----------
-function renderPorTipo(corridas) {
-  const stats = {};
-  for (const t of TIPO_ORDEN) stats[t.key] = { suma: 0, cuenta: 0 };
-  for (const c of corridas) {
-    const valor = mpDeCorrida(c);
-    if (valor <= 0) continue;
-    const tipo = TIPO_ORDEN.some(t => t.key === c.tipo_proceso) ? c.tipo_proceso : "OTRO";
-    stats[tipo].suma += valor;
-    stats[tipo].cuenta += 1;
-  }
-  const promedios = {};
-  for (const t of TIPO_ORDEN) promedios[t.key] = stats[t.key].cuenta ? stats[t.key].suma / stats[t.key].cuenta : 0;
-  const max = Math.max(...Object.values(promedios), 1);
-
-  const cont = document.getElementById("porTipo");
-  const filas = TIPO_ORDEN
-    .filter(t => stats[t.key].cuenta > 0)
-    .map(t => statBarRow(
-      `${t.label} <span class="stat-bar-sub">(${stats[t.key].cuenta})</span>`,
-      `${fmtKg(promedios[t.key])} kg`,
-      Math.max(2, (promedios[t.key] / max) * 100),
-      `background:var(--${t.clase === "series-otro" ? "text-muted" : t.clase})`,
-      "150px",
-      `${t.label} (${stats[t.key].cuenta})`
-    ));
-  cont.innerHTML = filas.join("") || '<div class="empty">Sin datos.</div>';
+function elegirTipo(id) {
+  estado.tipo = estado.tipo === id ? null : id;       // volver a tocar el mismo tipo quita el filtro
+  guardarEstado();
+  pintarFiltros();
+  cargar();
 }
-
-function renderPorEstado(lotes) {
-  const conteo = { "EN ESPERA": 0, "EN PROCESO": 0, "PROCESADO": 0 };
-  for (const l of lotes) {
-    const e = normEstado(l.estado_actual);
-    if (e in conteo) conteo[e]++;
-  }
-  const max = Math.max(...Object.values(conteo), 1);
-  const cont = document.getElementById("porEstado");
-  cont.innerHTML = ESTADO_ORDEN.map(e => statBarRow(
-    e.label, conteo[e.key], Math.max(2, (conteo[e.key] / max) * 100), `background:var(${e.var})`
-  )).join("");
+function elegirVista(v) {
+  if (estado.vista === v) return;
+  estado.vista = v;
+  ultimoDato = null;
+  guardarEstado();
+  pintarFiltros();
+  cargar();
 }
+document.querySelectorAll("#vistas button").forEach((b) => b.addEventListener("click", () => elegirVista(b.dataset.vista)));
+document.getElementById("bAplicar").addEventListener("click", () => {
+  const d = document.getElementById("fDesde").value, h = document.getElementById("fHasta").value;
+  if (!d || !h) { avisar("Elija las dos fechas: desde y hasta."); return; }
+  if (d > h) { avisar("La fecha «desde» no puede ser posterior a «hasta»."); return; }
+  estado.desde = d; estado.hasta = h;
+  guardarEstado();
+  cargar();
+});
+document.getElementById("bActualizar").addEventListener("click", () => cargar());
 
-// ---------- lotes que todavia tienen saldo (los que de verdad siguen en planta) ----------
-function renderListaSaldo(lotes) {
-  const conSaldo = lotes
-    .filter(l => ["EN PROCESO", "EN ESPERA"].includes(normEstado(l.estado_actual)))
-    .sort((a, b) => Number(b.kg_saldo) - Number(a.kg_saldo));
-
-  const cont = document.getElementById("listaSaldo");
-  if (conSaldo.length === 0) {
-    cont.innerHTML = '<div class="empty">No hay lotes con saldo en este momento.</div>';
-    return;
-  }
-  // el llenado de la barra es relativo al peso neto de CADA lote, no al
-  // lote mas grande de la lista - un lote completo (nunca tocado) siempre
-  // se ve con la barra llena, y solo un lote con saldo PARCIAL de verdad
-  // se ve incompleto (antes lotes completos aparecían con la
-  // barra a medias solo por ser más chicos que el más grande de la lista).
-  cont.innerHTML = conSaldo.map(l => statBarRow(
-    `#${l.numero} <span class="stat-bar-sub">${escapeHtml(l.ubicacion_actual || "—")}</span>`,
-    `${fmtSaldo(l.kg_saldo)} kg`,
-    Math.min(100, Math.max(2, (Number(l.kg_saldo) / Number(l.peso_neto_kg)) * 100)),
-    "background:var(--forest-2)",
-    "120px",
-    `#${l.numero} ${l.ubicacion_actual || "—"}`
-  )).join("");
-}
-
-// ---------- top proveedores por volumen de MP entregado ----------
-function renderPorProveedor(lotes) {
-  const totales = {};
-  for (const l of lotes) {
-    const prov = l.proveedor || "—";
-    totales[prov] = (totales[prov] || 0) + Number(l.peso_neto_kg || 0);
-  }
-  const entradas = Object.entries(totales).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const cont = document.getElementById("porProveedor");
-  if (entradas.length === 0) {
-    cont.innerHTML = '<div class="empty">Sin datos.</div>';
-    return;
-  }
-  const max = entradas[0][1] || 1;
-  cont.innerHTML = entradas.map(([prov, valor]) => statBarRowStacked(
-    escapeHtml(prov),
-    `${fmtKg(valor)} kg`,
-    Math.max(2, (valor / max) * 100),
-    "background:var(--citrus)"
-  )).join("");
-}
-
+// ---------- carga de datos ----------
 async function cargar() {
+  const mi = ++ticket;
+  contenido.classList.add("dv-cargando");
+  metaHora.textContent = "Actualizando…";
   try {
-    const [corridas, lotesTodos] = await Promise.all([
-      apiGet("/api/corridas"), apiGet("/api/lotes"),
-    ]);
-    // un lote derivado (numero negativo) es producto que salió de una
-    // corrida PRE CC, no materia prima nueva - no cuenta para "cuántos
-    // lotes hay" ni "cuánto entregó cada proveedor" (mismo criterio que en
-    // Lotes y los reportes).
-    const lotes = lotesTodos.filter(l => l.numero >= 0);
-
-    const mpProcesada = corridas.reduce((suma, c) => suma + mpDeCorrida(c), 0);
-    const conValor = corridas.filter(c => mpDeCorrida(c) > 0);
-    const promedio = conValor.length ? mpProcesada / conValor.length : 0;
-
-    document.getElementById("kpis").innerHTML = `
-      <div class="kpi with-icon">
-        <div class="kpi-medal citrus">${ICON_MP}</div>
-        <div><div class="kpi-label">MP procesada</div><div class="kpi-value num citrus">${fmtKg(mpProcesada)}</div><div class="kpi-note">Kg, toda la campaña</div></div>
-      </div>
-      <div class="kpi with-icon">
-        <div class="kpi-medal">${ICON_CORRIDAS}</div>
-        <div><div class="kpi-label">Corridas</div><div class="kpi-value num">${corridas.length}</div><div class="kpi-note">Registradas en total</div></div>
-      </div>
-      <div class="kpi with-icon">
-        <div class="kpi-medal">${ICON_PROMEDIO}</div>
-        <div><div class="kpi-label">Promedio por corrida</div><div class="kpi-value num">${fmtKg(promedio)}</div><div class="kpi-note">Kg de MP</div></div>
-      </div>
-    `;
-    ajustarKpiValues(document.getElementById("kpis"));
-
-    renderListaCorridas(corridas);
-    renderPorTipo(corridas);
-    renderPorProveedor(lotes);
-    renderPorEstado(lotes);
-    renderListaSaldo(lotes);
+    const q = new URLSearchParams();
+    const r = rangoDelPreset();
+    if (r.desde) q.set("desde", r.desde);
+    if (r.hasta) q.set("hasta", r.hasta);
+    if (estado.vista === "produccion" && estado.tipo) q.set("tipo", estado.tipo);
+    const datos = await apiGet(`/api/dashboard/${estado.vista}?${q}`);
+    if (mi !== ticket) return;
+    ultimoDato = datos;
+    dibujar(datos);
+    metaHora.textContent = "Actualizado a las " + new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
   } catch (e) {
-    document.getElementById("kpis").innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
+    if (mi !== ticket) return;
+    metaHora.textContent = "";
+    if (ultimoDato) avisar(e.message);
+    else contenido.replaceChildren(el("div", { class: "dv-error" }, el("div", { class: "msg bad", style: "margin:0" }, e.message), el("button", { type: "button", class: "dv-btn primario", onclick: () => cargar() }, "Reintentar")));
+  } finally {
+    if (mi === ticket) contenido.classList.remove("dv-cargando");
   }
 }
 
+function dibujar(d) {
+  metaPeriodo.replaceChildren("Período: ", el("strong", null, fmtRango(d.periodo.desde, d.periodo.hasta)), ` · ${d.periodo.dias} ${d.periodo.dias === 1 ? "día" : "días"}`);
+  metaComp.textContent = d.anterior ? `Comparado con ${fmtRango(d.anterior.desde, d.anterior.hasta)}` : "Sin período anterior para comparar";
+  const pendientes = [];
+  const nodos = estado.vista === "produccion" ? vistaProduccion(d, pendientes) : vistaStock(d, pendientes);
+  contenido.replaceChildren(...nodos);
+  dibujables = pendientes;
+  dibujables.forEach((p) => p());
+}
+let temporizador = null;
+window.addEventListener("resize", () => { clearTimeout(temporizador); temporizador = setTimeout(() => dibujables.forEach((p) => p()), 150); });
+
+// ====================================================================================================
+// piezas de interfaz
+// ====================================================================================================
+function delta(act, prev, mejor, unidad) {
+  // unidad: "%" (variación relativa), "pp" (puntos porcentuales) o "pts" (diferencia absoluta con 1 decimal)
+  if (act === null || act === undefined || prev === null || prev === undefined) return null;
+  let cambio, texto;
+  if (unidad === "%") {
+    if (!prev) return act ? { clase: mejor === "bajo" ? "malo" : "neutro", texto: "Nuevo", aria: "Sin dato en el período anterior" } : null;
+    cambio = (act - prev) / Math.abs(prev);
+    texto = dec(Math.abs(cambio) * 100, 1) + " %";
+  } else if (unidad === "pp") {
+    cambio = (act - prev) * 100;
+    texto = dec(Math.abs(cambio), 1) + " pp";
+  } else {
+    cambio = act - prev;
+    texto = dec(Math.abs(cambio), 2);
+  }
+  if (Math.abs(cambio) < 0.0005) return { clase: "neutro", texto: "Sin cambio", aria: "Sin cambio frente al período anterior" };
+  const sube = cambio > 0;
+  const bueno = mejor === "alto" ? sube : mejor === "bajo" ? !sube : null;
+  // una variación mínima (menos de 1 %, 0,5 pp o 0,05 puntos) es ruido: se muestra, pero sin pintarla de bueno ni de malo
+  const ruido = unidad === "%" ? Math.abs(cambio) < 0.01 : unidad === "pp" ? Math.abs(cambio) < 0.5 : Math.abs(cambio) < 0.05;
+  return {
+    clase: bueno === null || ruido ? "neutro" : bueno ? "bueno" : "malo",
+    texto: (sube ? "▲ " : "▼ ") + texto,
+    aria: `${sube ? "Aumento" : "Disminución"} de ${texto} frente al período anterior`,
+  };
+}
+function chipDelta(d) { return d ? el("span", { class: `dv-delta ${d.clase}`, "aria-label": d.aria }, d.texto) : null; }
+
+function sparkline(valores) {
+  const v = valores.map((x) => (x === null || x === undefined ? null : Number(x)));
+  const util = v.filter((x) => x !== null);
+  if (util.length < 2) return null;
+  const W = 150, H = 28, p = 4;
+  const max = Math.max(...util), min = Math.min(...util, 0);
+  const rango = max - min || 1;
+  const pts = [];
+  v.forEach((x, i) => { if (x !== null) pts.push([p + (i / (v.length - 1)) * (W - 2 * p), H - p - ((x - min) / rango) * (H - 2 * p)]); });
+  const ult = pts[pts.length - 1];
+  return sv("svg", { class: "dv-spark", viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true" },
+    sv("polyline", { points: pts.map((q) => q.join(",")).join(" "), fill: "none", stroke: "var(--text-muted)", "stroke-opacity": ".55", "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round" }),
+    sv("circle", { cx: ult[0], cy: ult[1], r: 4, fill: "var(--forest-2)", stroke: "var(--surface)", "stroke-width": 2 }));
+}
+
+function tarjeta({ etiqueta, valor, unidad, delta: dl, comparado, nota, spark }) {
+  return el("div", { class: "dv-kpi" },
+    el("div", { class: "dv-kpi-etq", title: etiqueta }, etiqueta),
+    el("div", { class: "dv-kpi-valor" }, valor, unidad ? el("small", null, unidad) : null),
+    dl ? el("div", { class: "dv-kpi-delta" }, chipDelta(dl), el("span", { class: "dv-kpi-nota", title: comparado ? "Período anterior: " + comparado : null }, "vs período anterior")) : null,
+    nota ? el("div", { class: "dv-kpi-nota" }, nota) : null,
+    spark || null);
+}
+
+// Panel con título y, si tiene gráfico, un conmutador Gráfico | Tabla (todo gráfico tiene su tabla equivalente).
+function panel(titulo, sub, cuerpo, acciones) {
+  return el("div", { class: "panel" },
+    el("div", { class: "panel-head" },
+      el("div", { class: "dv-panel-titulo" }, el("h3", null, titulo), sub ? el("div", { class: "dv-sub" }, sub) : null),
+      acciones || null),
+    el("div", { class: "panel-body" }, cuerpo));
+}
+function panelConTabla(titulo, sub, dibujarGrafico, tabla, pendientes, pie) {
+  const grafico = el("div");
+  const vistaTabla = el("div", { hidden: true }, tablaSimple(tabla));
+  let verTabla = false;
+  const bG = el("button", { type: "button", "aria-pressed": "true" }, "Gráfico");
+  const bT = el("button", { type: "button", "aria-pressed": "false" }, "Tabla");
+  const cambiar = (t) => {
+    verTabla = t;
+    bG.setAttribute("aria-pressed", String(!t)); bT.setAttribute("aria-pressed", String(t));
+    grafico.hidden = t; vistaTabla.hidden = !t;
+    if (!t) dibujarGrafico(grafico);
+  };
+  bG.addEventListener("click", () => cambiar(false));
+  bT.addEventListener("click", () => cambiar(true));
+  pendientes.push(() => { if (!verTabla) dibujarGrafico(grafico); });
+  return panel(titulo, sub, [grafico, vistaTabla, pie || null], el("div", { class: "dv-seg-btn", role: "group", "aria-label": "Vista" }, bG, bT));
+}
+function tablaSimple({ cols, filas }) {
+  return el("div", { class: "dv-tabla-envoltura" }, el("table", { class: "dv-tabla" },
+    el("thead", null, el("tr", null, cols.map((c, i) => el("th", { class: i ? "d" : "" }, c)))),
+    el("tbody", null, filas.length
+      ? filas.map((f) => el("tr", null, f.map((c, i) => el("td", { class: i ? "d" : "" }, c))))
+      : el("tr", null, el("td", { colspan: cols.length, class: "dv-vacio" }, "Sin datos en este período.")))));
+}
+function leyenda(tipos, tipoActivo, alElegir) {
+  return el("div", { class: "dv-leyenda", role: "group", "aria-label": "Tipos de proceso" }, tipos.map((t) => el("button", {
+    type: "button", class: "dv-chip", "aria-pressed": String(t === tipoActivo), onclick: () => alElegir(t),
+  }, el("span", { class: "dv-punto", style: `background:${colorTipo(t)}` }), t)));
+}
+const vacio = (texto) => el("div", { class: "dv-vacio" }, texto);
+
+// ---------- escala del eje: pasos «redondos» ----------
+function escalaBonita(max, n) {
+  if (max <= 0) return { max: 1, vals: [0, 1] };
+  const crudo = max / n, mag = Math.pow(10, Math.floor(Math.log10(crudo)));
+  const paso = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((s) => s >= crudo);
+  const tope = Math.ceil(max / paso - 1e-9) * paso;
+  const vals = [];
+  for (let v = 0; v <= tope + paso / 1e6; v += paso) vals.push(Math.round(v * 1e6) / 1e6);
+  return { max: tope, vals };
+}
+
+// ---------- columnas (apiladas si hay varias series): una columna por día, semana o mes ----------
+// buckets: [{clave, hasta, total, partes:[{id, nombre, color, valor}], extra?: [[nombre, valor]...]}]
+function dibujarColumnas(cont, buckets, o) {
+  const W = Math.max(300, Math.round(cont.clientWidth || 600)), H = o.alto || 250;
+  const m = { t: 20, r: 6, b: 30, l: 48 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const esc = escalaBonita(Math.max(...buckets.map((b) => b.total), 0), 4);
+  const y = (v) => m.t + ph - (v / esc.max) * ph;
+  const slot = pw / buckets.length;
+  const bw = Math.min(24, Math.max(3, slot * 0.68));
+  const gap = 2;
+  const svg = sv("svg", { class: "dv-svg", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.aria });
+  for (const v of esc.vals) {
+    svg.append(sv("line", { class: v === 0 ? "dv-base" : "dv-grid", x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }));
+    svg.append(sv("text", { class: "dv-eje", x: m.l - 8, y: y(v) + 4, "text-anchor": "end" }, compacto(v)));
+  }
+  const paso = Math.max(1, Math.ceil(64 / slot));
+  buckets.forEach((b, i) => {
+    if (i % paso === 0) svg.append(sv("text", { class: "dv-eje", x: m.l + slot * i + slot / 2, y: H - 10, "text-anchor": "middle" }, etiquetaEje(b, o.gran)));
+  });
+  let pico = -1;
+  buckets.forEach((b, i) => { if (b.total > 0 && (pico < 0 || b.total > buckets[pico].total)) pico = i; });
+  buckets.forEach((b, i) => {
+    const cx = m.l + slot * i + slot / 2;
+    const g = sv("g", { class: "dv-col", tabindex: b.total > 0 ? "0" : null, role: "img", "aria-label": `${tituloBloque(b, o.gran)}: ${o.textoValor(b.total)}` });
+    g.append(sv("rect", { class: "dv-col-fondo", x: m.l + slot * i, y: m.t, width: slot, height: ph, rx: 4 }));
+    const partes = b.partes.filter((p) => p.valor > 0);
+    let acum = 0;
+    partes.forEach((p, k) => {
+      const yTop = y(acum + p.valor), yBase = y(acum);
+      const ultima = k === partes.length - 1;
+      const y0 = yTop + (ultima ? 0 : gap / 2), y1 = yBase - (k === 0 ? 0 : gap / 2);
+      const alto = Math.max(1, y1 - y0);
+      const r = ultima ? Math.min(4, bw / 2, alto) : 0;
+      const x0 = cx - bw / 2, x1 = cx + bw / 2;
+      const d = r > 0
+        ? `M${x0},${y0 + alto} L${x0},${y0 + r} Q${x0},${y0} ${x0 + r},${y0} L${x1 - r},${y0} Q${x1},${y0} ${x1},${y0 + r} L${x1},${y0 + alto} Z`
+        : `M${x0},${y0} H${x1} V${y0 + alto} H${x0} Z`;
+      const seg = sv("path", { class: "dv-seg", d, fill: p.color });
+      if (o.alElegir && p.id) seg.addEventListener("click", () => o.alElegir(p.id));
+      g.append(seg);
+      acum += p.valor;
+    });
+    if (i === pico && b.total > 0) g.append(sv("text", { class: "dv-pico", x: Math.min(Math.max(cx, m.l + 14), W - m.r - 14), y: y(b.total) - 6, "text-anchor": "middle" }, fmtKg(b.total)));
+    if (b.total > 0) conTip(g, () => {
+      const c = el("div");
+      c.append(el("div", { class: "dv-tip-tit" }, tituloBloque(b, o.gran)));
+      [...partes].reverse().forEach((p) => c.append(tipFila(p.color, p.nombre, o.textoValor(p.valor))));
+      if (partes.length > 1) c.append(el("div", { class: "dv-tip-total" }, tipFila(null, "Total", o.textoValor(b.total))));
+      (b.extra || []).forEach(([n, v]) => c.append(tipFila(null, n, v)));
+      return c;
+    });
+    svg.append(g);
+  });
+  cont.replaceChildren(svg);
+}
+
+// ---------- barras horizontales: etiqueta, barra de hasta 12 px y el valor en la punta ----------
+// filas: [{id, etiqueta, sub, valor, color, texto, nota, tip: () => nodo, apagado}]
+function barrasHorizontales(filas, o) {
+  const max = Math.max(...filas.map((f) => f.valor), 1);
+  // la barra más larga llega hasta donde empieza el espacio reservado al valor (--vw): el valor va siempre después de la punta
+  return el("div", { class: "dv-hb-lista" }, filas.map((f) => {
+    const frac = f.valor > 0 ? f.valor / max : 0;
+    const clic = o && o.alElegir && f.id !== undefined;
+    const fila = el("div", {
+      class: "dv-hb" + (o && o.apilado ? " apilado" : "") + (f.apagado ? " apagado" : ""), tabindex: "0",
+      role: clic ? "button" : "group", "aria-label": `${f.etiqueta}: ${f.texto}`,
+      "aria-pressed": clic ? String(!!f.activo) : null,
+    },
+      el("div", { class: "dv-hb-etq", title: f.etiqueta },
+        f.color ? el("span", { class: "dv-punto", style: `background:${f.color}` }) : null,
+        el("span", { class: "t" }, f.etiqueta), f.sub ? el("small", null, f.sub) : null),
+      el("div", { class: "dv-hb-pista" },
+        el("div", { class: "dv-hb-barra", style: `width:calc((100% - var(--vw)) * ${frac});min-width:${frac > 0 ? 2 : 0}px;background:${f.color || (o && o.color) || "var(--forest-2)"}` }),
+        el("div", { class: "dv-hb-val", style: `left:calc((100% - var(--vw)) * ${frac} + 8px)` }, f.texto, f.nota ? el("small", null, f.nota) : null)));
+    if (f.tip) conTip(fila, f.tip);
+    if (clic) {
+      fila.addEventListener("click", () => o.alElegir(f.id));
+      fila.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); o.alElegir(f.id); } });
+    }
+    return fila;
+  }));
+}
+
+// ---------- tabla con columnas ordenables y «mostrar más» ----------
+function tablaOrdenable(cols, datos, ordenInicial, limite) {
+  let orden = { col: ordenInicial.col, asc: ordenInicial.asc };
+  let todas = false;
+  const raiz = el("div");
+  const pintar = () => {
+    const c = cols.find((x) => x.id === orden.col);
+    const ord = [...datos].sort((a, b) => {
+      const va = c.valor(a), vb = c.valor(b);
+      if (va === null || va === undefined) return 1;
+      if (vb === null || vb === undefined) return -1;
+      const r = typeof va === "string" ? va.localeCompare(vb, "es") : va - vb;
+      return (orden.asc ? r : -r) || b.id - a.id;
+    });
+    const visibles = todas ? ord : ord.slice(0, limite);
+    const maxBarra = Math.max(...datos.map((x) => x.mp_kg), 1);
+    const th = cols.map((x) => el("th", { class: x.der ? "d" : "", "aria-sort": x.id === orden.col ? (orden.asc ? "ascending" : "descending") : "none" },
+      el("button", { type: "button", class: "dv-th-ord", onclick: () => { orden = { col: x.id, asc: x.id === orden.col ? !orden.asc : !!x.asc }; pintar(); } },
+        x.etq, el("span", { class: "fl" }, x.id === orden.col ? (orden.asc ? "▲" : "▼") : ""))));
+    const filas = visibles.map((r) => el("tr", null, cols.map((x) => el("td", { class: x.der ? "d" : "" }, x.celda(r, maxBarra)))));
+    raiz.replaceChildren(
+      el("div", { class: "dv-tabla-envoltura" }, el("table", { class: "dv-tabla" }, el("thead", null, el("tr", null, th)), el("tbody", null, filas))),
+      datos.length > limite ? el("div", { class: "dv-mas" }, el("button", { type: "button", class: "dv-btn", onclick: () => { todas = !todas; pintar(); } },
+        todas ? "Mostrar menos" : `Mostrar las ${datos.length} corridas`)) : null);
+  };
+  pintar();
+  return raiz;
+}
+
+// ====================================================================================================
+// vista: PRODUCCIÓN
+// ====================================================================================================
+function vistaProduccion(d, pend) {
+  const k = d.kpis, a = d.kpis_anterior, comp = d.anterior ? fmtRango(d.anterior.desde, d.anterior.hasta) : null;
+  if (d.kpis.corridas === 0) {
+    return [panel("Sin corridas en este período", null, vacio(estado.tipo
+      ? `No hay corridas de tipo ${estado.tipo} entre ${fmtRango(d.periodo.desde, d.periodo.hasta)}. Pruebe con otro período o quite el filtro de tipo.`
+      : `No hay corridas entre ${fmtRango(d.periodo.desde, d.periodo.hasta)}. Pruebe con «Campaña» para ver todo lo registrado.`))];
+  }
+  const porBloque = d.serie;
+  const tipoAct = estado.tipo;
+
+  const kpis = el("div", { class: "dv-kpis" },
+    tarjeta({
+      etiqueta: "MP procesada", valor: fmtKg(k.mp_kg), unidad: "kg",
+      delta: a ? delta(k.mp_kg, a.mp_kg, "alto", "%") : null, comparado: comp,
+      nota: tipoAct ? `Solo ${tipoAct}` : null, spark: sparkline(porBloque.map((b) => b.mp_kg)),
+    }),
+    tarjeta({
+      etiqueta: "Corridas", valor: fmtInt(k.corridas),
+      delta: a ? delta(k.corridas, a.corridas, "alto", "%") : null, comparado: comp,
+      nota: tipoAct ? `Solo ${tipoAct}` : `${d.por_tipo.length} ${d.por_tipo.length === 1 ? "tipo" : "tipos"} de proceso`,
+    }),
+    tarjeta({
+      etiqueta: "Promedio por corrida", valor: fmtKg(k.promedio_kg), unidad: "kg",
+      delta: a ? delta(k.promedio_kg, a.promedio_kg, "alto", "%") : null, comparado: comp,
+      spark: sparkline(porBloque.map((b) => (b.corridas ? b.mp_kg / b.corridas : null))),
+    }),
+    tarjeta({
+      etiqueta: "Producto terminado", valor: fmtKg(k.pt_kg), unidad: "kg",
+      delta: a && a.pt_kg ? delta(k.pt_kg, a.pt_kg, "alto", "%") : null, comparado: comp,
+      nota: `${k.con_pt} de ${k.corridas} corridas con tambores`,
+    }),
+    tarjeta({
+      etiqueta: "Tiempo parado", valor: fmtMin(k.min_parado),
+      delta: a ? delta(k.min_parado, a.min_parado, "bajo", "%") : null, comparado: comp,
+      nota: k.n_paradas ? `${k.n_paradas} ${k.n_paradas === 1 ? "parada" : "paradas"}` + (k.min_parado_suma - k.min_parado >= 1 ? ` · ${fmtMin(k.min_parado_suma)} sumando corridas` : "") : "Sin paradas registradas",
+    }));
+
+  // --- MP en el tiempo (columnas apiladas por tipo)
+  const tiposVistos = [...new Set(porBloque.flatMap((b) => Object.keys(b.por_tipo)))];
+  const orden = [...TIPOS.map((t) => t.id), "Otro"].filter((t) => tiposVistos.includes(t));
+  const buckets = porBloque.map((b) => ({
+    clave: b.clave, hasta: b.hasta, total: b.mp_kg,
+    partes: orden.map((t) => ({ id: t, nombre: t, color: colorTipo(t), valor: b.por_tipo[t] || 0 })),
+    extra: [["Corridas", String(b.corridas)]],
+  }));
+  const tiempo = panelConTabla(
+    "MP procesada en el tiempo",
+    `Kg por ${d.periodo.gran === "dia" ? "día" : d.periodo.gran === "semana" ? "semana" : "mes"}, según la fecha de inicio de la corrida · toque un color para filtrar por tipo`,
+    (cont) => {
+      dibujarColumnas(cont, buckets, { gran: d.periodo.gran, textoValor: (v) => fmtKg(v) + " kg", alElegir: elegirTipo, aria: `MP procesada por ${d.periodo.gran}, ${fmtKg(k.mp_kg)} kg en total` });
+      cont.append(leyenda(orden, tipoAct, elegirTipo));
+    },
+    {
+      cols: ["Período", ...orden, "Total (kg)", "Corridas"],
+      filas: porBloque.map((b) => [tituloBloque(b, d.periodo.gran), ...orden.map((t) => (b.por_tipo[t] ? fmtKg(b.por_tipo[t]) : "—")), fmtKg(b.mp_kg), String(b.corridas)]),
+    }, pend);
+
+  // --- MP por tipo (el desglose ignora el filtro: la barra elegida se resalta entre las demás)
+  const totalMp = d.por_tipo.reduce((s, t) => s + t.mp_kg, 0) || 1;
+  const porTipo = panelConTabla(
+    "MP por tipo de proceso", "Entre paréntesis, las corridas · toque una barra para filtrar todo el tablero",
+    (cont) => {
+      cont.replaceChildren(barrasHorizontales(d.por_tipo.map((t) => ({
+        id: t.tipo, etiqueta: t.tipo, sub: `(${t.corridas})`, valor: t.mp_kg, color: colorTipo(t.tipo),
+        texto: fmtKg(t.mp_kg) + " kg", nota: Math.round((t.mp_kg / totalMp) * 100) + " %", activo: t.tipo === tipoAct, apagado: !!tipoAct && t.tipo !== tipoAct,
+        tip: () => {
+          const c = el("div");
+          c.append(el("div", { class: "dv-tip-tit" }, t.tipo));
+          c.append(tipFila(null, "MP procesada", fmtKg(t.mp_kg) + " kg"), tipFila(null, "Corridas", String(t.corridas)), tipFila(null, "Promedio por corrida", fmtKg(t.promedio_kg) + " kg"));
+          c.append(tipFila(null, "Rendimiento", fmtPct(t.rend)));
+          return c;
+        },
+      })), { alElegir: elegirTipo }));
+    },
+    { cols: ["Tipo", "Corridas", "MP (kg)", "Promedio (kg)", "% de la MP"], filas: d.por_tipo.map((t) => [t.tipo, String(t.corridas), fmtKg(t.mp_kg), fmtKg(t.promedio_kg), Math.round((t.mp_kg / totalMp) * 100) + " %"]) },
+    pend);
+
+  // --- rendimiento por tipo (PT ÷ MP, ponderado por MP)
+  const rend = panel("Rendimiento por tipo",
+    "Producto terminado ÷ MP, ponderado por la MP de cada corrida. Cada tipo tiene su rango propio: no se comparan entre sí.",
+    el("div", { class: "dv-rend" }, d.por_tipo.map((t) => {
+      const dl = d.anterior ? delta(t.rend, t.rend_anterior, "alto", "pp") : null;
+      const fila = el("div", { class: "dv-rend-fila" + (tipoAct && t.tipo !== tipoAct ? " apagado" : ""), role: "button", tabindex: "0", "aria-pressed": String(t.tipo === tipoAct), "aria-label": `${t.tipo}: rendimiento ${fmtPct(t.rend)}` },
+        el("div", { class: "dv-rend-nom" }, el("span", { class: "dv-punto", style: `background:${colorTipo(t.tipo)}` }),
+          el("div", null, t.tipo, el("small", null, t.n_rend ? `${t.n_rend} de ${t.corridas} ${t.corridas === 1 ? "corrida" : "corridas"} con dato` : "Sin dato de producto terminado"))),
+        el("div", null, chipDelta(dl)),
+        el("div", { class: "dv-rend-val" + (t.rend === null ? " sin" : "") }, t.rend === null ? "—" : fmtPct(t.rend)));
+      fila.addEventListener("click", () => elegirTipo(t.tipo));
+      fila.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); elegirTipo(t.tipo); } });
+      conTip(fila, () => {
+        const c = el("div");
+        c.append(el("div", { class: "dv-tip-tit" }, `${t.tipo} · rendimiento`));
+        c.append(tipFila(null, "Este período", fmtPct(t.rend, 2)));
+        if (d.anterior) c.append(tipFila(null, "Período anterior", fmtPct(t.rend_anterior, 2)));
+        c.append(tipFila(null, "Producto terminado", fmtKg(t.pt_kg) + " kg"));
+        return c;
+      });
+      return fila;
+    })));
+
+  // --- paradas
+  const paradas = panelParadas(d);
+
+  // --- proveedores
+  const totProv = d.proveedores.reduce((s, p) => s + p.kg, 0) || 1;
+  const prov = panelConTabla(
+    "Principales proveedores", `MP entregada a las corridas del período${tipoAct ? " (" + tipoAct + ")" : ""}`,
+    (cont) => cont.replaceChildren(d.proveedores.length ? barrasHorizontales(d.proveedores.map((p) => ({
+      etiqueta: p.nombre, valor: p.kg, texto: fmtKg(p.kg) + " kg", nota: Math.round((p.kg / totProv) * 100) + " %", color: "var(--forest-2)",
+      tip: () => { const c = el("div"); c.append(el("div", { class: "dv-tip-tit" }, p.nombre), tipFila(null, "MP entregada", fmtKg(p.kg) + " kg")); return c; },
+    })), { apilado: true }) : vacio("Sin entregas registradas en este período.")),
+    { cols: ["Proveedor", "MP entregada (kg)"], filas: d.proveedores.map((p) => [p.nombre, fmtKg(p.kg)]) }, pend);
+
+  // --- detalle de corridas
+  const cols = [
+    { id: "fecha", etq: "Fecha", asc: false, valor: (r) => r.fecha + String(r.id).padStart(8, "0"), celda: (r) => fmtDia(r.fecha, true) },
+    { id: "nombre", etq: "Corrida", asc: true, valor: (r) => r.nombre || "", celda: (r) => el("span", { style: "display:inline-flex;align-items:center;gap:8px" }, r.nombre || "—", r.abierta ? el("span", { class: "dv-estado" }, "En curso") : null) },
+    { id: "tipo", etq: "Tipo", asc: true, valor: (r) => r.tipo, celda: (r) => el("span", { style: "display:inline-flex;align-items:center;gap:7px" }, el("span", { class: "dv-punto", style: `background:${colorTipo(r.tipo)}` }), r.tipo) },
+    { id: "mp", etq: "MP (kg)", der: true, asc: false, valor: (r) => r.mp_kg, celda: (r, mx) => el("div", { class: "dv-celda-barra" }, el("span", null, fmtKg(r.mp_kg)), el("span", { class: "mini" }, el("i", { style: `width:${Math.max(2, (r.mp_kg / mx) * 100)}%` }))) },
+    { id: "pt", etq: "PT (kg)", der: true, asc: false, valor: (r) => r.pt_kg, celda: (r) => (r.pt_kg ? fmtKg(r.pt_kg) : "—") },
+    { id: "rend", etq: "Rend.", der: true, asc: false, valor: (r) => r.rend, celda: (r) => (r.rend === null ? "—" : fmtPct(r.rend)) },
+    { id: "par", etq: "Paradas", der: true, asc: false, valor: (r) => r.min_parado, celda: (r) => (r.min_parado ? fmtMin(r.min_parado) : "—") },
+  ];
+  const detalle = panel("Detalle de corridas", `${d.corridas.length} ${d.corridas.length === 1 ? "corrida" : "corridas"} del período · toque un encabezado para ordenar`, tablaOrdenable(cols, d.corridas, { col: "fecha", asc: false }, 12));
+
+  return [kpis,
+    el("div", { class: "dv-g" }, tiempo),
+    el("div", { class: "dv-g g-12" }, porTipo, rend),
+    el("div", { class: "dv-g g-11" }, paradas, prov),
+    detalle];
+}
+
+function panelParadas(d) {
+  const p = d.paradas;
+  const cuerpo = el("div");
+  let vista = "area";
+  const bA = el("button", { type: "button", "aria-pressed": "true" }, "Por área");
+  const bT = el("button", { type: "button", "aria-pressed": "false" }, "Por tipo");
+  const pintar = () => {
+    bA.setAttribute("aria-pressed", String(vista === "area")); bT.setAttribute("aria-pressed", String(vista === "tipo"));
+    const items = vista === "area" ? p.por_area : p.por_tipo;
+    const total = items.reduce((s, x) => s + x.min, 0) || 1;
+    cuerpo.replaceChildren(items.length ? barrasHorizontales(items.map((x) => ({
+      etiqueta: x.nombre, valor: x.min, texto: fmtMin(x.min), nota: Math.round((x.min / total) * 100) + " %", color: "var(--citrus)",
+      tip: () => { const c = el("div"); c.append(el("div", { class: "dv-tip-tit" }, x.nombre), tipFila(null, "Tiempo parado", fmtMin(x.min)), tipFila(null, "Del total de paradas", Math.round((x.min / total) * 100) + " %")); return c; },
+    })), {}) : vacio("Sin paradas registradas en este período."));
+  };
+  bA.addEventListener("click", () => { vista = "area"; pintar(); });
+  bT.addEventListener("click", () => { vista = "tipo"; pintar(); });
+  pintar();
+  const sub = p.n ? `${fmtMin(p.total_min)} con la planta parada · ${p.n} ${p.n === 1 ? "parada" : "paradas"}` : "Tiempo con la planta parada";
+  return panel("Paradas", sub, cuerpo, el("div", { class: "dv-seg-btn", role: "group", "aria-label": "Agrupar por" }, bA, bT));
+}
+
+// ====================================================================================================
+// vista: STOCK Y LOTES
+// ====================================================================================================
+function vistaStock(d, pend) {
+  const r = d.recibida, ra = d.recibida_anterior, comp = d.anterior ? fmtRango(d.anterior.desde, d.anterior.hasta) : null;
+  const kpis = el("div", { class: "dv-kpis" },
+    tarjeta({ etiqueta: "Stock en planta", valor: fmtKg(d.stock.kg), unidad: "kg", nota: `${d.stock.lotes} ${d.stock.lotes === 1 ? "lote" : "lotes"} con saldo · foto de hoy` }),
+    tarjeta({ etiqueta: "MP recibida", valor: fmtKg(r.kg), unidad: "kg", delta: ra ? delta(r.kg, ra.kg, "alto", "%") : null, comparado: comp, spark: sparkline(d.serie.map((b) => b.kg)) }),
+    tarjeta({ etiqueta: "Lotes recibidos", valor: fmtInt(r.lotes), delta: ra ? delta(r.lotes, ra.lotes, "alto", "%") : null, comparado: comp, }),
+    tarjeta({ etiqueta: "Brix de recepción", valor: r.brix === null ? "—" : dec(r.brix, 2), unidad: "°Bx", delta: ra && r.brix !== null ? delta(r.brix, ra.brix, "alto", "pts") : null, comparado: comp, nota: "Promedio ponderado por kg" }),
+    tarjeta({ etiqueta: "Ratio", valor: r.ratio === null ? "—" : dec(r.ratio, 2), delta: ra && r.ratio !== null ? delta(r.ratio, ra.ratio, "alto", "pts") : null, comparado: comp, nota: "Brix ÷ acidez, ponderado por kg" }));
+
+  const buckets = d.serie.map((b) => ({ clave: b.clave, hasta: b.hasta, total: b.kg, partes: [{ id: null, nombre: "MP recibida", color: "var(--forest-2)", valor: b.kg }], extra: [["Lotes", String(b.lotes)]] }));
+  const tiempo = panelConTabla(
+    "MP recibida en el tiempo", `Kg de materia prima que llegó por ${d.periodo.gran === "dia" ? "día" : d.periodo.gran === "semana" ? "semana" : "mes"}, según la fecha de ingreso del lote`,
+    (cont) => dibujarColumnas(cont, buckets, { gran: d.periodo.gran, textoValor: (v) => fmtKg(v) + " kg", aria: `MP recibida por ${d.periodo.gran}, ${fmtKg(r.kg)} kg en total` }),
+    { cols: ["Período", "MP recibida (kg)", "Lotes"], filas: d.serie.map((b) => [tituloBloque(b, d.periodo.gran), fmtKg(b.kg), String(b.lotes)]) }, pend);
+
+  const totalStock = d.stock.kg || 1;
+  const ubic = panelConTabla(
+    "Stock por ubicación", "Lo que hay hoy en cada silo, rampa o bodega",
+    (cont) => cont.replaceChildren(d.por_ubicacion.length ? barrasHorizontales(d.por_ubicacion.map((u) => ({
+      etiqueta: u.nombre, sub: `${u.lotes} ${u.lotes === 1 ? "lote" : "lotes"}`, valor: u.kg, texto: fmtKg(u.kg) + " kg", nota: Math.round((u.kg / totalStock) * 100) + " %", color: "var(--forest-2)",
+      tip: () => { const c = el("div"); c.append(el("div", { class: "dv-tip-tit" }, u.nombre), tipFila(null, "Saldo", fmtKg(u.kg) + " kg"), tipFila(null, "Lotes", String(u.lotes))); return c; },
+    })), {}) : vacio("No hay lotes con saldo en este momento.")),
+    { cols: ["Ubicación", "Lotes", "Saldo (kg)"], filas: d.por_ubicacion.map((u) => [u.nombre, String(u.lotes), fmtKg(u.kg)]) }, pend);
+
+  // antigüedad: categorías ordenadas → un solo tono que se oscurece con la edad
+  const tonos = ["var(--citrus-light)", "var(--citrus)", "var(--citrus-big)", "var(--bad)", "var(--text-muted)"];
+  const antig = panelConTabla(
+    "Antigüedad del stock", "Días desde que ingresó cada lote que sigue en planta",
+    (cont) => cont.replaceChildren(d.stock.lotes ? barrasHorizontales(d.antiguedad.map((t, i) => ({
+      etiqueta: t.nombre, valor: t.kg, texto: fmtKg(t.kg) + " kg", nota: `${t.lotes} ${t.lotes === 1 ? "lote" : "lotes"}`, color: tonos[i] || tonos[4],
+      tip: () => { const c = el("div"); c.append(el("div", { class: "dv-tip-tit" }, t.nombre), tipFila(null, "Saldo", fmtKg(t.kg) + " kg"), tipFila(null, "Lotes", String(t.lotes))); return c; },
+    })), {}) : vacio("No hay lotes con saldo en este momento.")),
+    { cols: ["Antigüedad", "Lotes", "Saldo (kg)"], filas: d.antiguedad.map((t) => [t.nombre, String(t.lotes), fmtKg(t.kg)]) }, pend);
+
+  const colsProv = [
+    { id: "nombre", etq: "Proveedor", asc: true, valor: (x) => x.nombre, celda: (x) => x.nombre },
+    { id: "kg", etq: "MP (kg)", der: true, asc: false, valor: (x) => x.kg, celda: (x, mx) => el("div", { class: "dv-celda-barra" }, el("span", null, fmtKg(x.kg)), el("span", { class: "mini" }, el("i", { style: `width:${Math.max(2, (x.kg / mx) * 100)}%` }))) },
+    { id: "lotes", etq: "Lotes", der: true, asc: false, valor: (x) => x.lotes, celda: (x) => String(x.lotes) },
+    { id: "brix", etq: "Brix", der: true, asc: false, valor: (x) => x.brix, celda: (x) => (x.brix === null ? "—" : dec(x.brix, 2)) },
+    { id: "acidez", etq: "Acidez", der: true, asc: false, valor: (x) => x.acidez, celda: (x) => (x.acidez === null ? "—" : dec(x.acidez, 2)) },
+    { id: "ratio", etq: "Ratio", der: true, asc: false, valor: (x) => x.ratio, celda: (x) => (x.ratio === null ? "—" : dec(x.ratio, 2)) },
+  ];
+  const datosProv = d.proveedores.map((x, i) => ({ ...x, id: i, mp_kg: x.kg }));
+  const provs = panel("Proveedores del período", "MP recibida y su calidad promedio (ponderada por kg) · toque un encabezado para ordenar",
+    datosProv.length ? tablaOrdenable(colsProv, datosProv, { col: "kg", asc: false }, 12) : vacio("No llegó materia prima en este período."));
+
+  const colsLotes = [
+    { id: "numero", etq: "Lote", asc: false, valor: (x) => x.numero, celda: (x) => "#" + x.numero },
+    { id: "prov", etq: "Proveedor", asc: true, valor: (x) => x.proveedor || "", celda: (x) => x.proveedor || "—" },
+    { id: "ubic", etq: "Ubicación", asc: true, valor: (x) => x.ubicacion || "", celda: (x) => x.ubicacion || "—" },
+    { id: "estado", etq: "Estado", asc: true, valor: (x) => x.estado, celda: (x) => (x.estado === "EN PROCESO" ? "En proceso" : "En espera") },
+    { id: "saldo", etq: "Saldo (kg)", der: true, asc: false, valor: (x) => x.kg_saldo, celda: (x) => fmtKg(x.kg_saldo) },
+    { id: "dias", etq: "Días", der: true, asc: false, valor: (x) => x.dias, celda: (x) => (x.dias === null ? "—" : String(x.dias)) },
+  ];
+  const datosLotes = d.lotes_saldo.map((x) => ({ ...x, id: x.numero, mp_kg: x.kg_saldo }));
+  const lotes = panel("Lotes con saldo en planta", "Los más antiguos primero",
+    datosLotes.length ? tablaOrdenable(colsLotes, datosLotes, { col: "dias", asc: false }, 12) : vacio("No hay lotes con saldo en este momento."));
+
+  return [kpis, el("div", { class: "dv-g" }, tiempo), el("div", { class: "dv-g g-11" }, ubic, antig), provs, lotes];
+}
+
+// ---------- arranque ----------
+pintarFiltros();
 cargar();
 </script>
 </body>

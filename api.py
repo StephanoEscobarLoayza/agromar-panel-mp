@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import logging
 import os
+import asyncio
 import re
 import secrets
 import time
@@ -29,9 +30,11 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import InterfaceError, OperationalError
 
 from db import crear_motor
 from sync_lotes import sincronizar_lotes
+import dashboard
 from reporte_base import ahora_peru
 from reporte_corrida import generar_reporte_pdf
 from reporte_periodo import generar_reporte_periodo_pdf
@@ -48,7 +51,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL_POOLED") or os.environ.get("DATABASE
 if not DATABASE_URL:
     raise RuntimeError("Falta DATABASE_URL o DATABASE_URL_POOLED en .env")
 
-engine = crear_motor(DATABASE_URL, pool_pre_ping=True)
+engine = crear_motor(DATABASE_URL, pool_pre_ping=True, pool_recycle=240)
 
 # La documentación automática (/docs, /redoc, /openapi.json) queda apagada: describe todos los endpoints y no la necesita el usuario.
 # Tampoco hay CORS: las páginas y la API salen del mismo servicio, así que ningún otro sitio debe poder llamarla desde un navegador.
@@ -208,10 +211,23 @@ def logout(request: Request):
     return resp
 
 
+MENSAJE_SIN_BD = ("Se perdió la conexión con la base de datos por un momento. Intente de nuevo en unos segundos; "
+                  "si estaba guardando, revise primero si el registro ya quedó.")
+_CABECERAS_REINTENTO = {"Retry-After": "2", "X-Reintentable": "1"}
+
+
+def _es_error_de_conexion(e: Exception) -> bool:
+    """La base (Neon) cortó la conexión o no respondió: no es culpa del dato que se mandó, basta con volver a intentar."""
+    return isinstance(e, (OperationalError, InterfaceError)) or bool(getattr(e, "connection_invalidated", False))
+
+
 def _error_http(e: Exception) -> HTTPException:
     """Traduce un error de la base de datos a un mensaje claro para el usuario. Las reglas escritas a propósito en la base
     (como «el lote solo tiene X kg de saldo») ya vienen en español y se muestran tal cual; los demás errores se anotan en el
     registro del servidor y al usuario solo se le dice qué tipo de problema fue."""
+    if _es_error_de_conexion(e):
+        _log.error("Conexión con la base de datos perdida: %s", str(e).split("\n")[0][:200])
+        return HTTPException(status_code=503, detail=MENSAJE_SIN_BD, headers=_CABECERAS_REINTENTO)
     orig = getattr(e, "orig", None) or e
     codigo = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None) or ""
     mensaje = ""
@@ -244,6 +260,24 @@ def _error_http(e: Exception) -> HTTPException:
 
 def rows(result):
     return [dict(r._mapping) for r in result]
+
+
+def _pedir_confirmacion(mensaje: str) -> JSONResponse:
+    """409 que la pantalla convierte en «¿Registrarlo de todos modos?»: el dato parece repetido o se cruza con otro. Si la
+    persona confirma, la pantalla repite el envío con `forzar: true`."""
+    return JSONResponse(status_code=409, content={"detail": mensaje, "requiere_confirmacion": True})
+
+
+def _instante(texto, campo: str) -> datetime:
+    """Fecha y hora escritas como «2026-11-03T13:53» (hora local de la planta, tal cual las manda el navegador)."""
+    try:
+        return datetime.fromisoformat(str(texto))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail=f"La {campo} no es válida.")
+
+
+def _hm(valor) -> str:
+    return valor.strftime("%d/%m %H:%M") if isinstance(valor, datetime) else "—"
 
 
 def one(result):
@@ -1091,6 +1125,9 @@ def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
     en la nube suele correr en UTC, así que un now() del servidor quedaría ~5
     horas adelantado frente a fecha_inicio - mismo caso ya resuelto en paradas."""
     with engine.begin() as conn:
+        inicio = conn.execute(text("SELECT fecha_inicio FROM corridas WHERE id = :id"), {"id": corrida_id}).scalar()
+        if inicio is not None and _instante(f.fecha_final, "hora de fin") < inicio:
+            raise HTTPException(status_code=400, detail=f"La hora de fin no puede ser anterior al inicio de la corrida ({_hm(inicio)}).")
         result = conn.execute(
             text(
                 f"""
@@ -1402,6 +1439,83 @@ def reporte_periodo_pdf(desde: str, hasta: str):
             "Cache-Control": "no-store",
         },
     )
+
+
+def _periodo_dashboard(desde: Optional[str], hasta: Optional[str], primera, hoy):
+    """Lee el período pedido (AAAA-MM-DD). Sin fechas: desde la primera corrida de la campaña hasta hoy."""
+    try:
+        d = datetime.strptime(desde, "%Y-%m-%d").date() if desde else (primera or hoy)
+        h = datetime.strptime(hasta, "%Y-%m-%d").date() if hasta else hoy
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fechas no válidas. Utilice el formato AAAA-MM-DD.")
+    if d > h:
+        raise HTTPException(status_code=400, detail="La fecha «desde» no puede ser posterior a «hasta».")
+    if (h - d).days > 1100:
+        raise HTTPException(status_code=400, detail="El período es demasiado largo. Elija un rango de hasta tres años.")
+    return d, h
+
+
+@app.get("/api/dashboard/produccion")
+def dashboard_produccion(desde: Optional[str] = None, hasta: Optional[str] = None, tipo: Optional[str] = None):
+    """Panel de producción ya agregado (totales, series, comparación con el período anterior). Ver dashboard.py."""
+    if tipo is not None and tipo not in (*dashboard.TIPOS, dashboard.OTRO):
+        raise HTTPException(status_code=400, detail="Tipo de proceso no válido.")
+    hoy = ahora_peru().date()
+    with engine.connect() as conn:
+        lim = conn.execute(text("SELECT MIN(fecha_inicio) AS p, MAX(fecha_inicio) AS u FROM corridas")).fetchone()
+        primera = lim.p.date() if lim and lim.p else None
+        ultima = lim.u.date() if lim and lim.u else None
+        d, h = _periodo_dashboard(desde, hasta, primera, hoy)
+        ant_d, _ = dashboard.ventana_anterior(d, h)
+        p = {"d": ant_d, "h": h + timedelta(days=1), "d_act": d}
+        corridas = rows(conn.execute(text(
+            """
+            SELECT v.*, c.rendimiento
+            FROM v_cuadre_corridas v JOIN corridas c ON c.id = v.id
+            WHERE v.fecha_inicio >= :d AND v.fecha_inicio < :h
+            """
+        ), {"d": p["d"], "h": p["h"]}))
+        productos = rows(conn.execute(text(
+            """
+            SELECT p.corrida_id, p.tipo, p.pt_kg, p.volumen_litros, p.cuenta_como_pt
+            FROM corrida_productos p JOIN corridas c ON c.id = p.corrida_id
+            WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
+            """
+        ), {"d": p["d"], "h": p["h"]}))
+        paradas = rows(conn.execute(text(
+            """
+            SELECT p.corrida_id, p.hora_inicio, p.hora_fin, p.area_proceso, p.tipo_parada
+            FROM paradas p JOIN corridas c ON c.id = p.corrida_id
+            WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h
+            """
+        ), {"d": p["d"], "h": p["h"]}))
+        proveedores = rows(conn.execute(text(
+            """
+            SELECT a.corrida_id, l.proveedor, SUM(a.kg_asignados) AS kg
+            FROM asignaciones a
+            JOIN corridas c ON c.id = a.corrida_id
+            JOIN lotes l ON l.numero = a.lote_numero
+            WHERE c.fecha_inicio >= :d AND c.fecha_inicio < :h AND a.kg_asignados IS NOT NULL
+              AND a.lote_numero >= 0  -- "MP entregada": un lote derivado es el mismo kg reprocesado, no una entrega nueva
+            GROUP BY a.corrida_id, l.proveedor
+            """
+        ), {"d": p["d_act"], "h": p["h"]}))
+    limites = {"primera": primera.isoformat() if primera else None, "ultima": ultima.isoformat() if ultima else None, "hoy": hoy.isoformat()}
+    return dashboard.armar_produccion(corridas, productos, paradas, proveedores, d, h, tipo, limites)
+
+
+@app.get("/api/dashboard/stock")
+def dashboard_stock(desde: Optional[str] = None, hasta: Optional[str] = None):
+    """Panel de stock y lotes: lo que hay en planta hoy + la MP recibida del período con su calidad. Ver dashboard.py."""
+    hoy = ahora_peru().date()
+    with engine.connect() as conn:
+        lim = conn.execute(text("SELECT MIN(fecha_ingreso) AS p, MAX(fecha_ingreso) AS u FROM lotes WHERE numero >= 0")).fetchone()
+        primera = lim.p if lim and lim.p else None
+        ultima = lim.u if lim and lim.u else None
+        d, h = _periodo_dashboard(desde, hasta, primera, hoy)
+        lotes = rows(conn.execute(text("SELECT * FROM v_saldo_lotes WHERE numero >= 0")))
+    limites = {"primera": primera.isoformat() if primera else None, "ultima": ultima.isoformat() if ultima else None, "hoy": hoy.isoformat()}
+    return dashboard.armar_stock(lotes, d, h, hoy, limites)
 
 
 def _secuencia_corridas(conn) -> list:
@@ -2080,6 +2194,7 @@ class DatosParada(BaseModel):
     responsable_solucion: Optional[str] = None
     solucion_obs: Optional[str] = None
     recomendacion: Optional[str] = None
+    forzar: bool = False      # la persona confirmó registrarla aunque se cruce con otra parada de la misma corrida
 
 
 class NuevaParada(DatosParada):
@@ -2102,12 +2217,44 @@ def _params_parada(p: DatosParada):
     }
 
 
+def _validar_horas_parada(hora_inicio, hora_fin):
+    ini = _instante(hora_inicio, "hora de inicio")
+    if hora_fin and _instante(hora_fin, "hora de fin") < ini:
+        raise HTTPException(status_code=400, detail="La hora de fin no puede ser anterior a la hora de inicio.")
+
+
+def _solape_de_parada(conn, corrida_id, hora_inicio, hora_fin, excluir_id=None):
+    """Otra parada de la MISMA corrida que se cruza con esta (hora_fin vacía = sigue en curso): devuelve (inicio, fin) de la primera."""
+    return conn.execute(
+        text(
+            """
+            SELECT hora_inicio, hora_fin FROM paradas
+            WHERE corrida_id = :c
+              AND (CAST(:ex AS integer) IS NULL OR id <> CAST(:ex AS integer))
+              AND hora_inicio < COALESCE(CAST(:fin AS timestamp), 'infinity'::timestamp)
+              AND COALESCE(hora_fin, 'infinity'::timestamp) > CAST(:ini AS timestamp)
+            ORDER BY hora_inicio LIMIT 1
+            """
+        ),
+        {"c": corrida_id, "ex": excluir_id, "ini": hora_inicio, "fin": hora_fin or None},
+    ).fetchone()
+
+
+def _aviso_de_cruce(cruce) -> JSONResponse:
+    return _pedir_confirmacion(f"Esta parada se cruza con otra ya registrada en la misma corrida ({_hm(cruce[0])} a {_hm(cruce[1]) if cruce[1] else 'en curso'}).")
+
+
 @app.post("/api/paradas")
 def crear_parada(p: NuevaParada):
     if not p.hora_inicio:
         raise HTTPException(status_code=400, detail="La hora de inicio es obligatoria.")
+    _validar_horas_parada(p.hora_inicio, p.hora_fin)
     try:
         with engine.begin() as conn:
+            if not p.forzar:
+                cruce = _solape_de_parada(conn, p.corrida_id, p.hora_inicio, p.hora_fin)
+                if cruce:
+                    return _aviso_de_cruce(cruce)
             result = conn.execute(
                 text(
                     """
@@ -2144,6 +2291,9 @@ def cerrar_parada(parada_id: int, p: CerrarParada):
     correr en UTC, así que un now() del servidor quedaría ~5 horas adelantado
     frente a hora_inicio y la duración calculada saldría mal."""
     with engine.begin() as conn:
+        inicio = conn.execute(text("SELECT hora_inicio FROM paradas WHERE id = :id AND hora_fin IS NULL"), {"id": parada_id}).scalar()
+        if inicio is not None and _instante(p.hora_fin, "hora de fin") < inicio:
+            raise HTTPException(status_code=400, detail=f"La hora de fin no puede ser anterior a la hora de inicio ({_hm(inicio)}).")
         result = conn.execute(
             text(
                 """
@@ -2163,8 +2313,16 @@ def cerrar_parada(parada_id: int, p: CerrarParada):
 def editar_parada(parada_id: int, p: DatosParada):
     if not p.hora_inicio:
         raise HTTPException(status_code=400, detail="La hora de inicio es obligatoria.")
+    _validar_horas_parada(p.hora_inicio, p.hora_fin)
     try:
         with engine.begin() as conn:
+            corrida_id = conn.execute(text("SELECT corrida_id FROM paradas WHERE id = :id"), {"id": parada_id}).scalar()
+            if corrida_id is None:
+                raise HTTPException(status_code=404, detail="Parada no encontrada.")
+            if not p.forzar:
+                cruce = _solape_de_parada(conn, corrida_id, p.hora_inicio, p.hora_fin, excluir_id=parada_id)
+                if cruce:
+                    return _aviso_de_cruce(cruce)
             result = conn.execute(
                 text(
                     """
@@ -2283,6 +2441,7 @@ class NuevaMedicionTanque(BaseModel):
     ph: Optional[float] = None
     observaciones: Optional[str] = ""
     lotes: Optional[List[int]] = None  # lotes que alimentaron este tanque (hasta 5); None = no tocar
+    forzar: bool = False               # la persona confirmó registrarlo aunque ya haya un tanque con ese nombre en la corrida
 
 
 def _numero_tanque(nombre):
@@ -2326,6 +2485,14 @@ def crear_medicion_tanque(m: NuevaMedicionTanque):
         raise HTTPException(status_code=500, detail="No se pudieron guardar los lotes del tanque.")
     try:
         with engine.begin() as conn:
+            if not m.forzar:
+                previo = conn.execute(
+                    text("SELECT litros, brix_inicial, brix_final FROM mediciones_tanque WHERE corrida_id = :c AND upper(replace(tanque, ' ', '')) = :t ORDER BY id LIMIT 1"),
+                    {"c": m.corrida_id, "t": tanque.upper().replace(" ", "")},
+                ).fetchone()
+                if previo:
+                    litros = f"{float(previo.litros):,.0f} L, " if previo.litros is not None else ""
+                    return _pedir_confirmacion(f"Ya hay un {tanque.upper()} registrado en esta corrida ({litros}Brix {float(previo.brix_inicial):g} a {float(previo.brix_final):g}).")
             # un tanque que se registra tarde (p. ej. el TK12 cuando ya están el TK11 y el TK13) queda en su lugar por número
             numero = _numero_tanque(tanque)
             hora = None
@@ -2640,6 +2807,50 @@ def _raiz():
 # para páginas (lo que ve alguien navegando); /api/* sigue devolviendo JSON
 # tal cual, porque apiGet/apiPost en app.js leen el campo "detail" del JSON
 # para mostrar el mensaje de error real (ej. "Este lote solo tiene X kg...").
+async def _bd_sin_conexion(request: Request, exc: Exception):
+    """Una consulta que no llegó a una excepción propia (no pasó por _error_http): también se responde 503 en español."""
+    _log.error("Conexión con la base de datos perdida: %s", str(exc).split("\n")[0][:200])
+    return JSONResponse(status_code=503, content={"detail": MENSAJE_SIN_BD}, headers=_CABECERAS_REINTENTO)
+
+
+app.add_exception_handler(OperationalError, _bd_sin_conexion)
+app.add_exception_handler(InterfaceError, _bd_sin_conexion)
+
+
+class _ReintentoLecturas:
+    """Si una LECTURA (GET) falla porque la base cortó la conexión (503 con X-Reintentable), la repite una vez antes de
+    mostrarle el error a nadie: Neon cierra conexiones y el usuario no tiene por qué enterarse. Las escrituras nunca se
+    repiten solas (podrían duplicarse)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["method"] != "GET":
+            return await self.app(scope, receive, send)
+        for intento in (1, 2):
+            mensajes, reintentar = [], False
+
+            async def captura(mensaje):
+                nonlocal reintentar
+                mensajes.append(mensaje)
+                if mensaje["type"] == "http.response.start" and intento == 1 and mensaje["status"] == 503:
+                    if (b"x-reintentable", b"1") in [(k.lower(), v) for k, v in mensaje.get("headers", [])]:
+                        reintentar = True
+
+            await self.app(scope, receive, captura)
+            if reintentar:
+                _log.warning("Lectura repetida tras perder la conexión con la base: %s", scope.get("path"))
+                await asyncio.sleep(0.8)
+                continue
+            for mensaje in mensajes:
+                await send(mensaje)
+            return
+
+
+app.add_middleware(_ReintentoLecturas)
+
+
 @app.exception_handler(StarletteHTTPException)
 async def _404_con_marca(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 404 and not request.url.path.startswith("/api/"):

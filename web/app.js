@@ -65,46 +65,133 @@ function _mensajeError(body, res) {
   return d || `Error ${res.status}`;
 }
 
+// ---------- conexión con el servidor ----------
+// Mensajes claros en español cuando falla la red (antes salía «Failed to fetch»), tiempo máximo de espera, reintento
+// automático de las LECTURAS y protección contra el doble envío de las escrituras. Una escritura nunca se repite sola:
+// podría quedar duplicada si la respuesta se perdió pero el dato sí llegó.
+class ErrorApi extends Error {
+  constructor(mensaje, { estado = 0, sinConexion = false, confirmable = false } = {}) {
+    super(mensaje);
+    this.name = "ErrorApi";
+    this.estado = estado;
+    this.sinConexion = sinConexion;     // el navegador no pudo hablar con el servidor
+    this.confirmable = confirmable;     // el servidor pide confirmar («parece repetido», «se cruza con otra»)
+  }
+}
+const MSG_SIN_CONEXION = "No hay conexión con el servidor. Revise su internet: lo que escribió sigue en pantalla; vuelva a intentarlo cuando regrese la conexión.";
+const MSG_LENTO = "El servidor tardó demasiado en responder. Espere unos segundos y vuelva a intentarlo; antes de repetir, revise si el registro ya se guardó.";
+const MSG_NO_DISPONIBLE = "El servidor no está disponible por un momento. Intente de nuevo en unos segundos.";
+const PLAZO_MS = 30000;
+
+const _espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function _fetch(path, opciones = {}, reintentos = 0) {
+  for (let intento = 0; ; intento++) {
+    const control = new AbortController();
+    const temporizador = setTimeout(() => control.abort(), PLAZO_MS);
+    try {
+      const res = await fetch(path, { ...opciones, signal: control.signal });
+      clearTimeout(temporizador);
+      if ([502, 503, 504].includes(res.status) && intento < reintentos) { await _espera(900 * (intento + 1)); continue; }
+      _servidorRespondio(true);
+      return res;
+    } catch (e) {
+      clearTimeout(temporizador);
+      if (intento < reintentos) { await _espera(900 * (intento + 1)); continue; }
+      const lento = !!(e && e.name === "AbortError");
+      if (!lento) _servidorRespondio(false);
+      throw new ErrorApi(lento ? MSG_LENTO : MSG_SIN_CONEXION, { sinConexion: !lento });
+    }
+  }
+}
+
+async function _leer(res, tolerante) {
+  if (!res.ok) {
+    const corte = _siNoAutenticado(res);
+    if (corte) return corte;
+  }
+  if (res.ok && !tolerante) return res.json();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const sinDetalle = !(body && body.detail);
+    const mensaje = sinDetalle && [502, 503, 504].includes(res.status) ? MSG_NO_DISPONIBLE : _mensajeError(body, res);
+    throw new ErrorApi(mensaje, { estado: res.status, confirmable: !!(body && body.requiere_confirmacion) });
+  }
+  return body;
+}
+
+// Un envío idéntico mientras el primero sigue en camino (o terminó hace un instante) no se manda otra vez: es el doble clic.
+const _enVuelo = new Map();
+const _recientes = new Map();
+function _unico(clave, enviar) {
+  const ahora = Date.now();
+  for (const [k, v] of _recientes) if (ahora - v.cuando > 5000) _recientes.delete(k);
+  const reciente = _recientes.get(clave);
+  if (reciente && ahora - reciente.cuando < 1200) return Promise.resolve(reciente.resultado);
+  if (_enVuelo.has(clave)) return _enVuelo.get(clave);
+  const promesa = enviar()
+    .then((r) => { _recientes.set(clave, { cuando: Date.now(), resultado: r }); return r; })
+    .finally(() => _enVuelo.delete(clave));
+  _enVuelo.set(clave, promesa);
+  return promesa;
+}
+
 async function apiGet(path) {
-  const res = await fetch(path);
-  if (!res.ok) {
-    const corte = _siNoAutenticado(res);
-    if (corte) return corte;
-    const body = await res.json().catch(() => ({}));
-    throw new Error(_mensajeError(body, res));
-  }
-  return res.json();
+  return _leer(await _fetch(path, {}, 2));
 }
 
-async function apiPost(path, data) {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const corte = _siNoAutenticado(res);
-    if (corte) return corte;
-  }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(_mensajeError(body, res));
-  }
-  return body;
+function apiPost(path, data) {
+  return _unico("POST " + path + " " + JSON.stringify(data), async () =>
+    _leer(await _fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }), true));
 }
 
-async function apiDelete(path) {
-  const res = await fetch(path, { method: "DELETE" });
-  if (!res.ok) {
-    const corte = _siNoAutenticado(res);
-    if (corte) return corte;
-  }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(_mensajeError(body, res));
-  }
-  return body;
+function apiDelete(path) {
+  return _unico("DELETE " + path, async () => _leer(await _fetch(path, { method: "DELETE" }), true));
 }
+
+// Guarda y, si el servidor avisa de un posible repetido o cruce («requiere confirmación»), pregunta antes de insistir.
+// Devuelve null si la persona decide no registrarlo; en ese caso no hay que limpiar el formulario.
+async function apiPostConfirmando(path, data) {
+  try {
+    return await apiPost(path, data);
+  } catch (e) {
+    if (e instanceof ErrorApi && e.confirmable) {
+      if (await confirmar(e.message + " ¿Desea registrarlo de todos modos?")) return apiPost(path, { ...data, forzar: true });
+      return null;
+    }
+    throw e;
+  }
+}
+
+// ---------- aviso permanente cuando se pierde la conexión ----------
+let _barraConexion = null;
+let _vigilaConexion = null;
+function _mostrarBarraConexion(texto) {
+  if (!_barraConexion) {
+    _barraConexion = document.createElement("div");
+    _barraConexion.id = "barraSinConexion";
+    _barraConexion.setAttribute("role", "status");
+    _barraConexion.setAttribute("aria-live", "polite");
+    document.body.appendChild(_barraConexion);
+    // mientras el aviso está, se revisa cada pocos segundos si el servidor ya volvió
+    _vigilaConexion = setInterval(() => {
+      fetch("/api/sesion", { cache: "no-store" }).then(() => _servidorRespondio(true)).catch(() => {});
+    }, 6000);
+  }
+  _barraConexion.textContent = texto;
+}
+function _servidorRespondio(ok) {
+  if (!ok) { _mostrarBarraConexion("No se puede contactar con el servidor. Lo que escribió se conserva; vuelva a intentar cuando regrese la conexión."); return; }
+  if (_barraConexion) {
+    _barraConexion.remove();
+    _barraConexion = null;
+    clearInterval(_vigilaConexion);
+    avisar("Conexión restablecida.", "ok");
+  }
+}
+window.addEventListener("offline", () => _mostrarBarraConexion("Sin conexión a internet. Lo que escribió se conserva; no se guardará nada hasta que regrese la conexión."));
+window.addEventListener("online", () => { fetch("/api/sesion", { cache: "no-store" }).then(() => _servidorRespondio(true)).catch(() => {}); });
+document.addEventListener("DOMContentLoaded", () => { if (!navigator.onLine) _mostrarBarraConexion("Sin conexión a internet. Lo que escribió se conserva; no se guardará nada hasta que regrese la conexión."); });
 
 // "Cerrar sesión" en el pie de cada página - solo aparece si el login está activo.
 document.addEventListener("DOMContentLoaded", () => {

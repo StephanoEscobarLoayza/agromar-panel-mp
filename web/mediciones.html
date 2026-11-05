@@ -506,7 +506,7 @@ btnGuardar.addEventListener("click", async () => {
 
   btnGuardar.disabled = true;
   try {
-    await apiPost("/api/mediciones-tanque", {
+    const guardada = await apiPostConfirmando("/api/mediciones-tanque", {
       corrida_id: Number(corridaSel.value),
       tanque,
       litros: litrosInput.value ? Number(litrosInput.value) : null,
@@ -516,6 +516,7 @@ btnGuardar.addEventListener("click", async () => {
       ph: phInput.value ? Number(phInput.value) : null,
       lotes: [...lotesMarcados],
     });
+    if (guardada === null) { mensaje.innerHTML = ""; return; }          // la persona prefirió no registrarlo (ya había un tanque con ese nombre)
     mensaje.innerHTML = `<div class="msg ok">Medición de ${escapeHtml(tanque)} guardada${lotesMarcados.size ? " con " + (lotesMarcados.size === 1 ? "el lote " : "los lotes ") + [...lotesMarcados].join(" · ") : " (sin lotes anotados)"}.</div>`;
     tanqueInput.value = "";
     litrosInput.value = "";

@@ -14,7 +14,10 @@ from sqlalchemy.engine import make_url
 def crear_motor(url: str, **opciones):
     try:
         import psycopg2  # noqa: F401 - si Windows bloquea el archivo, falla aquí con ImportError
-        return create_engine(url, **opciones)
+        connect_args = dict(opciones.pop("connect_args", {}))
+        for clave, valor in (("keepalives", 1), ("keepalives_idle", 30), ("keepalives_interval", 10), ("keepalives_count", 5)):
+            connect_args.setdefault(clave, valor)          # avisos de «sigo aquí»: la conexión inactiva no se corta en silencio
+        return create_engine(url, connect_args=connect_args, **opciones)
     except ImportError:
         u = make_url(url)
         sslmode = u.query.get("sslmode", "require")
