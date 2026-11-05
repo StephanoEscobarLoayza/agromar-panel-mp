@@ -136,6 +136,86 @@ class ExcelConVariasCorridas(unittest.TestCase):
         self.assertNotIn("1857 REPROCESO", {str(ws.cell(fila, 3).value) for fila in range(8, 11)})
 
 
+class ExcelDeParadas(unittest.TestCase):
+    def _parada(self, **extra):
+        from datetime import datetime
+        base = {"corrida": "03-Noviembre JCC", "turno": "DÍA", "hora_inicio": datetime(2026, 11, 3, 10, 33), "hora_fin": datetime(2026, 11, 3, 12, 18), "min_total": 105,
+                "area_proceso": "Estandarizado", "tipo_parada": "Espera producción", "equipo_afectado": "Tanque", "descripcion_falla": "Tanque lleno",
+                "responsable_solucion": "Maquinista", "solucion_obs": "", "recomendacion": ""}
+        base.update(extra)
+        return base
+
+    def _libro(self, paradas):
+        import io
+        from datetime import date
+        import openpyxl
+        from reporte_paradas import generar_paradas_periodo_xlsx
+        return openpyxl.load_workbook(io.BytesIO(generar_paradas_periodo_xlsx(date(2026, 11, 1), date(2026, 11, 7), paradas)))
+
+    def test_el_libro_trae_tablero_analisis_datos_y_detalle(self):
+        from datetime import datetime
+        en_curso = self._parada(hora_inicio=datetime(2026, 11, 4, 8, 0), hora_fin=None, min_total=None, tipo_parada="Mecánico", turno="NOCHE")
+        wb = self._libro([self._parada(), en_curso])
+        self.assertEqual(wb.sheetnames, ["Tablero", "Análisis", "Datos", "Detalle"])
+        self.assertEqual(len(wb["Tablero"]._charts), 7)
+        self.assertIn("TablaParadas", wb["Datos"].tables)
+        self.assertEqual(wb["Datos"].max_row, 3)                       # encabezado + 2 paradas
+        self.assertEqual(wb["Datos"]["S3"].value, "En curso")
+
+    def test_un_texto_que_empieza_con_igual_no_se_guarda_como_formula(self):
+        wb = self._libro([self._parada(descripcion_falla="=1+1")])
+        celdas = [c for fila in wb["Datos"].iter_rows(min_row=2) for c in fila if c.value == "=1+1"]
+        self.assertTrue(celdas)
+        self.assertTrue(all(c.data_type == "s" for c in celdas))
+
+    def test_sin_paradas_el_libro_se_genera_sin_graficos(self):
+        wb = self._libro([])
+        self.assertEqual(wb.sheetnames, ["Tablero", "Análisis", "Datos", "Detalle"])
+        self.assertEqual(len(wb["Tablero"]._charts), 0)
+        self.assertEqual(len(wb["Datos"].tables), 0)
+
+
+class LoteDeReproceso(unittest.TestCase):
+    def _post(self, **datos):
+        from unittest import mock
+        from fastapi.testclient import TestClient
+        base = {"numero": 1857, "descripcion": "Jugo observado ene-2025", "kg": 8100, "brix": 11.5}
+        base.update(datos)
+        with mock.patch.object(api, "AUTH_ON", False):          # la prueba no depende de si el login está activo en este equipo
+            return TestClient(api.app).post("/api/lotes/reproceso", json=base)
+
+    def test_rechaza_datos_invalidos_sin_tocar_la_base(self):
+        for cambio, texto in (({"numero": 0}, "número"), ({"kg": 0}, "cantidad"), ({"brix": 150}, "Brix"), ({"acidez": 80}, "acidez"),
+                              ({"fecha_ingreso": "05/11/2026"}, "fecha"), ({"descripcion": "x" * 81}, "descripción")):
+            r = self._post(**cambio)
+            self.assertEqual(r.status_code, 400, cambio)
+            self.assertIn(texto.lower(), r.json()["detail"].lower())
+
+    def test_el_lote_se_guarda_en_negativo_con_proveedor_reproceso_y_ratio(self):
+        class Res:
+            def __init__(self, v): self.v = v
+            def scalar(self): return self.v
+
+        class Conexion:
+            def __init__(self, existe): self.existe, self.llamadas = existe, []
+            def execute(self, sql, params=None):
+                self.llamadas.append((str(sql), params))
+                return Res(1 if self.existe and "SELECT 1" in str(sql) else None)
+
+        from datetime import date
+        c = Conexion(existe=False)
+        self.assertEqual(api._insertar_lote_reproceso(c, 1857, "REPROCESO (JUGO)", date(2026, 11, 5), 8100.0, 11.5, 0.5), -1857)
+        sql, params = c.llamadas[-1]
+        self.assertIn("INSERT INTO lotes", sql)
+        self.assertEqual((params["d"], params["prov"], params["kg"], params["r"]), (-1857, "REPROCESO (JUGO)", 8100.0, 23.0))
+        sin_acidez = Conexion(existe=False)
+        api._insertar_lote_reproceso(sin_acidez, 1858, "REPROCESO", date(2026, 11, 5), 100.0, 11.5, None)
+        self.assertIsNone(sin_acidez.llamadas[-1][1]["r"])
+        with self.assertRaises(api.HTTPException) as e:                # un número que ya usa otro lote
+            api._insertar_lote_reproceso(Conexion(existe=True), 2831, "REPROCESO", date(2026, 11, 5), 100.0, None, None)
+        self.assertEqual(e.exception.status_code, 409)
+
+
 class TanqueOlvidado(unittest.TestCase):
     def test_numero_de_tanque(self):
         self.assertEqual(api._numero_tanque("TK12"), 12)

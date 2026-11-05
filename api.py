@@ -753,6 +753,69 @@ def actualizar_peso_lote(numero: int, body: ActualizarPesoLote):
     return {"ok": True}
 
 
+class NuevoLoteReproceso(BaseModel):
+    numero: int
+    descripcion: Optional[str] = None
+    kg: float
+    brix: Optional[float] = None
+    acidez: Optional[float] = None
+    fecha_ingreso: Optional[str] = None   # AAAA-MM-DD; si no viene, hoy
+
+
+def _insertar_lote_reproceso(conn, numero: int, proveedor: str, fecha, kg: float, brix, acidez) -> int:
+    """Crea el lote derivado de reproceso (número en negativo, sin lote de origen). Devuelve su número."""
+    derivado = -numero
+    if conn.execute(text("SELECT 1 FROM lotes WHERE numero IN (:n, :d)"), {"n": numero, "d": derivado}).scalar():
+        raise HTTPException(
+            status_code=409,
+            detail=f"El número {numero} ya lo usa otro lote. Elija uno que no esté en la lista de lotes (por ejemplo, el código que traía el lote observado).",
+        )
+    ratio = round(brix / acidez, 2) if brix and acidez else None
+    conn.execute(
+        text(
+            """
+            INSERT INTO lotes (numero, proveedor, procedencia, fecha_ingreso, tipo_almacen, peso_neto_kg,
+                               brix_recepcion, acidez, ratio, estado_manual, peso_congelado, lote_origen_numero)
+            VALUES (:d, :prov, NULL, :f, 'SILO', :kg, :b, :a, :r, 'EN ESPERA', true, NULL)
+            """
+        ),
+        {"d": derivado, "prov": proveedor, "f": fecha, "kg": kg, "b": brix, "a": acidez, "r": ratio},
+    )
+    return derivado
+
+
+@app.post("/api/lotes/reproceso")
+def crear_lote_reproceso(body: NuevoLoteReproceso):
+    """Agrega un lote de REPROCESO: jugo que se vuelve a procesar (p. ej. cilindros observados de otra campaña). No se fabrica
+    como una corrida nueva: entra como un lote más y se consume desde «Registrar consumo». Se guarda como lote derivado
+    (número en negativo, sin lote de origen), así que no cuenta como stock ni como MP entregada, igual que los PRE CC; se
+    reconoce porque su proveedor empieza por «REPROCESO»."""
+    if body.numero <= 0:
+        raise HTTPException(status_code=400, detail="Escriba el número del lote de reproceso (un número mayor a 0).")
+    if not (0 < body.kg <= 1_000_000):
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0 kg.")
+    if body.brix is not None and not (0 <= body.brix <= 100):
+        raise HTTPException(status_code=400, detail="El Brix debe estar entre 0 y 100.")
+    if body.acidez is not None and not (0 <= body.acidez <= 50):
+        raise HTTPException(status_code=400, detail="La acidez debe estar entre 0 y 50.")
+    descripcion = (body.descripcion or "").strip()
+    if len(descripcion) > 80:
+        raise HTTPException(status_code=400, detail="La descripción es demasiado larga (máximo 80 caracteres).")
+    try:
+        fecha = datetime.strptime(body.fecha_ingreso, "%Y-%m-%d").date() if body.fecha_ingreso else datetime.now(timezone(timedelta(hours=-5))).date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="La fecha no es válida. Utilice el formato AAAA-MM-DD.")
+    proveedor = f"REPROCESO ({descripcion.upper()})" if descripcion else "REPROCESO"
+    try:
+        with engine.begin() as conn:
+            derivado = _insertar_lote_reproceso(conn, body.numero, proveedor, fecha, body.kg, body.brix, body.acidez)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _error_http(e)
+    return {"ok": True, "numero": derivado}
+
+
 SYNC_INTERVAL_SEGUNDOS = 20 * 60  # cada 20 minutos
 
 # Estado en memoria del último sync (manual o automático) - se reinicia con

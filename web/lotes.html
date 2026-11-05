@@ -93,6 +93,29 @@
       <h2 style="margin:0 0 4px;font-size:19px;font-family:'Fraunces',serif">Lotes de PRE CC y reproceso</h2>
       <p style="margin:0;font-size:13px;color:var(--text-muted)">PRE CC: producto derivado de un proceso PRE CC, pendiente de incorporarse como materia prima en otra corrida. Reproceso: jugo que se volvió a procesar en una corrida.</p>
     </div>
+    <div class="panel-body" style="padding-top:0">
+      <button type="button" class="btn-link strong" id="btnNuevoReproceso">+ Agregar lote de reproceso</button>
+      <div id="formReproceso" hidden style="margin-top:12px">
+        <p style="margin:0 0 12px;font-size:13px;color:var(--text-muted)">El reproceso no se fabrica como corrida: se registra aquí como un lote más y luego se consume desde «Registrar consumo» escribiendo su número. No cuenta como stock ni como materia prima entregada.</p>
+        <div class="two-col">
+          <div class="field"><label for="rpNumero">N.º del lote</label><input type="number" id="rpNumero" min="1" step="1" placeholder="Ej. 1857"></div>
+          <div class="field"><label for="rpDesc">Descripción (opcional)</label><input type="text" id="rpDesc" maxlength="80" placeholder="Ej. Jugo observado ene-2025"></div>
+        </div>
+        <div class="two-col" style="margin-top:12px">
+          <div class="field"><label for="rpKg">Cantidad (kg)</label><input type="number" id="rpKg" min="0" step="0.01" placeholder="Ej. 8100"></div>
+          <div class="field"><label for="rpBrix">Brix</label><input type="number" id="rpBrix" min="0" max="100" step="0.01" placeholder="Ej. 11.50"></div>
+        </div>
+        <div class="two-col" style="margin-top:12px">
+          <div class="field"><label for="rpAcidez">Acidez (opcional)</label><input type="number" id="rpAcidez" min="0" max="50" step="0.01" placeholder="Ej. 0.65"></div>
+          <div class="field"><label for="rpFecha">Fecha</label><input type="date" id="rpFecha"></div>
+        </div>
+        <div id="rpMsg" style="margin-top:10px"></div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button type="button" class="btn" id="btnGuardarReproceso" style="width:auto;padding:10px 22px">Guardar lote de reproceso</button>
+          <button type="button" class="btn-ghost" id="btnCancelarReproceso" style="padding:10px 22px">Cancelar</button>
+        </div>
+      </div>
+    </div>
     <div class="table-wrap">
       <table class="tabla-tarjetas">
         <thead>
@@ -447,6 +470,53 @@ async function onFilasClick(ev) {
 }
 filasBody.addEventListener("click", onFilasClick);
 filasPreCCBody.addEventListener("click", onFilasClick);
+
+// ---------- agregar un lote de reproceso (no se fabrica como corrida nueva: entra como un lote más) ----------
+const btnNuevoReproceso = document.getElementById("btnNuevoReproceso");
+const formReproceso = document.getElementById("formReproceso");
+const rp = (id) => document.getElementById(id);
+
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function abrirFormReproceso(abrir) {
+  formReproceso.hidden = !abrir;
+  btnNuevoReproceso.textContent = abrir ? "Cancelar" : "+ Agregar lote de reproceso";
+  rp("rpMsg").innerHTML = "";
+  if (abrir) {
+    if (!rp("rpFecha").value) rp("rpFecha").value = hoyISO();
+    rp("rpNumero").focus();
+  }
+}
+btnNuevoReproceso.addEventListener("click", () => abrirFormReproceso(formReproceso.hidden));
+rp("btnCancelarReproceso").addEventListener("click", () => abrirFormReproceso(false));
+
+rp("btnGuardarReproceso").addEventListener("click", async () => {
+  const btn = rp("btnGuardarReproceso"), msg = rp("rpMsg");
+  const falta = (texto) => { msg.innerHTML = `<div class="msg bad">${texto}</div>`; };
+  const numero = parseInt(rp("rpNumero").value, 10);
+  const kg = Number(rp("rpKg").value);
+  const brix = rp("rpBrix").value === "" ? null : Number(rp("rpBrix").value);
+  const acidez = rp("rpAcidez").value === "" ? null : Number(rp("rpAcidez").value);
+  if (!numero || numero <= 0) return falta("Escriba el número del lote.");
+  if (!(kg > 0)) return falta("Escriba la cantidad en kg (mayor a 0).");
+  if (brix !== null && (brix < 0 || brix > 100)) return falta("El Brix debe estar entre 0 y 100.");
+  if (acidez !== null && (acidez < 0 || acidez > 50)) return falta("La acidez debe estar entre 0 y 50.");
+  btn.disabled = true;                      // evita registrarlo dos veces si se pulsa de nuevo mientras guarda
+  try {
+    await apiPost("/api/lotes/reproceso", { numero, descripcion: rp("rpDesc").value.trim(), kg, brix, acidez, fecha_ingreso: rp("rpFecha").value || null });
+    ["rpNumero", "rpDesc", "rpKg", "rpBrix", "rpAcidez"].forEach((id) => { rp(id).value = ""; });
+    abrirFormReproceso(false);
+    await cargar();
+    avisar(`Lote de reproceso ${numero} agregado.`, "ok");
+  } catch (e) {
+    falta(escapeHtml(e.message));
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 cargar();
 </script>
