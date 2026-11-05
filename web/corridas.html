@@ -146,16 +146,21 @@
 <script src="app.js"></script>
 <script>
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Setiembre","Octubre","Noviembre","Diciembre"];
+// los 4 tipos principales primero y, después de una línea, los menos comunes
 const TIPOS_PROCESO = [
   { value: "JSA", label: "JSA Aseptic" },
   { value: "JCC", label: "JCC" },
-  { value: "JCC TASTE", label: "JCC TASTE" },
   { value: "JSC", label: "JSC" },
   { value: "ICEGEN", label: "ICEGEN" },
-  { value: "PRE CC", label: "PRE CC" },
-  { value: "OBSERV", label: "OBSERV (observación)" },
+  { value: "JCC TASTE", label: "JCC TASTE", secundario: true },
+  { value: "PRE CC", label: "PRE CC", secundario: true },
 ];
-document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option value="${t.value}">${t.label}</option>`).join("");
+function opcionesTipoProceso(seleccionado) {
+  return TIPOS_PROCESO.map((t, i) =>
+    `${t.secundario && !TIPOS_PROCESO[i - 1].secundario ? "<hr>" : ""}<option value="${t.value}"${t.value === seleccionado ? " selected" : ""}>${t.label}</option>`
+  ).join("");
+}
+document.getElementById("ncTipo").innerHTML = opcionesTipoProceso("");
 
 // peso neto del tambor "de siempre" según el tipo de proceso de la corrida -
 // solo para no tener que acordarse cada vez (se olvida con frecuencia); el campo sigue siendo editable, esto solo precarga el
@@ -163,19 +168,14 @@ document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option va
 const PESO_TAMBOR_POR_TIPO = { "JCC": 265, "JSA": 220, "ICEGEN": 200 };
 
 // ---------- lista de productos para «+ Agregar producto» (así no hay que escribir el nombre cada vez) ----------
-// Nombre, peso del tambor y si cuenta como PT. En cada tipo de corrida el producto principal queda elegido de entrada;
-// «Otro» deja escribir uno nuevo. Para agregar un producto a la lista basta una línea más en estas tres tablas.
+// Solo productos terminados (PT): nombre, peso del tambor y los tipos de corrida que lo producen. En cada tipo de corrida
+// su producto queda elegido de entrada y va primero; «Otro» deja escribir uno que no esté (p. ej. un enjuague o un saldo,
+// desmarcando «Cuenta como PT»). Para sumar un producto basta una línea más en estas tablas.
 const PRODUCTOS_SALIDA = [
-  { nombre: "Cilindro Jugo Simple Aséptico NJ ORG", peso: 220, pt: true, tipos: ["JSA"] },
-  { nombre: "Cilindro Jugo Concentrado Congelado", peso: 265, pt: true, tipos: ["JCC", "JCC TASTE"] },
-  { nombre: "Cilindro Jugo Simple Congelado NJ ORG", peso: 200, pt: true, tipos: ["JSC"] },
-  { nombre: "Cilindro Jugo Simple Congelado ICEGEN NJ ORG", peso: 200, pt: true, tipos: ["ICEGEN"] },
-  { nombre: "Jugo Pre Concentrado Congelado NJ ORG", peso: 200, pt: true, tipos: ["PRE CC"] },
-  { nombre: "Cilindro Jugo Simple OBSERV", peso: 200, pt: true, tipos: ["OBSERV"] },
-];
-const PRODUCTOS_SIN_PT = [
-  { nombre: "Enjuague", peso: null, pt: false },
-  { nombre: "Enjuague (Parcial)", peso: null, pt: false },
+  { nombre: "Jugo Simple Concentrado Congelado", peso: 265, pt: true, tipos: ["JCC", "JCC TASTE"] },
+  { nombre: "Jugo Simple Aséptico NJ ORG", peso: 220, pt: true, tipos: ["JSA"] },
+  { nombre: "Jugo Simple Congelado NJ ORG", peso: 200, pt: true, tipos: ["JSC"] },
+  { nombre: "Jugo Simple Congelado no Pasteurizado ICEGEN NJ ORG", peso: 200, pt: true, tipos: ["ICEGEN"] },
 ];
 // en un insumo de entrada, «pt» es si se descuenta del total de la corrida
 const INSUMOS_ENTRADA = [
@@ -185,8 +185,7 @@ const INSUMOS_ENTRADA = [
   { nombre: "Cilindros de reposición 2026", peso: 265, pt: true },
 ];
 const PRODUCTO_POR_NOMBRE = {};
-[...PRODUCTOS_SALIDA.flatMap(p => [p, { nombre: `${p.nombre} (Saldo)`, peso: null, pt: false }]), ...PRODUCTOS_SIN_PT, ...INSUMOS_ENTRADA]
-  .forEach(p => { PRODUCTO_POR_NOMBRE[p.nombre] = p; });
+[...PRODUCTOS_SALIDA, ...INSUMOS_ENTRADA].forEach(p => { PRODUCTO_POR_NOMBRE[p.nombre] = p; });
 // sugerencias también al editar un producto ya registrado
 document.body.insertAdjacentHTML("beforeend",
   `<datalist id="lista-productos-conocidos">${Object.keys(PRODUCTO_POR_NOMBRE).map(n => `<option value="${escapeHtml(n)}"></option>`).join("")}</datalist>`);
@@ -201,24 +200,13 @@ function productoInicial(tipoItem, tipoCorrida) {
 
 function htmlOpcionesProducto(tipoItem, tipoCorrida) {
   const inicial = productoInicial(tipoItem, tipoCorrida);
-  let grupos;
-  if (tipoItem === "entrada") {
-    grupos = [{ etiqueta: "Insumos de entrada", items: INSUMOS_ENTRADA }];
-  } else {
-    const propios = PRODUCTOS_SALIDA.filter(p => p.tipos.includes(tipoCorrida));
-    const otros = PRODUCTOS_SALIDA.filter(p => !p.tipos.includes(tipoCorrida));
-    const sinPt = [...propios.map(p => PRODUCTO_POR_NOMBRE[`${p.nombre} (Saldo)`]), ...PRODUCTOS_SIN_PT];
-    grupos = [
-      { etiqueta: "De este tipo de corrida", items: propios },
-      { etiqueta: propios.length ? "Otros productos" : "Productos", items: otros },
-      { etiqueta: "Sin PT (no cuentan como producto terminado)", items: sinPt },
-    ].filter(g => g.items.length);
-  }
+  // lista corta y plana: el producto de este tipo de corrida primero y los demás en su orden
+  const lista = tipoItem === "entrada"
+    ? INSUMOS_ENTRADA
+    : [...PRODUCTOS_SALIDA].sort((a, b) => Number(b.tipos.includes(tipoCorrida)) - Number(a.tipos.includes(tipoCorrida)));
   const op = (p) => `<option value="${escapeHtml(p.nombre)}"${inicial && p.nombre === inicial.nombre ? " selected" : ""}>${escapeHtml(p.nombre)}</option>`;
   const vacio = inicial ? "" : `<option value="" selected disabled>${tipoItem === "entrada" ? "Elija un insumo" : "Elija un producto"}</option>`;
-  return vacio
-    + grupos.map(g => `<optgroup label="${escapeHtml(g.etiqueta)}">${g.items.map(op).join("")}</optgroup>`).join("")
-    + '<option value="__otro__">Otro (escribir el nombre)…</option>';
+  return vacio + lista.map(op).join("") + '<hr><option value="__otro__">Otro (escribir el nombre)…</option>';
 }
 
 // Rellena nombre, peso del tambor y «cuenta como PT» con lo que se eligió en la lista
@@ -312,9 +300,7 @@ function corridaCard(c) {
     acciones.push(`<button class="btn-link btn-link-bad" data-accion="eliminar-corrida" data-id="${c.id}" data-nombre="${escapeHtml(c.nombre)}">Eliminar</button>`);
   }
 
-  const opcionesTipo = TIPOS_PROCESO.map(t =>
-    `<option value="${t.value}" ${t.value === c.tipo_proceso ? "selected" : ""}>${t.label}</option>`
-  ).join("");
+  const opcionesTipo = opcionesTipoProceso(c.tipo_proceso);
 
   return `
     <div class="corrida${abierta ? " live" : ""}" data-id="${c.id}">
@@ -363,11 +349,9 @@ function corridaCard(c) {
               <option value="salida" selected>Producto de salida (lo produjo esta corrida)</option>
               <option value="entrada">Insumo de entrada (ingresó a la corrida desde una fuente externa, ej. para subir Brix)</option>
             </select>
-            <div>
-              <select id="prod-cat-${c.id}" aria-label="Producto">${htmlOpcionesProducto("salida", c.tipo_proceso)}</select>
-              <input type="text" id="prod-nombre-${c.id}" value="${escapeHtml(productoInicial("salida", c.tipo_proceso)?.nombre || "")}" placeholder="Escriba el nombre del producto" style="display:none;margin-top:8px">
-            </div>
+            <select id="prod-cat-${c.id}" aria-label="Producto">${htmlOpcionesProducto("salida", c.tipo_proceso)}</select>
           </div>
+          <input type="text" id="prod-nombre-${c.id}" value="${escapeHtml(productoInicial("salida", c.tipo_proceso)?.nombre || "")}" placeholder="Escriba el nombre del producto" style="display:none;margin-top:8px">
           <div class="two-col" style="margin-top:8px">
             <input type="number" id="prod-tambores-${c.id}" min="0" step="0.5" placeholder="Tambores">
             <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)" value="${productoInicial("salida", c.tipo_proceso)?.peso ?? PESO_TAMBOR_POR_TIPO[c.tipo_proceso] ?? ""}">
