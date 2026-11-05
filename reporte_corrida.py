@@ -9,8 +9,21 @@ from reporte_base import (
     FOREST_2, CITRUS, OK, BAD, TEXT,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
     fmt_kg, fmt_num, fmt_tambores, fmt_lote, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
-    encabezado, seccion, tabla, nuevo_doc,
+    encabezado, seccion, tabla, nuevo_doc, etiqueta_derivado,
 )
+
+
+def _es_reproceso(lote: dict) -> bool:
+    """Fila de consumo de un lote derivado de REPROCESO (jugo que se vuelve a procesar): no es materia prima nueva."""
+    return (lote.get("lote_numero") or 0) < 0 and etiqueta_derivado(lote.get("proveedor")) == "REPROCESO"
+
+
+def _tabla_reproceso(filas):
+    total = sum(float(l["kg_asignados"]) for l in filas if l.get("kg_asignados") is not None)
+    datos = [[fmt_lote(l["lote_numero"], l.get("proveedor")), l.get("proveedor") or "—",
+              fmt_kg(l["kg_asignados"]) if l.get("kg_asignados") is not None else "pendiente"] for l in filas]
+    datos.append(["", "Total reprocesado", fmt_kg(total)])
+    return tabla(["Lote", "Descripción", "Kg reprocesados"], datos, [22 * mm, 111 * mm, 40 * mm], align_derecha_desde=2)
 
 
 def _tabla_lotes(lotes):
@@ -158,6 +171,11 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     paradas: filas de paradas (+ duracion_minutos)."""
     buf = BytesIO()
     doc = nuevo_doc(buf, f"Cuadre - {corrida['nombre']}")
+
+    # el jugo de REPROCESO (p. ej. cilindros observados que se vuelven a procesar) no es materia prima nueva: no entra en la
+    # MP consumida, en el gráfico Silo/Bines ni en el Brix ponderado, y se informa en un cuadro aparte
+    reproceso = [l for l in lotes if _es_reproceso(l)]
+    lotes = [l for l in lotes if not _es_reproceso(l)]
 
     # los lotes con "kg pendiente" (kg_asignados NULL - ya empezaron a
     # alimentar la corrida pero todavía no se sabe cuánto, típico en Silo
@@ -337,6 +355,16 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
             f"{n_pendientes} lote(s) con kg pendiente no se cuentan en los KPIs ni en el gráfico Silo/Bines.",
+            style_footnote,
+        ))
+
+    if reproceso:
+        story.append(Spacer(1, 8 * mm))
+        story.extend(seccion("Reproceso (informativo)"))
+        story.append(_tabla_reproceso(reproceso))
+        story.append(Spacer(1, 3 * mm))
+        story.append(Paragraph(
+            "Jugo que se volvió a procesar en esta corrida. No está sumado en la MP consumida, en el gráfico Silo/Bines ni en el rendimiento.",
             style_footnote,
         ))
 

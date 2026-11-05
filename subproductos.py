@@ -52,11 +52,13 @@ _SQL_REGISTROS = """
                      WHERE rc.registro_id = r.id), 0) AS descuento_kg,
            COALESCE((SELECT SUM(a.kg_asignados)
                      FROM emulsion_registro_corridas rc JOIN asignaciones a ON a.corrida_id = rc.corrida_id
-                     WHERE rc.registro_id = r.id AND a.lote_numero < 0), 0) AS precc_kg,
+                     WHERE rc.registro_id = r.id AND a.lote_numero < 0
+                       AND NOT EXISTS (SELECT 1 FROM lotes lr WHERE lr.numero = a.lote_numero AND upper(btrim(lr.proveedor)) LIKE 'REPROCESO%')), 0) AS precc_kg,
            COALESCE((
                SELECT json_agg(json_build_object(
                           'id', co.id, 'nombre', co.nombre,
-                          'kg', COALESCE((SELECT SUM(a.kg_asignados) FROM asignaciones a WHERE a.corrida_id = co.id), 0))
+                          'kg', COALESCE((SELECT SUM(a.kg_asignados) FROM asignaciones a WHERE a.corrida_id = co.id
+                                          AND NOT (a.lote_numero < 0 AND EXISTS (SELECT 1 FROM lotes lr WHERE lr.numero = a.lote_numero AND upper(btrim(lr.proveedor)) LIKE 'REPROCESO%'))), 0))
                       ORDER BY co.fecha_inicio, co.id)
                FROM emulsion_registro_corridas rc JOIN corridas co ON co.id = rc.corrida_id
                WHERE rc.registro_id = r.id), '[]'::json) AS corridas,
@@ -348,9 +350,9 @@ def crear_router(engine) -> APIRouter:
         with engine.connect() as conn:
             res = conn.execute(text("""
                 SELECT c.id, c.nombre, c.tipo_proceso, c.fecha_inicio::date AS fecha,
-                       COALESCE(SUM(a.kg_asignados), 0) AS kg,
+                       COALESCE(SUM(a.kg_asignados) FILTER (WHERE NOT (a.lote_numero < 0 AND upper(btrim(l.proveedor)) LIKE 'REPROCESO%')), 0) AS kg,
                        (SELECT rc.registro_id FROM emulsion_registro_corridas rc WHERE rc.corrida_id = c.id LIMIT 1) AS registro_id
-                FROM corridas c LEFT JOIN asignaciones a ON a.corrida_id = c.id
+                FROM corridas c LEFT JOIN asignaciones a ON a.corrida_id = c.id LEFT JOIN lotes l ON l.numero = a.lote_numero
                 WHERE c.fecha_inicio >= (CURRENT_DATE - CAST(:d AS integer))
                 GROUP BY c.id ORDER BY c.fecha_inicio DESC, c.id DESC
             """), {"d": max(1, min(dias, 400))})

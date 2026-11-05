@@ -51,7 +51,8 @@ def _rendimientos_tipicos(conn):
     """Mediana histórica del rendimiento (PT / MP) por tipo de proceso."""
     filas = conn.execute(text(f"""
         SELECT c.tipo_proceso AS tipo,
-               COALESCE((SELECT SUM(a.kg_asignados) FROM asignaciones a WHERE a.corrida_id = c.id), 0) AS mp,
+               COALESCE((SELECT SUM(a.kg_asignados) FROM asignaciones a JOIN lotes l ON l.numero = a.lote_numero
+                         WHERE a.corrida_id = c.id AND NOT (l.numero < 0 AND upper(btrim(l.proveedor)) LIKE 'REPROCESO%')), 0) AS mp,
                {_SQL_PT} AS pt
         FROM corridas c WHERE c.tipo_proceso IS NOT NULL
     """)).fetchall()

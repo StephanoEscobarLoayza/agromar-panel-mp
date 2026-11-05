@@ -237,9 +237,9 @@ def _cuadro_reproceso(ws, fila0, filas):
     `filas` = filas de consumo (asignaciones) de esos lotes. Devuelve la última fila usada."""
     h = 8  # col H
     _set(ws, ws.cell(row=fila0, column=h), "Reproceso (informativo)", bold=True, fill=_SEC_FILL)
-    c = _set(ws, ws.cell(row=fila0 + 1, column=h), "Jugo que se volvió a procesar en esta corrida. No está sumado en el Peso Neto, la MP ni el rendimiento de esta hoja.")
+    c = _set(ws, ws.cell(row=fila0 + 1, column=h), "Kg de cada lote de reproceso que se volvieron a procesar en esta corrida. No están sumados en el Peso Neto, la MP ni el rendimiento de esta hoja.")
     c.font = _NOTA_FONT
-    for k, nom in enumerate(["Lote", "Descripción", "Kg"]):
+    for k, nom in enumerate(["Lote", "Descripción", "Kg reprocesados"]):
         c = _set(ws, ws.cell(row=fila0 + 2, column=h + k), nom, fill=_HEAD_FILL, borde=True, centro=True)
         c.font = _HEAD_FONT
     i = 0
@@ -249,7 +249,7 @@ def _cuadro_reproceso(ws, fila0, filas):
         _set(ws, ws.cell(row=rr, column=h + 1), lo.get("proveedor") or "", borde=True)
         _set(ws, ws.cell(row=rr, column=h + 2), _f(lo.get("kg_asignados")), fmt=_FMT_KG, borde=True)
     tr = fila0 + 3 + i
-    _set(ws, ws.cell(row=tr, column=h + 1), "TOTAL", bold=True, fill=_TOTAL_FILL, borde=True)
+    _set(ws, ws.cell(row=tr, column=h + 1), "TOTAL REPROCESADO", bold=True, fill=_TOTAL_FILL, borde=True)
     _set(ws, ws.cell(row=tr, column=h + 2), f"=SUM({get_column_letter(h + 2)}{fila0 + 3}:{get_column_letter(h + 2)}{tr - 1})",
          fmt=_FMT_KG, bold=True, fill=_TOTAL_FILL, borde=True)
     ws.cell(row=tr, column=h).fill = _TOTAL_FILL
