@@ -144,7 +144,7 @@ def _tabla_paradas(paradas):
     ] for p in paradas]
     return tabla(
         ["Inicio", "Fin", "Duración", "Área", "Tipo", "Falla"], filas,
-        [30 * mm, 30 * mm, 18 * mm, 28 * mm, 26 * mm, 50 * mm], align_derecha_desde=2,
+        [28 * mm, 28 * mm, 18 * mm, 28 * mm, 26 * mm, 50 * mm], align_derecha_desde=2,       # 178 mm: el ancho útil de la página
     )
 
 

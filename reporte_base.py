@@ -37,7 +37,7 @@ PAGE_W, PAGE_H = A4
 MARGIN = 16 * mm
 
 styles = getSampleStyleSheet()
-style_section = ParagraphStyle("section", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=13, textColor=TEXT, spaceBefore=16, spaceAfter=3)
+style_section = ParagraphStyle("section", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=13, textColor=TEXT, spaceBefore=16, spaceAfter=3, keepWithNext=1)
 style_kpi_label = ParagraphStyle("kpiLabel", parent=styles["Normal"], fontName="Helvetica", fontSize=8.5, textColor=TEXT_2)
 style_kpi_value = ParagraphStyle("kpiValue", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=17, textColor=TEXT, leading=20)
 style_cell = ParagraphStyle("cell", parent=styles["Normal"], fontName="Helvetica", fontSize=9, textColor=TEXT)
@@ -320,11 +320,15 @@ def seccion(titulo):
     """Encabezado de sección: título en negrita + una doble regla delgada
     debajo (forest + un tramo corto citrus), en vez de solo texto en negrita
     - separa las secciones sin necesitar otra tarjeta o caja."""
-    return [
-        Paragraph(titulo, style_section),
+    reglas = [
         HRFlowable(width="100%", thickness=1.3, color=FOREST_2, spaceBefore=1, spaceAfter=1),
         HRFlowable(width="26%", thickness=1.3, color=CITRUS, spaceBefore=0, spaceAfter=8, hAlign="LEFT"),
     ]
+    # el título va siempre pegado a lo que sigue (su tabla): si no cabe al final de la página, se pasa entero a la siguiente
+    # en vez de quedar solo abajo con la tabla en la página de al lado
+    for r in reglas:
+        r.keepWithNext = 1
+    return [Paragraph(titulo, style_section), *reglas]
 
 
 def tabla(headers, filas, col_widths, align_derecha_desde=None):

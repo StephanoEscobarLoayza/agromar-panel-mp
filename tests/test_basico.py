@@ -301,6 +301,19 @@ class NombreDeProveedores(unittest.TestCase):
             self.assertEqual(sync_lotes.PROVEEDOR_NOMBRE_COMPLETO.get(variante), oficial)
 
 
+class TituloDeSeccionEnElPdf(unittest.TestCase):
+    def test_el_titulo_siempre_va_pegado_a_su_tabla(self):
+        from reporte_base import seccion
+        piezas = seccion("Paradas registradas (2)")
+        self.assertTrue(all(p.getKeepWithNext() for p in piezas), "si no, el título puede quedar solo al final de una página")
+
+    def test_la_tabla_de_paradas_cabe_en_el_ancho_util_de_la_pagina(self):
+        import reporte_corrida
+        from reporte_base import PAGE_W, MARGIN
+        tabla = reporte_corrida._tabla_paradas([{"hora_inicio": None, "hora_fin": None, "duracion_minutos": 5, "area_proceso": "Extracción", "tipo_parada": "Mecánico", "descripcion_falla": "x"}])
+        self.assertLessEqual(sum(tabla._colWidths), PAGE_W - 2 * MARGIN + 0.01)
+
+
 class TanqueOlvidado(unittest.TestCase):
     def test_numero_de_tanque(self):
         self.assertEqual(api._numero_tanque("TK12"), 12)
