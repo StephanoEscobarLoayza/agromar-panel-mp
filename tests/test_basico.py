@@ -293,6 +293,14 @@ class ReprocesoFueraDeLaMP(unittest.TestCase):
         self.assertTrue(pdf.startswith(b"%PDF"))
 
 
+class NombreDeProveedores(unittest.TestCase):
+    def test_agronature_siempre_se_guarda_con_su_nombre_oficial(self):
+        import sync_lotes
+        oficial = "COOPERATIVA AGRARIA CAI AGRONATURE"
+        for variante in ('COOPERATIVA AGRARIA "C.A.I. AGRONATURE"', 'COOPERATIVA AGRARIA "C.A.1. AGRONATURE"'):
+            self.assertEqual(sync_lotes.PROVEEDOR_NOMBRE_COMPLETO.get(variante), oficial)
+
+
 class TanqueOlvidado(unittest.TestCase):
     def test_numero_de_tanque(self):
         self.assertEqual(api._numero_tanque("TK12"), 12)
