@@ -162,6 +162,104 @@ document.getElementById("ncTipo").innerHTML = TIPOS_PROCESO.map(t => `<option va
 // valor más común de cada tipo.
 const PESO_TAMBOR_POR_TIPO = { "JCC": 265, "JSA": 220, "ICEGEN": 200 };
 
+// ---------- lista de productos para «+ Agregar producto» (así no hay que escribir el nombre cada vez) ----------
+// Nombre, peso del tambor y si cuenta como PT. En cada tipo de corrida el producto principal queda elegido de entrada;
+// «Otro» deja escribir uno nuevo. Para agregar un producto a la lista basta una línea más en estas tres tablas.
+const PRODUCTOS_SALIDA = [
+  { nombre: "Cilindro Jugo Simple Aséptico NJ ORG", peso: 220, pt: true, tipos: ["JSA"] },
+  { nombre: "Cilindro Jugo Concentrado Congelado", peso: 265, pt: true, tipos: ["JCC", "JCC TASTE"] },
+  { nombre: "Cilindro Jugo Simple Congelado NJ ORG", peso: 200, pt: true, tipos: ["JSC"] },
+  { nombre: "Cilindro Jugo Simple Congelado ICEGEN NJ ORG", peso: 200, pt: true, tipos: ["ICEGEN"] },
+  { nombre: "Jugo Pre Concentrado Congelado NJ ORG", peso: 200, pt: true, tipos: ["PRE CC"] },
+  { nombre: "Cilindro Jugo Simple OBSERV", peso: 200, pt: true, tipos: ["OBSERV"] },
+];
+const PRODUCTOS_SIN_PT = [
+  { nombre: "Enjuague", peso: null, pt: false },
+  { nombre: "Enjuague (Parcial)", peso: null, pt: false },
+];
+// en un insumo de entrada, «pt» es si se descuenta del total de la corrida
+const INSUMOS_ENTRADA = [
+  { nombre: "Cilindro Taste 2025", peso: 265, pt: false },
+  { nombre: "Cilindro Concentrado Congelado (PT)", peso: 265, pt: false },
+  { nombre: "Cilindro Pre Concentrado", peso: 250, pt: false },
+  { nombre: "Cilindros de reposición 2026", peso: 265, pt: true },
+];
+const PRODUCTO_POR_NOMBRE = {};
+[...PRODUCTOS_SALIDA.flatMap(p => [p, { nombre: `${p.nombre} (Saldo)`, peso: null, pt: false }]), ...PRODUCTOS_SIN_PT, ...INSUMOS_ENTRADA]
+  .forEach(p => { PRODUCTO_POR_NOMBRE[p.nombre] = p; });
+// sugerencias también al editar un producto ya registrado
+document.body.insertAdjacentHTML("beforeend",
+  `<datalist id="lista-productos-conocidos">${Object.keys(PRODUCTO_POR_NOMBRE).map(n => `<option value="${escapeHtml(n)}"></option>`).join("")}</datalist>`);
+
+const textoCuentaPt = (esEntrada) => esEntrada
+  ? "Descontar del total de la corrida (kg, litros, tambores) — desmárquelo si este insumo no debe restarse del total reportado"
+  : "Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares.";
+
+function productoInicial(tipoItem, tipoCorrida) {
+  return tipoItem === "salida" ? (PRODUCTOS_SALIDA.find(p => p.tipos.includes(tipoCorrida)) || null) : null;
+}
+
+function htmlOpcionesProducto(tipoItem, tipoCorrida) {
+  const inicial = productoInicial(tipoItem, tipoCorrida);
+  let grupos;
+  if (tipoItem === "entrada") {
+    grupos = [{ etiqueta: "Insumos de entrada", items: INSUMOS_ENTRADA }];
+  } else {
+    const propios = PRODUCTOS_SALIDA.filter(p => p.tipos.includes(tipoCorrida));
+    const otros = PRODUCTOS_SALIDA.filter(p => !p.tipos.includes(tipoCorrida));
+    const sinPt = [...propios.map(p => PRODUCTO_POR_NOMBRE[`${p.nombre} (Saldo)`]), ...PRODUCTOS_SIN_PT];
+    grupos = [
+      { etiqueta: "De este tipo de corrida", items: propios },
+      { etiqueta: propios.length ? "Otros productos" : "Productos", items: otros },
+      { etiqueta: "Sin PT (no cuentan como producto terminado)", items: sinPt },
+    ].filter(g => g.items.length);
+  }
+  const op = (p) => `<option value="${escapeHtml(p.nombre)}"${inicial && p.nombre === inicial.nombre ? " selected" : ""}>${escapeHtml(p.nombre)}</option>`;
+  const vacio = inicial ? "" : `<option value="" selected disabled>${tipoItem === "entrada" ? "Elija un insumo" : "Elija un producto"}</option>`;
+  return vacio
+    + grupos.map(g => `<optgroup label="${escapeHtml(g.etiqueta)}">${g.items.map(op).join("")}</optgroup>`).join("")
+    + '<option value="__otro__">Otro (escribir el nombre)…</option>';
+}
+
+// Rellena nombre, peso del tambor y «cuenta como PT» con lo que se eligió en la lista
+function aplicarProductoElegido(id) {
+  const lista = document.getElementById(`prod-cat-${id}`);
+  const nombre = document.getElementById(`prod-nombre-${id}`);
+  if (lista.value === "__otro__") {
+    nombre.style.display = "";
+    nombre.value = "";
+    document.getElementById(`prod-cuentapt-${id}`).checked = true;
+    nombre.focus();
+    return;
+  }
+  nombre.style.display = "none";
+  nombre.value = lista.value;
+  const p = PRODUCTO_POR_NOMBRE[lista.value];
+  if (!p) return;
+  const peso = document.getElementById(`prod-peso-${id}`);
+  peso.value = p.peso ?? "";
+  document.getElementById(`prod-cuentapt-${id}`).checked = p.pt !== false;
+  peso.dispatchEvent(new Event("input", { bubbles: true }));     // recalcula «PT kg»
+}
+
+// Deja el formulario de producto como recién abierto (con el producto principal del tipo de corrida elegido)
+function reiniciarFormProducto(id, tipoItem = "salida") {
+  const tipoCorrida = document.getElementById(`prod-form-${id}`).dataset.tipoCorrida || "";
+  const inicial = productoInicial(tipoItem, tipoCorrida);
+  document.getElementById(`prod-tipo-${id}`).value = tipoItem;
+  document.getElementById(`prod-cat-${id}`).innerHTML = htmlOpcionesProducto(tipoItem, tipoCorrida);
+  const nombre = document.getElementById(`prod-nombre-${id}`);
+  nombre.style.display = "none";
+  nombre.value = inicial ? inicial.nombre : "";
+  document.getElementById(`prod-peso-${id}`).value = inicial ? inicial.peso : "";
+  document.getElementById(`prod-cuentapt-${id}`).checked = inicial ? inicial.pt : true;
+  document.getElementById(`prod-cuentapt-texto-${id}`).textContent = textoCuentaPt(tipoItem === "entrada");
+  document.getElementById(`prod-tambores-${id}`).value = "";
+  document.getElementById(`prod-litros-${id}`).value = "";
+  document.getElementById(`prod-obs-${id}`).value = "";
+  document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
+}
+
 function nowLocalDatetime() {
   const d = new Date();
   const pad = n => String(n).padStart(2, "0");
@@ -259,17 +357,20 @@ function corridaCard(c) {
       <div class="productos-panel" id="prod-panel-${c.id}" style="display:none">
         <div class="prod-lista" id="prod-lista-${c.id}"><div class="empty">Cargando…</div></div>
         <button class="btn-link" id="prod-form-toggle-${c.id}" data-accion="toggle-form-producto" data-id="${c.id}" style="margin-top:10px">+ Agregar producto</button>
-        <div class="prod-form" id="prod-form-${c.id}" style="display:none;margin-top:10px">
+        <div class="prod-form" id="prod-form-${c.id}" data-tipo-corrida="${escapeHtml(c.tipo_proceso || "")}" style="display:none;margin-top:10px">
           <div class="two-col">
             <select id="prod-tipo-${c.id}">
               <option value="salida" selected>Producto de salida (lo produjo esta corrida)</option>
               <option value="entrada">Insumo de entrada (ingresó a la corrida desde una fuente externa, ej. para subir Brix)</option>
             </select>
-            <input type="text" id="prod-nombre-${c.id}" placeholder="Nombre (ej. Concentrado, o Reposición 2026)">
+            <div>
+              <select id="prod-cat-${c.id}" aria-label="Producto">${htmlOpcionesProducto("salida", c.tipo_proceso)}</select>
+              <input type="text" id="prod-nombre-${c.id}" value="${escapeHtml(productoInicial("salida", c.tipo_proceso)?.nombre || "")}" placeholder="Escriba el nombre del producto" style="display:none;margin-top:8px">
+            </div>
           </div>
           <div class="two-col" style="margin-top:8px">
             <input type="number" id="prod-tambores-${c.id}" min="0" step="0.5" placeholder="Tambores">
-            <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)" value="${PESO_TAMBOR_POR_TIPO[c.tipo_proceso] ?? ""}">
+            <input type="number" id="prod-peso-${c.id}" min="0" step="0.01" placeholder="Peso neto del tambor (kg)" value="${productoInicial("salida", c.tipo_proceso)?.peso ?? PESO_TAMBOR_POR_TIPO[c.tipo_proceso] ?? ""}">
           </div>
           <div class="hint-line" id="prod-pt-${c.id}" style="margin-top:4px">PT kg: —</div>
           <div class="two-col" style="margin-top:8px">
@@ -312,7 +413,7 @@ function productoFilaEdicion(p, corridaId) {
           <option value="salida" ${esEntrada ? "" : "selected"}>Producto de salida</option>
           <option value="entrada" ${esEntrada ? "selected" : ""}>Insumo de entrada</option>
         </select>
-        <input type="text" class="ed-prod-nombre" value="${escapeHtml(p.producto)}" placeholder="Nombre">
+        <input type="text" class="ed-prod-nombre" list="lista-productos-conocidos" value="${escapeHtml(p.producto)}" placeholder="Nombre">
       </div>
       <div class="two-col">
         <input type="number" class="ed-prod-tambores" min="0" step="0.5" value="${p.tambores ?? ""}" placeholder="Tambores">
@@ -662,7 +763,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     const obs = document.getElementById(`prod-obs-${id}`).value.trim();
     const msg = document.getElementById(`prod-msg-${id}`);
     if (!nombre) {
-      msg.innerHTML = '<div class="msg bad">Asigne un nombre.</div>';
+      msg.innerHTML = '<div class="msg bad">Elija un producto de la lista, o «Otro» para escribir su nombre.</div>';
       return;
     }
     const cuentaComoPt = document.getElementById(`prod-cuentapt-${id}`).checked;
@@ -676,15 +777,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
         cuenta_como_pt: cuentaComoPt,
         observaciones: obs,
       });
-      document.getElementById(`prod-nombre-${id}`).value = "";
-      document.getElementById(`prod-tambores-${id}`).value = "";
-      document.getElementById(`prod-peso-${id}`).value = "";
-      document.getElementById(`prod-litros-${id}`).value = "";
-      document.getElementById(`prod-obs-${id}`).value = "";
-      document.getElementById(`prod-cuentapt-${id}`).checked = true;
-      document.getElementById(`prod-cuentapt-texto-${id}`).textContent = "Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares.";
-      document.getElementById(`prod-tipo-${id}`).value = "salida";
-      document.getElementById(`prod-pt-${id}`).textContent = "PT kg: —";
+      reiniciarFormProducto(id);
       msg.innerHTML = "";
       cargarProductosPanel(id);
     } catch (e) {
@@ -812,12 +905,10 @@ document.getElementById("corridas").addEventListener("input", (ev) => {
 // de "siempre descuenta" que tenía antes), el checkbox solo cambia el texto.
 document.getElementById("corridas").addEventListener("change", (ev) => {
   const el = ev.target;
-  if (!el.id.startsWith("prod-tipo-")) return;
   const id = el.id.split("-").pop();
-  const esEntrada = el.value === "entrada";
-  document.getElementById(`prod-cuentapt-texto-${id}`).textContent = esEntrada
-    ? "Descontar del total de la corrida (kg, litros, tambores) — desmárquelo si este insumo no debe restarse del total reportado"
-    : "Cuenta como producto terminado (PT) — desmárquelo en caso de enjuague, saldo de tambor sin completar u otros similares.";
+  if (el.id.startsWith("prod-cat-")) { aplicarProductoElegido(id); return; }
+  if (!el.id.startsWith("prod-tipo-")) return;
+  reiniciarFormProducto(id, el.value === "entrada" ? "entrada" : "salida");     // otra lista según sea producto de salida o insumo de entrada
 });
 
 cargar();
