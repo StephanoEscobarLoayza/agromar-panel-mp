@@ -588,3 +588,5 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 @media (prefers-reduced-motion:reduce){.dv-contenido,.dv-hb,.dv-rend-fila,.dv-col .dv-seg{transition:none}}
 
 .dv-fila[hidden]{display:none}
+.dv-descarga{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+a.dv-btn{display:inline-block;text-decoration:none}

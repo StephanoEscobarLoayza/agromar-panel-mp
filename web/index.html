@@ -743,7 +743,12 @@ function panelParadas(d) {
   bT.addEventListener("click", () => { vista = "tipo"; pintar(); });
   pintar();
   const sub = p.n ? `${fmtMin(p.total_min)} con la planta parada · ${p.n} ${p.n === 1 ? "parada" : "paradas"}` : "Tiempo con la planta parada";
-  return panel("Paradas", sub, cuerpo, el("div", { class: "dv-seg-btn", role: "group", "aria-label": "Agrupar por" }, bA, bT));
+  // el mismo Excel de la página «Paradas» (tablero con gráficos), para el período que se está viendo
+  const rango = `desde=${d.periodo.desde}&hasta=${d.periodo.hasta}`;
+  const descarga = el("div", { class: "dv-descarga" },
+    el("a", { class: "dv-btn", href: `/api/paradas/export.xlsx?${rango}`, title: "Libro de Excel con tablero de gráficos, datos para tablas dinámicas y detalle de las paradas" }, "Descargar Excel de paradas"),
+    el("span", { class: "dv-sub" }, "Tablero con gráficos · " + fmtRango(d.periodo.desde, d.periodo.hasta)));
+  return panel("Paradas", sub, [cuerpo, descarga], el("div", { class: "dv-seg-btn", role: "group", "aria-label": "Agrupar por" }, bA, bT));
 }
 
 // ====================================================================================================
