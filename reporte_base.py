@@ -9,7 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Flowable, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Flowable, HRFlowable, CondPageBreak
 
 # ---------------------------------------------------------------------------
 # paleta - copiada 1:1 de las variables --root de web/style.css, para que el
@@ -316,19 +316,25 @@ def encabezado(tipo_doc, titulo, periodo, chip=None):
     return Encabezado(PAGE_W - 2 * MARGIN, tipo_doc, titulo, periodo, chip)
 
 
-def seccion(titulo):
+def seccion(titulo, largo=False):
     """Encabezado de sección: título en negrita + una doble regla delgada
     debajo (forest + un tramo corto citrus), en vez de solo texto en negrita
-    - separa las secciones sin necesitar otra tarjeta o caja."""
+    - separa las secciones sin necesitar otra tarjeta o caja.
+
+    `largo=True` es para cuando lo que sigue es una tabla que puede ocupar varias páginas: si el título quedara «pegado» a toda
+    la tabla, reportlab la mandaría completa a la página siguiente y dejaría un hueco enorme. En su lugar se exige solo un
+    mínimo de espacio (el título más el encabezado y un par de filas) y la tabla se parte donde haga falta."""
     reglas = [
         HRFlowable(width="100%", thickness=1.3, color=FOREST_2, spaceBefore=1, spaceAfter=1),
         HRFlowable(width="26%", thickness=1.3, color=CITRUS, spaceBefore=0, spaceAfter=8, hAlign="LEFT"),
     ]
+    titulo_p = Paragraph(titulo, style_section)
     # el título va siempre pegado a lo que sigue (su tabla): si no cabe al final de la página, se pasa entero a la siguiente
     # en vez de quedar solo abajo con la tabla en la página de al lado
-    for r in reglas:
-        r.keepWithNext = 1
-    return [Paragraph(titulo, style_section), *reglas]
+    pegado = 0 if largo else 1
+    for r in [titulo_p, *reglas]:
+        r.keepWithNext = pegado
+    return ([CondPageBreak(44 * mm)] if largo else []) + [titulo_p, *reglas]
 
 
 def tabla(headers, filas, col_widths, align_derecha_desde=None):
@@ -337,7 +343,7 @@ def tabla(headers, filas, col_widths, align_derecha_desde=None):
     lista de listas de Paragraph (o texto plano, se envuelve solo)."""
     data = [[Paragraph(h, style_cell_head) for h in headers]]
     for fila in filas:
-        data.append([c if isinstance(c, Paragraph) else Paragraph(str(c), style_cell) for c in fila])
+        data.append([c if isinstance(c, Flowable) else Paragraph(str(c), style_cell) for c in fila])
     t = Table(data, colWidths=col_widths, repeatRows=1)
     estilo = [
         ("BACKGROUND", (0, 0), (-1, 0), FOREST_TINT),

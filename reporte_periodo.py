@@ -2,19 +2,50 @@
 Junta lo que pasó en un rango de fechas: MP procesada, corridas, tipos de
 proceso, producto terminado, proveedores y paradas. Piezas compartidas
 (paleta, KPIs, tablas) viven en reporte_base.py."""
+from datetime import timedelta
 from io import BytesIO
 
 from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, BAD, TEXT,
+    FOREST_2, CITRUS, BAD, TEXT, TEXT_MUTED, MESES_ES,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
-    fmt_kg, fmt_num, fmt_fecha, fmt_minutos, Banda, header_footer, kpi_card,
-    encabezado, seccion, tabla, nuevo_doc,
+    fmt_kg, fmt_num, fmt_fecha, fmt_minutos, header_footer, kpi_card,
+    encabezado, seccion, tabla, nuevo_doc, _parse_dt,
 )
+from reporte_graficos import BarrasH, BarraCelda, ColumnasApiladas, color_tipo, corto_proveedor
 
-TIPOS_ORDEN = ["JSA", "JCC", "JCC TASTE", "JSC", "ICEGEN"]
+TIPOS_ORDEN = ["JSA", "JCC", "JCC TASTE", "JSC", "ICEGEN", "PRE CC"]
+# ancho que de verdad tiene el área de contenido: el marco de la página deja 6 pt de relleno a cada lado
+ANCHO_UTIL = PAGE_W - 2 * MARGIN - 12
+
+
+def _tipo_de(c):
+    return c.get("tipo_proceso") if c.get("tipo_proceso") in TIPOS_ORDEN else "Otro"
+
+
+def _como_fecha(x):
+    d = _parse_dt(x)
+    return d.date() if hasattr(d, "date") else d
+
+
+def _columnas_de_tiempo(desde, hasta):
+    """Una columna por día (períodos de hasta 35 días) o por semana (más largos). Devuelve (claves, etiquetas, clave_de(fecha),
+    por_semana): las etiquetas llevan el día y, solo cuando cambia, el mes."""
+    dias = (hasta - desde).days + 1
+    if dias <= 35:
+        claves = [desde + timedelta(days=i) for i in range(dias)]
+        clave_de, por_semana = (lambda d: d), False
+    else:
+        lunes = desde - timedelta(days=desde.weekday())
+        claves = [lunes + timedelta(days=7 * i) for i in range((hasta - lunes).days // 7 + 1)]
+        clave_de, por_semana = (lambda d: d - timedelta(days=d.weekday())), True
+    etiquetas, mes_previo = [], None
+    for k in claves:
+        etiquetas.append((k.strftime("%d"), MESES_ES.get(k.strftime("%b"), k.strftime("%b")) if k.month != mes_previo else None))
+        mes_previo = k.month
+    return claves, etiquetas, clave_de, por_semana
 
 
 def _mp_de_corrida(c):
@@ -114,9 +145,47 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
             style_footnote,
         ))
 
+    columnas, etiquetas_t, clave_de, por_semana = _columnas_de_tiempo(desde, hasta)
+
+    # --- MP procesada en el tiempo, apilada por tipo de proceso ---
+    if corridas and mp_total > 0:
+        tipos_presentes = [t for t in TIPOS_ORDEN + ["Otro"] if any(_tipo_de(c) == t for c in corridas)]
+        pos = {k: n for n, k in enumerate(columnas)}
+        valores = [[0.0] * len(tipos_presentes) for _ in columnas]
+        for c in corridas:
+            f = _como_fecha(c.get("fecha_inicio"))
+            if f is not None and clave_de(f) in pos:
+                valores[pos[clave_de(f)]][tipos_presentes.index(_tipo_de(c))] += _mp_de_corrida(c)
+        story.append(Spacer(1, 6 * mm))
+        story.extend(seccion("MP procesada en el tiempo"))
+        story.append(ColumnasApiladas(
+            ANCHO_UTIL, 150, etiquetas_t, [(t, color_tipo(t)) for t in tipos_presentes], valores,
+        ))
+        story.append(Spacer(1, 1 * mm))
+        story.append(Paragraph(
+            ("Kg de MP por semana (cada columna parte del lunes), según el tipo de proceso de cada corrida." if por_semana
+             else "Kg de MP por día, según el tipo de proceso de cada corrida."), style_footnote))
+
+    # --- MP por tipo de proceso ---
+    if corridas:
+        por_tipo = {}
+        for c in corridas:
+            d = por_tipo.setdefault(_tipo_de(c), {"kg": 0.0, "n": 0})
+            d["kg"] += _mp_de_corrida(c)
+            d["n"] += 1
+        orden = [t for t in TIPOS_ORDEN + ["Otro"] if t in por_tipo]
+        story.append(Spacer(1, 6 * mm))
+        story.extend(seccion("MP por tipo de proceso"))
+        story.append(BarrasH(ANCHO_UTIL, [{
+            "etiqueta": t, "valor": por_tipo[t]["kg"], "texto": fmt_kg(por_tipo[t]["kg"]) + " kg",
+            "nota": f"{por_tipo[t]['n']} {'corrida' if por_tipo[t]['n'] == 1 else 'corridas'} · {por_tipo[t]['kg'] / mp_total * 100:.0f} %" if mp_total > 0
+            else f"{por_tipo[t]['n']} corrida(s)",
+            "color": color_tipo(t),
+        } for t in orden], ancho_etq=70))
+
     # --- corridas del período ---
     story.append(Spacer(1, 6 * mm))
-    story.extend(seccion(f"Corridas del período ({len(corridas)})"))
+    story.extend(seccion(f"Corridas del período ({len(corridas)})", largo=True))
     if corridas:
         pt_por_corrida = {}
         for p in prod_pt:
@@ -125,6 +194,8 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         for p in prod_entrada_desc:
             if p.get("pt_kg") is not None:
                 pt_por_corrida[p["corrida"]] = pt_por_corrida.get(p["corrida"], 0) - float(p["pt_kg"])
+        maximo_mp = max((_mp_de_corrida(c) for c in corridas), default=0)
+        ancho_mp = 46 * mm - 12
         filas = []
         for c in corridas:
             pt_c = pt_por_corrida.get(c.get("nombre"))
@@ -136,57 +207,30 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
                 c.get("nombre") or "—",
                 fmt_fecha(c.get("fecha_inicio")),
                 c.get("tipo_proceso") or "—",
-                fmt_kg(mp_c),
+                BarraCelda(ancho_mp, mp_c, maximo_mp, color_tipo(_tipo_de(c)), fmt_kg(mp_c)),
                 fmt_kg(pt_c) if pt_c else "—",
                 _rend_txt(rend),
             ])
         story.append(tabla(
             ["Corrida", "Fecha", "Tipo", "MP kg", "PT kg", "Rend."], filas,
-            [52 * mm, 24 * mm, 24 * mm, 26 * mm, 24 * mm, 18 * mm], align_derecha_desde=3,
+            [44 * mm, 23 * mm, 22 * mm, 46 * mm, 20 * mm, 16 * mm], align_derecha_desde=4,
         ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(Paragraph("La barra de «MP kg» lleva el color del tipo de proceso (mismos colores que en Dashboards).", style_footnote))
     else:
         story.append(Paragraph("Ninguna corrida en este período.", style_footnote))
-
-    # --- MP por tipo de proceso ---
-    if corridas:
-        por_tipo = {}
-        for c in corridas:
-            t = c.get("tipo_proceso") if c.get("tipo_proceso") in TIPOS_ORDEN else "Otro"
-            d = por_tipo.setdefault(t, {"kg": 0.0, "n": 0})
-            d["kg"] += _mp_de_corrida(c)
-            d["n"] += 1
-        orden = [t for t in TIPOS_ORDEN if t in por_tipo] + (["Otro"] if "Otro" in por_tipo else [])
-        maximo = max((por_tipo[t]["kg"] for t in orden), default=1) or 1
-        story.append(Spacer(1, 8 * mm))
-        story.extend(seccion("MP por tipo de proceso"))
-        ancho_barra = PAGE_W - 2 * MARGIN - 34 * mm
-        filas = []
-        for t in orden:
-            d = por_tipo[t]
-            etq = f"{t}"
-            filas.append([
-                Paragraph(f"{etq} <font size=7 color='#8B9186'>({d['n']})</font>", style_kpi_label),
-                Banda(ancho_barra, d["kg"], maximo, FOREST_2, fmt_kg(d["kg"]) + " kg"),
-            ])
-        tt = Table(filas, colWidths=[34 * mm, ancho_barra])
-        tt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-        story.append(tt)
 
     # --- top proveedores ---
     if proveedores:
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion("Proveedores del período (por MP entregada)"))
-        maximo = float(proveedores[0][1]) or 1
-        ancho_barra = PAGE_W - 2 * MARGIN - 62 * mm
-        filas = []
-        for prov, kg in proveedores:
-            filas.append([
-                Paragraph((prov or "—")[:38], style_kpi_label),
-                Banda(ancho_barra, float(kg), maximo, CITRUS, fmt_kg(float(kg)) + " kg"),
-            ])
-        tt = Table(filas, colWidths=[62 * mm, ancho_barra])
-        tt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-        story.append(tt)
+        total_prov = sum(float(kg) for _, kg in proveedores) or 1
+        story.append(BarrasH(ANCHO_UTIL, [{
+            "etiqueta": corto_proveedor(prov), "valor": float(kg), "texto": fmt_kg(float(kg)) + " kg",
+            "nota": f"{float(kg) / total_prov * 100:.0f} %", "color": FOREST_2,
+        } for prov, kg in proveedores], ancho_etq=182))
+        story.append(Spacer(1, 1 * mm))
+        story.append(Paragraph("Los nombres van abreviados en el gráfico (S.A.C., Coop.). El porcentaje es sobre la MP de los proveedores mostrados.", style_footnote))
 
     # --- paradas: total + cortes por área, por tipo y por día ---
     story.append(Spacer(1, 8 * mm))
@@ -202,32 +246,37 @@ def generar_reporte_periodo_pdf(desde, hasta, corridas, productos, proveedores, 
         def _sumar(clave):
             acc = {}
             for p in paradas:
-                k = (p.get(clave) or "Sin especificar") if clave != "dia" else fmt_fecha(p.get("hora_inicio"))
+                k = p.get(clave) or "Sin especificar"
                 acc[k] = acc.get(k, 0.0) + float(p.get("minutos") or 0)
             return sorted(acc.items(), key=lambda kv: kv[1], reverse=True)
 
-        def _barras(titulo, items, color, ancho_etq):
-            if not any(m > 0 for _, m in items):
+        def _barras(titulo, items):
+            items = [(k, m) for k, m in items if m > 0][:10]
+            if not items:
                 return
+            total = sum(m for _, m in items) or 1
             story.append(Spacer(1, 5 * mm))
             story.append(Paragraph(titulo, style_kpi_label))
             story.append(Spacer(1, 2 * mm))
-            maximo = max((m for _, m in items), default=1) or 1
-            ancho_barra = PAGE_W - 2 * MARGIN - ancho_etq - 4 * mm
-            filas = [[
-                Paragraph(str(etq)[:34], style_kpi_label),
-                Banda(ancho_barra, m, maximo, color, fmt_minutos(m)),
-            ] for etq, m in items]
-            tt = Table(filas, colWidths=[ancho_etq, ancho_barra])
-            tt.setStyle(TableStyle([
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]))
-            story.append(tt)
+            story.append(BarrasH(ANCHO_UTIL, [{
+                "etiqueta": str(k), "valor": m, "texto": fmt_minutos(m), "nota": f"{m / total * 100:.0f} %", "color": CITRUS,
+            } for k, m in items], ancho_etq=120))
 
-        _barras("Por área / proceso", _sumar("area_proceso"), FOREST_2, 40 * mm)
-        _barras("Por tipo de parada", _sumar("tipo_parada"), CITRUS, 40 * mm)
-        _barras("Por día", _sumar("dia"), FOREST_2, 30 * mm)
+        _barras("Por área / proceso", _sumar("area_proceso"))
+        _barras("Por tipo de parada", _sumar("tipo_parada"))
+
+        # por día (o por semana): columnas de minutos parados
+        pos = {k: n for n, k in enumerate(columnas)}
+        minutos = [[0.0] for _ in columnas]
+        for p in paradas:
+            f = _como_fecha(p.get("hora_inicio"))
+            if f is not None and clave_de(f) in pos:
+                minutos[pos[clave_de(f)]][0] += float(p.get("minutos") or 0)
+        if any(m[0] > 0 for m in minutos):
+            story.append(Spacer(1, 5 * mm))
+            story.append(Paragraph("Por semana" if por_semana else "Por día", style_kpi_label))
+            story.append(Spacer(1, 2 * mm))
+            story.append(ColumnasApiladas(ANCHO_UTIL, 130, etiquetas_t, [("Tiempo parado", CITRUS)], minutos, unidad_eje="min"))
 
     doc.build(
         story,

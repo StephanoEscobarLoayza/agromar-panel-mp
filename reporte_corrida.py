@@ -6,11 +6,77 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
 
 from reporte_base import (
-    FOREST_2, CITRUS, OK, BAD, TEXT,
+    FOREST_2, CITRUS, OK, BAD, TEXT, TEXT_MUTED,
     PAGE_W, MARGIN, style_kpi_label, style_footnote,
-    fmt_kg, fmt_num, fmt_tambores, fmt_lote, fmt_fecha, fmt_hora, fmt_minutos, Banda, header_footer, kpi_card,
-    encabezado, seccion, tabla, nuevo_doc, etiqueta_derivado,
+    fmt_kg, fmt_num, fmt_tambores, fmt_lote, fmt_fecha, fmt_hora, fmt_minutos, header_footer, kpi_card,
+    encabezado, seccion, tabla, nuevo_doc, etiqueta_derivado, _parse_dt,
 )
+from reporte_graficos import (
+    BarrasH, BarraCelda, Anillo, Mancuernas, LineaTiempo, FOREST_3, SERIE_AZUL,
+)
+
+# ancho que de verdad tiene el área de contenido: el marco de la página deja 6 pt de relleno a cada lado
+ANCHO_UTIL = PAGE_W - 2 * MARGIN - 12
+ANCHO_KG_LOTE = 37 * mm - 12            # ancho de la celda «Kg usado» (37 mm de columna menos el relleno de la tabla)
+
+
+def _grafico_productos(productos_salida):
+    items = []
+    for p in productos_salida:
+        if p.get("pt_kg") is None:
+            continue
+        cuenta = _cuenta_como_pt(p)
+        tambores = f"{fmt_tambores(p.get('tambores'))} tambor(es)" if p.get("tambores") is not None else None
+        items.append({
+            "etiqueta": p.get("producto") or "—", "valor": float(p["pt_kg"]), "texto": f"{fmt_kg(p['pt_kg'])} kg",
+            "nota": tambores if cuenta else ((tambores + " · " if tambores else "") + "no cuenta como PT"),
+            "color": SERIE_AZUL if cuenta else TEXT_MUTED,
+        })
+    if not items:
+        return None
+    hay_ambos = any(i["color"] is SERIE_AZUL for i in items) and any(i["color"] is TEXT_MUTED for i in items)
+    return BarrasH(ANCHO_UTIL, items, ancho_etq=170, leyenda=[(SERIE_AZUL, "Producto terminado"), (TEXT_MUTED, "No cuenta como PT")] if hay_ambos else None)
+
+
+def _grafico_tanques(mediciones):
+    filas = [{
+        "etiqueta": m.get("tanque") or "—",
+        "sub": f"{fmt_kg(m['litros'])} L" if m.get("litros") is not None else None,
+        "a": m.get("brix_inicial"), "b": m.get("brix_final"),
+    } for m in mediciones if m.get("brix_final") is not None]
+    if not any(f["a"] is not None for f in filas):
+        return None                      # sin Brix inicial no hay «antes → después» que dibujar; queda solo la tabla
+    return Mancuernas(ANCHO_UTIL, filas, ancho_etq=60)
+
+
+def _grafico_paradas(paradas, fecha_inicio, fecha_final):
+    """Línea de tiempo de la corrida con cada parada marcada, o None si no hay horas válidas para dibujarla."""
+    inicio = _parse_dt(fecha_inicio)
+    if inicio is None:
+        return None
+    pares = []
+    for p in paradas:
+        a, b = _parse_dt(p.get("hora_inicio")), _parse_dt(p.get("hora_fin"))
+        if a is not None:
+            pares.append((a, b))
+    if not pares:
+        return None
+    return LineaTiempo(ANCHO_UTIL, inicio, _parse_dt(fecha_final), pares)
+
+
+def _grafico_paradas_por_area(paradas):
+    acc = {}
+    for p in paradas:
+        if p.get("duracion_minutos") is not None:
+            k = p.get("area_proceso") or "Sin especificar"
+            acc[k] = acc.get(k, 0.0) + float(p["duracion_minutos"])
+    if len(acc) < 2:
+        return None
+    total = sum(acc.values()) or 1
+    items = [{
+        "etiqueta": k, "valor": v, "texto": fmt_minutos(v), "nota": f"{v / total * 100:.0f} %", "color": CITRUS,
+    } for k, v in sorted(acc.items(), key=lambda kv: kv[1], reverse=True)[:8]]
+    return BarrasH(ANCHO_UTIL, items, ancho_etq=110)
 
 
 def _es_reproceso(lote: dict) -> bool:
@@ -27,28 +93,38 @@ def _tabla_reproceso(filas):
 
 
 def _tabla_lotes(lotes):
+    """Tabla de lotes con una barra de datos en «Kg usado» (verde oscuro = silo, verde claro = bines), para ver de un vistazo cuáles
+    lotes pesaron más en la corrida."""
+    color_almacen = {"SILO": FOREST_2, "BINES": FOREST_3}
+    maximo = max((float(l["kg_asignados"]) for l in lotes if l.get("kg_asignados") is not None), default=0)
     filas = []
     for l in lotes:
         es_bines = l.get("tipo_almacen_origen") == "BINES"
-        kg_txt = fmt_kg(l["kg_asignados"]) if l.get("kg_asignados") is not None else "pendiente"
-        # en bines el conteo de patio manda más que el kg (que es un
-        # estimado) - se muestra al lado, no reemplazando el kg.
+        notas = []
+        # en bines el conteo de patio manda más que el kg (que es un estimado) - se muestra al lado, no reemplazando el kg.
         if es_bines and l.get("bines_consumidos") is not None:
-            kg_txt += f" ({fmt_num(l['bines_consumidos'], 0)} bines)"
+            notas.append(f"{fmt_num(l['bines_consumidos'], 0)} bines")
         if l.get("porcentaje_descuento") is not None:
-            kg_txt += f" (-{fmt_num(l['porcentaje_descuento'], 1)}% brix)"
+            notas.append(f"-{fmt_num(l['porcentaje_descuento'], 1)}% brix")
+        if l.get("kg_asignados") is not None:
+            kg_celda = BarraCelda(
+                ANCHO_KG_LOTE, l["kg_asignados"], maximo, color_almacen.get(l.get("tipo_almacen_origen"), TEXT_MUTED),
+                fmt_kg(l["kg_asignados"]), nota=" · ".join(notas) or None,
+            )
+        else:
+            kg_celda = "pendiente"
         filas.append([
             fmt_lote(l["lote_numero"], l.get("proveedor")),
             l.get("proveedor") or "—",
             "Bines" if es_bines else "Silo" if l.get("tipo_almacen_origen") == "SILO" else "—",
-            kg_txt,
+            kg_celda,
             fmt_num(l.get("brix_recepcion"), 2),
             fmt_num(l.get("acidez"), 2),
             fmt_num(l.get("ratio"), 2),
         ])
     return tabla(
         ["Lote", "Proveedor", "Almacén", "Kg usado", "Brix", "Acidez", "Ratio"], filas,
-        [22 * mm, 50 * mm, 20 * mm, 31 * mm, 16 * mm, 18 * mm, 16 * mm], align_derecha_desde=3,
+        [20 * mm, 50 * mm, 19 * mm, 37 * mm, 14 * mm, 15 * mm, 13 * mm], align_derecha_desde=4,
     )
 
 
@@ -263,7 +339,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     )
     story = [
         encabezado("Cuadre de corrida", corrida["nombre"], periodo),
-        Spacer(1, 10 * mm),
+        Spacer(1, 6 * mm),
         *seccion("Resumen"),
     ]
 
@@ -276,6 +352,8 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     # tarjetas en blanco con "—", eso se ve roto. Las que sí aplican se
     # acomodan solas de a 3 por fila.
     ancho_kpi = (PAGE_W - 2 * MARGIN - 2 * 6) / 3
+    # el rendimiento se muestra en grande en «Del jugo al tambor»; en ese caso no se repite como tarjeta
+    hay_anillo = bool(rendimiento) and pt_total > 0 and kg_total > 0
     kpis = [("MP consumida", f"{fmt_kg(kg_total)} kg", TEXT)]
     stock_inicio = corrida.get("stock_inicio_kg")
     stock_cierre = corrida.get("stock_cierre_kg")
@@ -292,7 +370,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         kpis.append(("Brix ponderado (estimado)", fmt_num(brix_prom, 2), TEXT))
         if ratio_prom is not None:
             kpis.append(("Ratio ponderado (estimado)", fmt_num(ratio_prom, 2), TEXT))
-    if rendimiento:
+    if rendimiento and not hay_anillo:
         kpis.append(("Rendimiento", f"{rendimiento * 100:.1f} %", TEXT))
     if pt_total:
         kpis.append(("Producto terminado", f"{fmt_kg(pt_total)} kg", TEXT))
@@ -336,25 +414,37 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         ))
     story.append(Spacer(1, 6 * mm))
 
-    if kg_silo > 0 or kg_bines > 0:
-        story.extend(seccion("MP por almacén de origen"))
-        ancho_barra = PAGE_W - 2 * MARGIN - 30 * mm
-        maximo = max(kg_silo, kg_bines)
-        fila = [
-            [Paragraph("Silo", style_kpi_label), Banda(ancho_barra, kg_silo, maximo, FOREST_2, fmt_kg(kg_silo) + " kg")],
-            [Paragraph("Bines", style_kpi_label), Banda(ancho_barra, kg_bines, maximo, CITRUS, fmt_kg(kg_bines) + " kg")],
-        ]
-        t = Table(fila, colWidths=[18 * mm, ancho_barra])
-        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-        story.append(t)
-        story.append(Spacer(1, 4 * mm))
+    if hay_anillo:
+        story.extend(seccion("Del jugo al tambor"))
+        ancho_anillo = 38 * mm
+        anillo = Anillo(30 * mm, rendimiento, f"{rendimiento * 100:.1f} %", "Rendimiento")
+        barras = BarrasH(ANCHO_UTIL - ancho_anillo, [
+            {"etiqueta": "MP consumida", "valor": kg_total, "texto": f"{fmt_kg(kg_total)} kg", "color": FOREST_2},
+            {"etiqueta": "Producto terminado", "valor": pt_total, "texto": f"{fmt_kg(pt_total)} kg",
+             "nota": f"{rendimiento * 100:.1f} % de la MP", "color": SERIE_AZUL},
+        ], ancho_etq=96)
+        par = Table([[anillo, barras]], colWidths=[ancho_anillo, ANCHO_UTIL - ancho_anillo])
+        par.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (0, 0), (0, 0), "LEFT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(par)
+        story.append(Spacer(1, 1 * mm))
+        story.append(Paragraph("Rendimiento = producto terminado ÷ MP consumida.", style_footnote))
+        story.append(Spacer(1, 3 * mm))
 
-    story.extend(seccion(f"Lotes de MP consumidos ({len(lotes)})"))
+    story.extend(seccion(f"Lotes de MP consumidos ({len(lotes)})", largo=True))
     story.append(_tabla_lotes(lotes) if lotes else Paragraph("Sin lotes registrados todavía.", style_footnote))
+    if kg_silo > 0 and kg_bines > 0:
+        story.append(Spacer(1, 2 * mm))
+        story.append(Paragraph(
+            f'Barra: kg usado de cada lote. <font color="#{FOREST_2.hexval()[2:]}">■</font> Silo {fmt_kg(kg_silo)} kg · '
+            f'<font color="#{FOREST_3.hexval()[2:]}">■</font> Bines {fmt_kg(kg_bines)} kg.', style_footnote))
     if n_pendientes:
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
-            f"{n_pendientes} lote(s) con kg pendiente no se cuentan en los KPIs ni en el gráfico Silo/Bines.",
+            f"{n_pendientes} lote(s) con kg pendiente no se cuentan en los KPIs ni en los gráficos.",
             style_footnote,
         ))
 
@@ -364,7 +454,7 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
         story.append(_tabla_reproceso(reproceso))
         story.append(Spacer(1, 3 * mm))
         story.append(Paragraph(
-            "Jugo que se volvió a procesar en esta corrida. No está sumado en la MP consumida, en el gráfico Silo/Bines ni en el rendimiento.",
+            "Jugo que se volvió a procesar en esta corrida. No está sumado en la MP consumida, en los gráficos de MP ni en el rendimiento.",
             style_footnote,
         ))
 
@@ -394,11 +484,21 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
     if mediciones:
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Tanques medidos ({len(mediciones)})"))
+        g_tanques = _grafico_tanques(mediciones)
+        if g_tanques:
+            story.append(g_tanques)
+            story.append(Spacer(1, 2 * mm))
+            story.append(Paragraph("Brix de cada tanque antes y después de estandarizar. La tabla trae también acidez, pH y ratio.", style_footnote))
+            story.append(Spacer(1, 4 * mm))
         story.append(_tabla_mediciones(mediciones))
 
     if productos_salida:
         story.append(Spacer(1, 8 * mm))
         story.extend(seccion(f"Productos de salida ({len(productos_salida)})"))
+        g_productos = _grafico_productos(productos_salida)
+        if g_productos:
+            story.append(g_productos)
+            story.append(Spacer(1, 4 * mm))
         story.append(_tabla_productos(productos_salida))
 
     if productos_entrada:
@@ -413,7 +513,25 @@ def generar_reporte_pdf(corrida: dict, lotes: list, productos: list, paradas: li
 
     if paradas:
         story.append(Spacer(1, 8 * mm))
-        story.extend(seccion(f"Paradas registradas ({len(paradas)})"))
+        story.extend(seccion(f"Paradas registradas ({len(paradas)})", largo=not (len(paradas) < 6)))
+        g_tiempo = _grafico_paradas(paradas, corrida.get("fecha_inicio"), corrida.get("fecha_final"))
+        if g_tiempo:
+            story.append(g_tiempo)
+            ini, fin = g_tiempo.t0, g_tiempo.t1
+            total_min = (fin - ini).total_seconds() / 60
+            if total_min > 0 and min_parado > 0:
+                pct_parado = min(float(min_parado) / total_min * 100, 100)
+                story.append(Spacer(1, 1 * mm))
+                story.append(Paragraph(
+                    f"{len(paradas)} {'parada' if len(paradas) == 1 else 'paradas'} · {fmt_minutos(min_parado)} con la planta parada, "
+                    f"{pct_parado:.0f} % de las {fmt_minutos(total_min)} que va de la corrida.", style_footnote))
+            story.append(Spacer(1, 4 * mm))
+        g_area = _grafico_paradas_por_area(paradas)
+        if g_area:
+            story.append(Paragraph("Tiempo parado por área", style_kpi_label))
+            story.append(Spacer(1, 2 * mm))
+            story.append(g_area)
+            story.append(Spacer(1, 4 * mm))
         story.append(_tabla_paradas(paradas))
 
     doc.build(
