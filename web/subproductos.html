@@ -36,25 +36,179 @@
   .tip{position:absolute;pointer-events:none;background:var(--forest);color:#F4EFE0;font-size:12px;padding:7px 10px;border-radius:8px;box-shadow:var(--shadow-lg);white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5}
   .tip b{color:var(--citrus-light)}
   /* formularios de registro */
-  .flow{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-  .lista-check{border:1px solid var(--border);border-radius:10px;max-height:230px;overflow:auto;background:var(--surface)}
-  .lista-check .check-fila{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)}
-  .lista-check .check-fila:last-child{border-bottom:none}
-  .lista-check .check-fila:hover{background:var(--forest-tint)}
-  .lista-check .check-fila.deshab{cursor:default;color:var(--text-muted)}
-  .lista-check .check-fila.deshab:hover{background:none}
-  .lista-check .check-fila .nom{font-weight:600;flex:1;min-width:0}
-  .lista-check .check-fila .meta{font-size:12px;color:var(--text-muted);white-space:nowrap}
-  .pill-btn{border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;text-align:left;line-height:1.3;white-space:normal;width:max-content;max-width:196px;border-radius:12px;padding:5px 11px}
-  .pill-btn:hover{box-shadow:0 0 0 1px var(--citrus)}
-  .pill-btn .caret{font-size:9px;opacity:.65}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1000;max-width:min(92vw,520px);box-shadow:var(--shadow-lg);display:none;text-align:center}
   .opcion-motivo{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:var(--text)}
   .opcion-motivo:hover{border-color:var(--citrus)}
   .opcion-motivo.activa{border-color:var(--forest-2);background:var(--forest-tint)}
   .opcion-motivo strong{display:block;font-size:14px}
   .opcion-motivo span{display:block;font-size:12.5px;color:var(--text-2);margin-top:2px;line-height:1.4}
-  @media (max-width:760px){ .flow{grid-template-columns:1fr} }
+  /* cámara de barriles */
+  .bar{background:none;border:1px solid transparent;border-radius:10px;cursor:pointer;font-family:inherit;display:inline-flex;flex-direction:column;align-items:center;gap:0;padding:4px 4px 3px;min-height:0;width:auto;color:var(--text-2)}
+  .bar:hover{border-color:var(--border);background:var(--surface-2)}
+  .bar:focus-visible{outline:2px solid var(--citrus);outline-offset:1px}
+  .bar .cod{font-size:10.5px;line-height:1.2;color:var(--text-muted);font-variant-numeric:tabular-nums}
+  .patio-leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);padding:8px 20px 14px}
+  .patio-leyenda i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid}
+  .patio-barra{position:sticky;bottom:10px;z-index:4;margin:6px 16px 16px;background:var(--surface);border:1px solid var(--forest-2);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:10px}
+  .patio-barra[hidden]{display:none}
+  .patio-resumen{font-size:13.5px;line-height:1.5}
+  .patio-resumen b{font-weight:600}
+  .cam{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px;padding:14px 18px 4px}
+  .cam-col{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:10px 12px;box-sizing:border-box;flex:0 1 auto;min-width:min(100%,210px);width:min(100%,calc(var(--cols,4) * 70px + 28px))}
+  .cam-cab{display:flex;flex-direction:column;margin-bottom:8px}
+  .cam-cab strong{font-size:14px}
+  .cam-cab span{font-size:12.5px;color:var(--text-muted)}
+  .cam-barriles{display:flex;flex-wrap:wrap;gap:2px}
+  .cam-col .btn-link{margin-top:6px}
+  .bar svg{width:34px;height:50px;display:block}
+  .bar .env{fill:var(--surface);stroke:var(--text-muted);stroke-width:1}
+  .bar .niv{fill:var(--forest-2);opacity:.45}
+  .bar.abierto .env{stroke:var(--citrus);stroke-width:1.8}
+  .bar.abierto .niv{fill:var(--citrus);opacity:.65}
+  .bar .mez{fill:var(--warn)}
+  .bar.sel{background:var(--forest-tint);border-color:var(--forest-2)}
+  .bar.sel .env{stroke:var(--forest-2);stroke-width:2.2}
+  .cam-destinos{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .cam-detalle{font-size:12.5px;color:var(--text-2);line-height:1.6;border-top:1px solid var(--border);padding-top:8px}
+  .bar{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  .cam-col.vacia{background:transparent}
+  .cam-vacia{border:1.5px dashed var(--border);border-radius:10px;padding:20px 10px;text-align:center;font-size:12.5px;line-height:1.4;color:var(--text-muted)}
+  .bar.arrastrando{opacity:.3}
+  body.arrastrando-barril{-webkit-user-select:none;user-select:none;cursor:grabbing}
+  body.arrastrando-barril .cam-col[data-destino]{outline:2px dashed var(--forest-2);outline-offset:-3px;transition:background .12s}
+  body.arrastrando-barril .cam-col.sobre{outline:2.5px solid var(--forest-2);background:var(--forest-tint);box-shadow:0 0 0 4px rgba(47,111,79,.15)}
+  body.arrastrando-barril .cam-col.sobre-igual{outline:2px dashed var(--text-muted);background:var(--surface-2)}
+  body.arrastrando-barril .cam-col:not([data-destino]){opacity:.55}
+  .cam-fantasma{position:fixed;z-index:60;pointer-events:none;transform:translate(-50%,-50%);filter:drop-shadow(0 8px 14px rgba(0,0,0,.28))}
+  .cam-fantasma.tactil{transform:translate(-50%,-135%)}
+  .cam-fantasma .bar{transform:scale(1.2);background:var(--surface);border-color:var(--forest-2);opacity:1}
+  .cam-fantasma .cuenta{position:absolute;right:-10px;top:-8px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--forest-2);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  @media (max-width:760px){ .patio-barra{margin:6px 8px 12px} }
+  /* ===== cuaderno de emulsión y aceite ===== */
+  .cua-pasos{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--text-2)}
+  .cua-pasos li{display:flex;align-items:center;gap:7px}
+  .cua-pasos i{font-style:normal;font-weight:700;font-size:11px;width:19px;height:19px;border-radius:50%;background:var(--forest-2);color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .cua-pasos b{color:var(--text)}
+  .cua-tope{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin:0 0 18px}
+  .cua-stat{flex:1 1 190px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:11px 14px;position:relative;overflow:hidden}
+  .cua-stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--citrus)}
+  .cua-stat.verde::before{background:var(--forest-2)}
+  .cua-stat.alerta::before{background:var(--warn)}
+  .cua-stat .et{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted);font-weight:600}
+  .cua-stat .vl{font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:600;line-height:1.15;margin-top:2px}
+  .cua-stat .nt{font-size:12.5px;color:var(--text-2);margin-top:1px}
+  .cua-buscar{display:flex;gap:8px;margin:0 0 16px}
+  .cua-buscar input{flex:1;min-width:0;padding:10px 14px;border-radius:99px}
+  .cua{display:flex;flex-direction:column;gap:0;padding-bottom:10px}
+  .cua-cab{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(250px,340px);padding:0 2px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:600}
+  .cua-cab span:nth-child(2){grid-column:3}
+  .cua-fila{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(250px,340px);align-items:stretch;margin-bottom:14px;scroll-margin-top:90px}
+  .cua-izq{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px 8px;min-width:0;display:flex;gap:14px}
+  .cua-fecha{flex:none;width:58px;text-align:center;padding-top:2px}
+  .cua-fecha b{display:block;font-family:'Fraunces',Georgia,serif;font-size:26px;line-height:1;font-weight:600;color:var(--forest)}
+  .cua-fecha span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-top:2px}
+  .cua-izq-cuerpo{min-width:0;flex:1}
+  .cua-meta{font-size:12.5px;color:var(--text-2);margin-bottom:6px}
+  .cua-meta b{font-weight:600;color:var(--text)}
+  .cua-grupos{display:flex;flex-wrap:wrap;gap:4px 14px}
+  .cua-grupo{min-width:0;max-width:100%}
+  .cua-grupo-et{font-size:11px;color:var(--text-muted);margin:0 0 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .cua-grupo-dr{display:flex;flex-wrap:wrap}
+  .ci{background:none;border:1px solid transparent;border-radius:9px;display:inline-flex;flex-direction:column;align-items:center;padding:2px 2px 1px;min-height:0;width:auto;font-family:inherit;cursor:default;color:var(--text-2)}
+  button.ci{cursor:pointer}
+  button.ci:hover{border-color:var(--border);background:var(--surface-2)}
+  button.ci:focus-visible{outline:2px solid var(--citrus);outline-offset:1px}
+  .ci svg{width:32px;height:41px;display:block}
+  .ci em{font-style:normal;font-size:10px;line-height:1.15;color:var(--text-muted);font-variant-numeric:tabular-nums}
+  .ci .cu{fill:var(--citrus-tint);stroke:var(--citrus);stroke-width:1.2}
+  .ci .ban{stroke:var(--citrus);stroke-width:.8;opacity:.7}
+  .ci text{fill:var(--citrus-text);font-size:11px;font-weight:600;font-family:'Public Sans',sans-serif}
+  .ci.hecho .cu{fill:var(--forest-tint);stroke:var(--forest-2);stroke-width:1}
+  .ci.hecho .ban{stroke:var(--forest-2);opacity:.55}
+  .ci.hecho text{fill:var(--forest)}
+  .ci.sel{background:var(--forest-tint);border-color:var(--forest-2)}
+  .ci.sel .cu{fill:#fff;stroke:var(--forest-2);stroke-width:1.9}
+  .ci.sel .ban{stroke:var(--forest-2);opacity:1}
+  .ci.sel text{fill:var(--forest)}
+  .ci.fantasma .cu{fill:transparent;stroke:var(--text-muted);stroke-dasharray:3 2.5;stroke-width:1.2}
+  .ci.fantasma .ban{stroke:var(--text-muted);opacity:.5}
+  .ci.fantasma text{fill:var(--text-muted)}
+  .ci.pend-sin-peso .cu{stroke-dasharray:3 2}
+  .cua-llave{display:flex;align-items:stretch}
+  .cua-llave svg{width:40px;height:100%;display:block;overflow:visible}
+  .cua-llave path{fill:none;stroke:var(--forest-2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .cua-llave.pre path{stroke:var(--citrus);stroke-dasharray:5 4}
+  .cua-llave.espera path{stroke:var(--text-muted);stroke-dasharray:2 5;opacity:.7}
+  .cua-der{border-radius:14px;padding:12px 14px;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:6px;background:var(--forest);color:#F4EFE0;position:relative}
+  .cua-der .et{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--citrus-light);font-weight:600}
+  .cua-der .gr{font-family:'Fraunces',Georgia,serif;font-size:30px;line-height:1.05;font-weight:600}
+  .cua-der .gr small{font-size:14px;font-weight:500;opacity:.8}
+  .cua-der .sb{font-size:12.5px;opacity:.9;line-height:1.45}
+  .cua-der .conv{height:6px;border-radius:99px;background:rgba(255,255,255,.18);position:relative;overflow:hidden}
+  .cua-der .conv i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--citrus-light)}
+  .cua-der .conv u{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.85}
+  .cua-der .btn-link{color:var(--citrus-light);align-self:flex-start;min-height:0;padding:2px 0;font-size:12px}
+  .cua-der.pre{background:var(--citrus-tint);color:var(--text);border:1.5px dashed var(--citrus)}
+  .cua-der.pre .et{color:var(--citrus-text)}
+  .cua-der.espera{background:transparent;border:1.5px dashed var(--border-strong);color:var(--text-2)}
+  .cua-der.espera .et{color:var(--text-muted)}
+  .cua-der.espera .gr{font-size:20px}
+  .cua-barriles{display:flex;flex-wrap:wrap;gap:2px 3px;margin-top:2px}
+  .cb{display:inline-flex;flex-direction:column;align-items:center;font-size:9.5px;line-height:1.1;color:inherit;opacity:.95;padding:1px 2px;border-radius:6px;border:1px solid transparent}
+  .cb svg{width:20px;height:28px;display:block}
+  .cb .env{fill:rgba(255,255,255,.08);stroke:rgba(244,239,224,.6);stroke-width:1}
+  .cb .niv{fill:var(--citrus-light)}
+  .cb.parcial .env{stroke:var(--citrus-light);stroke-width:1.6}
+  .cua-der.pre .cb .env{fill:#fff;stroke:var(--citrus)}
+  .cua-der.pre .cb .niv{fill:var(--citrus)}
+  .cb.foco{border-color:#fff;background:rgba(255,255,255,.15)}
+  .cua-pleg{display:flex;align-items:center;gap:10px;margin:4px 0 10px;font-size:12px;color:var(--text-muted)}
+  .cua-pleg::before,.cua-pleg::after{content:"";flex:1;height:1px;background:var(--border)}
+  .cua-plegado{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px dashed var(--border-strong);border-radius:14px;padding:11px 14px;margin-bottom:14px;background:var(--surface-2);font-size:13px;color:var(--text-2)}
+  .cua-plegado b{color:var(--text);font-weight:600}
+  .cua-plegado .acciones{margin-left:auto;display:flex;gap:8px}
+  .cua-banda{display:flex;align-items:center;gap:10px;margin:6px 0 12px;font-family:'Fraunces',Georgia,serif;font-size:18px;font-weight:600;color:var(--forest)}
+  .cua-banda small{font-family:'Public Sans',sans-serif;font-size:12.5px;font-weight:400;color:var(--text-muted)}
+  .cua-banda::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,var(--citrus),transparent)}
+  .cua-vacio{text-align:center;padding:28px 12px;color:var(--text-muted);font-size:13.5px;border:1px dashed var(--border-strong);border-radius:14px;background:var(--surface)}
+  @keyframes cuaPulso{0%{box-shadow:0 0 0 0 rgba(232,137,12,.55)}70%{box-shadow:0 0 0 14px rgba(232,137,12,0)}100%{box-shadow:0 0 0 0 rgba(232,137,12,0)}}
+  .cua-fila.foco .cua-izq,.cua-fila.foco .cua-der{animation:cuaPulso 1.1s ease-out 3}
+  .ci.foco{border-color:var(--citrus);background:var(--citrus-tint);animation:cuaPulso 1.1s ease-out 3}
+  .ci.nuevo{animation:cuaPulso 1.1s ease-out 3}
+  .cua-dock{position:sticky;bottom:10px;z-index:6;margin:6px 0 0;background:var(--surface);border:1px solid var(--forest-2);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden}
+  .cua-tabs{display:flex;background:var(--forest);padding:6px 6px 0;gap:4px}
+  .cua-tab{background:transparent;border:none;color:#cfd8cf;font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:10px 10px 0 0;cursor:pointer;min-height:0;width:auto}
+  .cua-tab.on{background:var(--surface);color:var(--forest)}
+  .cua-panel{padding:12px 16px 14px;display:flex;flex-direction:column;gap:10px}
+  .cua-panel[hidden]{display:none}
+  .cua-campos{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+  .cua-campos.emu{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto}
+  .cua-campos .field{margin:0}
+  .cua-campos input{font-size:15px}
+  .cua-campos .grande input{font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:600;padding:8px 12px}
+  .cua-linea{font-size:13px;line-height:1.55;color:var(--text-2)}
+  .cua-linea b{color:var(--text);font-weight:600}
+  .cua-linea .mal{color:var(--warn)}
+  .cua-linea .bien{color:var(--forest-2)}
+  .cua-chips{display:flex;gap:6px;flex-wrap:wrap;max-height:96px;overflow:auto}
+  .cua-chip{background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:5px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;color:var(--text-2);min-height:0;width:auto}
+  .cua-chip:hover{border-color:var(--citrus)}
+  .cua-chip.on{background:var(--forest-tint);border-color:var(--forest-2);color:var(--forest);font-weight:600}
+  .cua-chip.ya{opacity:.5;cursor:default}
+  .cua-stepper{display:flex;align-items:center;gap:6px}
+  .cua-stepper button{width:38px;height:38px;padding:0;font-size:20px;line-height:1;min-height:0;border-radius:10px}
+  .cua-stepper input{text-align:center;width:64px;padding:8px 4px}
+  @media (max-width:900px){
+    .cua-cab{display:none}
+    .cua-fila{grid-template-columns:minmax(0,1fr);margin-bottom:18px}
+    .cua-llave{display:none}
+    .cua-der{margin-top:-6px;border-top-left-radius:6px;border-top-right-radius:6px}
+    .cua-campos,.cua-campos.emu{grid-template-columns:1fr 1fr}
+    .cua-campos .btn{grid-column:1/-1;width:100%}
+    .cua-plegado .acciones{margin-left:0}
+    .cua-tab{padding:8px 8px;font-size:12px}
+    .cua-panel{padding:10px 12px 12px}
+    .cua-dock{bottom:6px}
+  }
 </style>
 </head>
 <body>
@@ -103,16 +257,100 @@
   <div class="kpis" id="kpis"><div class="empty">Cargando…</div></div>
 
   <div class="tabs-vista chips" id="tabsVista">
-    <button type="button" class="chip-filter active" data-vista="resumen">Resumen por corrida</button>
+    <button type="button" class="chip-filter active" data-vista="cuaderno">Cuaderno</button>
+    <button type="button" class="chip-filter" data-vista="camara">Cámara de barriles</button>
+    <button type="button" class="chip-filter" data-vista="resumen">Resumen por corrida</button>
     <button type="button" class="chip-filter" data-vista="emulsion">Cilindros de emulsión</button>
     <button type="button" class="chip-filter" data-vista="aceite">Barriles de aceite</button>
-    <button type="button" class="chip-filter" data-vista="registrar">Registrar</button>
   </div>
 
   <div id="mensajeGlobal"></div>
 
+  <!-- ============ CUADERNO DE EMULSIÓN Y ACEITE ============ -->
+  <section class="vista activa" id="vista-cuaderno">
+    <div class="section-head">
+      <h2>Cuaderno de emulsión y aceite</h2>
+      <span class="hint" id="cuaNota">Las emulsiones a la izquierda y el aceite que salió de ellas a la derecha</span>
+    </div>
+
+    <div class="cua-tope" id="cuaTope"></div>
+
+    <form class="cua-buscar" id="cuaBuscarForm" autocomplete="off">
+      <input type="search" id="cuaBuscar" placeholder="Buscar un cilindro o un barril: 529, EORG-2026-529, 210690" aria-label="Buscar un cilindro o un barril">
+      <button type="submit" class="btn-ghost">Buscar</button>
+    </form>
+    <div id="cuaBuscarMsg" style="margin:-8px 0 12px"></div>
+
+    <div class="cua-cab" aria-hidden="true"><span>Emulsión</span><span>Aceite que salió</span></div>
+    <div class="cua" id="cuaderno"><div class="empty">Cargando…</div></div>
+
+    <div class="cua-dock" id="cuaDock">
+      <div class="cua-tabs" role="tablist">
+        <button type="button" class="cua-tab on" role="tab" data-modo="aceite">Anotar aceite que salió</button>
+        <button type="button" class="cua-tab" role="tab" data-modo="emulsion">Anotar emulsión nueva</button>
+      </div>
+
+      <div class="cua-panel" id="dockAceite">
+        <ol class="cua-pasos" aria-label="Cómo se anota el aceite">
+          <li><i>1</i>Escriba los kg de aceite que salieron</li>
+          <li><i>2</i>El panel marca los cilindros más antiguos que cubre; toque uno para quitarlo o agregarlo</li>
+          <li><i>3</i>Pulse <b>Registrar aceite</b></li>
+        </ol>
+        <div class="cua-campos">
+          <div class="field grande"><label for="cuaAceite">Aceite obtenido (kg)</label><input type="number" id="cuaAceite" min="0" step="0.01" inputmode="decimal" placeholder="0"></div>
+          <div class="field"><label for="cuaFecha">Fecha de transformación</label><input type="date" id="cuaFecha"></div>
+          <button class="btn" id="cuaRegAceite" style="width:auto;padding:11px 22px">Registrar aceite</button>
+        </div>
+        <div class="cua-linea" id="cuaLineaAceite"></div>
+        <div id="cuaMsgAceite"></div>
+      </div>
+
+      <div class="cua-panel" id="dockEmulsion" hidden>
+        <div class="field" style="margin:0">
+          <label>Corridas de origen <span class="hint-line">· Toque las que dieron esta emulsión</span></label>
+          <div class="cua-chips" id="cuaCorridas"></div>
+        </div>
+        <div class="cua-campos emu">
+          <div class="field"><label for="cuaEmuFecha">Fecha de emulsión</label><input type="date" id="cuaEmuFecha"></div>
+          <div class="field"><label>Cilindros que salieron</label>
+            <div class="cua-stepper"><button type="button" id="cuaMenos" aria-label="Uno menos">−</button><input type="number" id="cuaEmuN" min="1" max="60" step="1" inputmode="numeric" placeholder="0"><button type="button" id="cuaMas" aria-label="Uno más">+</button></div>
+          </div>
+          <div class="field grande"><label for="cuaEmuPeso">Peso neto total (kg)</label><input type="number" id="cuaEmuPeso" min="0" step="0.01" inputmode="decimal" placeholder="0"></div>
+          <button class="btn" id="cuaRegEmu" style="width:auto;padding:11px 22px">Registrar emulsión</button>
+        </div>
+        <div class="field" style="margin:0;max-width:340px"><label for="cuaEmuMp">MP procesada (kg) <span class="hint-line">· Solo si no hay corridas del panel</span></label><input type="number" id="cuaEmuMp" min="0" step="1" inputmode="decimal" placeholder="Ej. 132550"></div>
+        <div class="cua-linea" id="cuaLineaEmu"></div>
+        <div id="cuaMsgEmu"></div>
+      </div>
+    </div>
+    <div class="sub-note">Cada fila es una transformación: a la izquierda los cilindros de emulsión que se usaron y a la derecha el aceite que dieron, con sus barriles. Abajo está la cola de espera, de la emulsión más antigua a la más reciente: el aceite siempre se pega a los cilindros más antiguos, y el panel los sugiere solo cuando escribe los kg.</div>
+  </section>
+
+  <!-- ============ CÁMARA DE BARRILES ============ -->
+  <section class="vista" id="vista-camara">
+    <div class="section-head">
+      <h2>Cámara de barriles</h2>
+      <span class="hint" id="camNota">Arrastre un barril a su ubicación (en la tablet, mantenga presionado)</span>
+    </div>
+    <div class="panel" style="margin-top:0">
+      <div class="cam" id="cam"><div class="empty">Cargando…</div></div>
+      <div class="patio-leyenda">
+        <span><i style="background:var(--surface);border-color:var(--text-muted)"></i>Lleno (el color sube con los kg)</span>
+        <span><i style="background:var(--citrus-tint);border-color:var(--citrus)"></i>Abierto: aún le falta aceite</span>
+        <span><i style="background:var(--warn);border-color:var(--warn);border-radius:50%"></i>Aceite de más de una corrida</span>
+        <span><i style="background:var(--forest-tint);border-color:var(--forest-2)"></i>Elegido</span>
+      </div>
+      <div class="patio-barra" id="camBarra" hidden>
+        <div class="patio-resumen" id="camResumen"></div>
+        <div class="cam-destinos" id="camDestinos"></div>
+        <div class="cam-detalle" id="camDetalle" hidden></div>
+      </div>
+    </div>
+    <div class="sub-note">Cada barril se dibuja con su nivel de llenado (de sus 183 kg). Para moverlos, arrastre un barril hasta el cuadro de su nueva ubicación (en la tablet, manténgalo presionado un instante y arrástrelo); si antes eligió varios, se mueven todos los elegidos. También puede tocar uno o varios y usar «Mover a». Si elige uno solo verá de qué emulsiones y corridas salió su aceite. El aceite nuevo se registra en el Cuaderno.</div>
+  </section>
+
   <!-- ============ RESUMEN POR CORRIDA ============ -->
-  <section class="vista activa" id="vista-resumen">
+  <section class="vista" id="vista-resumen">
     <div class="section-head">
       <h2>Rendimiento de aceite</h2>
       <span class="hint">Kg de aceite por tonelada de materia prima procesada</span>
@@ -198,74 +436,6 @@
     <div class="sub-note">Los barriles se llenan en orden hasta 183 kg. Cuando una transformación deja un saldo, el barril queda abierto y la siguiente lo completa; el sistema conserva cuántos kg aportó cada corrida y marca el barril como mezcla cuando su aceite proviene de más de una. Si se deshace una transformación anterior, sus barriles quedan con espacio y la siguiente transformación los completa primero.</div>
   </section>
 
-  <!-- ============ REGISTRAR ============ -->
-  <section class="vista" id="vista-registrar">
-    <div class="section-head">
-      <h2>Registrar producción</h2>
-      <span class="hint">Emulsión y transformación a aceite</span>
-    </div>
-    <div class="flow">
-      <div class="panel" style="margin-top:0">
-        <div class="panel-head"><h3>1. Emulsión</h3></div>
-        <div class="form-body">
-          <div class="field">
-            <label for="emuFecha">Fecha de emulsión</label>
-            <input type="date" id="emuFecha">
-          </div>
-          <div class="field">
-            <label>Corridas de origen</label>
-            <div class="lista-check" id="emuCorridas"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
-          </div>
-          <div class="field">
-            <label for="emuMpManual">MP procesada (kg) <span class="hint-line">· Solo si no hay corridas del panel</span></label>
-            <input type="number" id="emuMpManual" min="0" step="1" inputmode="decimal" placeholder="Ej. 132550">
-          </div>
-          <div class="two-col">
-            <div class="field"><label for="emuN">N.º de cilindros</label><input type="number" id="emuN" min="1" max="60" step="1" inputmode="numeric"></div>
-            <div class="field"><label for="emuPeso">Peso neto total (kg)</label><input type="number" id="emuPeso" min="0" step="0.01" inputmode="decimal"></div>
-          </div>
-          <div class="lookup" id="emuResumen"></div>
-          <div id="emuMensaje"></div>
-          <button class="btn" id="btnEmulsion" style="width:auto;padding:11px 22px;align-self:flex-start">Registrar emulsión</button>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:0">
-        <div class="panel-head"><h3>2. Transformación a aceite</h3></div>
-        <div class="form-body">
-          <div class="two-col">
-            <div class="field"><label for="trFecha">Fecha de transformación</label><input type="date" id="trFecha"></div>
-            <div class="field"><label for="trAceite">Aceite obtenido (kg)</label><input type="number" id="trAceite" min="0" step="0.01" inputmode="decimal"></div>
-          </div>
-          <div class="field">
-            <label>Cilindros de emulsión que se transforman
-              <button type="button" class="btn-link" id="trTodos" style="margin-left:8px">Seleccionar todos</button>
-              <button type="button" class="btn-link" id="trNinguno" style="margin-left:6px">Ninguno</button>
-            </label>
-            <div class="lista-check" id="trCilindros"><div class="empty" style="padding:10px 12px">Cargando…</div></div>
-          </div>
-          <div class="lookup" id="trResumen"></div>
-          <div id="trMensaje"></div>
-          <button class="btn" id="btnTransformacion" style="width:auto;padding:11px 22px;align-self:flex-start">Registrar aceite</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="section-head" style="margin-top:36px">
-      <h2>Últimas transformaciones</h2>
-      <span class="hint">Puede deshacer cualquier transformación</span>
-    </div>
-    <div class="panel" style="margin-top:0">
-      <div class="table-wrap">
-        <table class="tabla-compacta tabla-tarjetas">
-          <thead><tr><th>Fecha</th><th class="right">Cilindros</th><th class="right">Emulsión (kg)</th><th class="right">Aceite (kg)</th><th class="right">Conversión</th><th>Barriles</th><th></th></tr></thead>
-          <tbody id="tbTransformaciones"></tbody>
-        </table>
-      </div>
-      <div id="masTransformaciones" style="padding:12px 20px;text-align:center"></div>
-    </div>
-  </section>
-
 </div>
 
 <div class="foot">
@@ -311,7 +481,7 @@ const pill = (tipo, texto) => `<span class="pill ${tipo}">${texto}</span>`;
 const hoy = () => ahoraLocal().slice(0, 10);
 
 let datos = { kpis: null, registros: [] };
-let barriles = [], precamara = [], corridasDisp = [], transformaciones = [], trLimite = 15;
+let barriles = [], corridasDisp = [], transformaciones = [];
 let ultimoCilindro = 0;
 let cilFiltro = "", cilLimite = 100, barFiltro = "", barLimite = 60;
 
@@ -666,73 +836,8 @@ document.getElementById("tbBarriles").addEventListener("change", async (ev) => {
   }
 });
 
-// ---------- registrar: emulsión ----------
-function corridasMarcadas() {
-  return [...document.querySelectorAll("#emuCorridas input:checked")];
-}
-function renderCorridasDisp() {
-  const el = document.getElementById("emuCorridas");
-  const marcadas = new Set(corridasMarcadas().map((c) => c.value));
-  const visibles = corridasDisp.filter((c) => c.kg > 0);   // una corrida sin MP asignada todavía no puede dar emulsión
-  el.innerHTML = visibles.length ? visibles.map((c) => {
-    const ya = c.registro_id !== null;
-    return `<label class="check-fila${ya ? " deshab" : ""}"><input type="checkbox" value="${c.id}" data-kg="${c.kg}"${ya ? " disabled" : ""}${marcadas.has(String(c.id)) ? " checked" : ""}>
-      <span class="nom">${escapeHtml(c.nombre)}</span><span class="meta">${fmtDM(c.fecha)} · ${fmtKg(c.kg)} kg${ya ? " · ya vinculada" : ""}</span></label>`;
-  }).join("") : '<div class="empty" style="padding:10px 12px">No hay corridas de los últimos 21 días.</div>';
-}
-function resumenEmulsion() {
-  const marc = corridasMarcadas();
-  const mpCorr = marc.reduce((a, c) => a + Number(c.dataset.kg), 0);
-  const manual = Number(document.getElementById("emuMpManual").value) || 0;
-  const mp = manual || mpCorr;
-  const n = Math.floor(Number(document.getElementById("emuN").value)) || 0;
-  const peso = Number(document.getElementById("emuPeso").value) || 0;
-  const filas = [];
-  filas.push(["MP de las corridas seleccionadas", marc.length ? `${fmtKg(mpCorr)} kg` : "—"]);
-  if (n > 0 && peso > 0) {
-    filas.push(["Códigos que se generarán", n === 1 ? `${PREFIJO}${ultimoCilindro + 1}` : `${PREFIJO}${ultimoCilindro + 1} a ${ultimoCilindro + n}`]);
-    filas.push(["Peso por cilindro", `${fmt2(peso / n)} kg`]);
-    if (mp > 0) filas.push(["Emulsión por tonelada de MP", `${fmt2(peso / mp * 1000)} kg`]);
-  }
-  document.getElementById("emuResumen").innerHTML = filas.map(([a, b]) => `<div class="lookup-row"><span>${a}</span><span class="num">${b}</span></div>`).join("");
-}
-["emuCorridas", "emuMpManual", "emuN", "emuPeso"].forEach((id) => {
-  document.getElementById(id).addEventListener("input", resumenEmulsion);
-  document.getElementById(id).addEventListener("change", resumenEmulsion);
-});
-document.getElementById("btnEmulsion").addEventListener("click", async () => {
-  const btn = document.getElementById("btnEmulsion");
-  aviso("emuMensaje", "");
-  const cuerpo = {
-    fecha: document.getElementById("emuFecha").value,
-    corrida_ids: corridasMarcadas().map((c) => Number(c.value)),
-    mp_kg_manual: Number(document.getElementById("emuMpManual").value) || null,
-    n_cilindros: Math.floor(Number(document.getElementById("emuN").value)) || 0,
-    peso_total_kg: Number(document.getElementById("emuPeso").value) || 0,
-  };
-  const textoBoton = btn.textContent;
-  btn.disabled = true; btn.textContent = "Guardando…";
-  try {
-    const r = await apiPost("/api/emulsion", cuerpo);
-    ["emuMpManual", "emuN", "emuPeso"].forEach((id) => { document.getElementById(id).value = ""; });
-    const cods = r.cilindros;
-    aviso("emuMensaje", `Emulsión registrada: ${cods.length === 1 ? cods[0] : cods[0] + " a " + cods[cods.length - 1].replace(PREFIJO, "")}, de ${fmt2(r.peso_por_cilindro_kg)} kg c/u. Actualizando la pantalla…`, "ok");
-    btn.textContent = "Actualizando…";
-    await recargar(["resumen", "precamara", "corridas", "lista"]);        // la emulsión no cambia los barriles ni las transformaciones
-    aviso("emuMensaje", `Emulsión registrada: ${cods.length === 1 ? cods[0] : cods[0] + " a " + cods[cods.length - 1].replace(PREFIJO, "")}, de ${fmt2(r.peso_por_cilindro_kg)} kg c/u.`, "ok");
-  } catch (e) { aviso("emuMensaje", e.message); }
-  btn.disabled = false; btn.textContent = textoBoton;
-});
-
-// ---------- registrar: transformación a aceite ----------
-function cilindrosMarcados() { return [...document.querySelectorAll("#trCilindros input:checked")]; }
-function renderPrecamara() {
-  const el = document.getElementById("trCilindros");
-  const marcados = new Set(cilindrosMarcados().map((c) => c.value));
-  el.innerHTML = precamara.length ? precamara.map((c) => `<label class="check-fila"><input type="checkbox" value="${c.id}" data-peso="${c.peso_neto_kg || 0}" data-corridas="${escapeHtml(c.corridas.join("|"))}"${marcados.has(String(c.id)) ? " checked" : ""}>
-      <span class="nom num">${c.codigo}</span><span class="meta">${fmtDM(c.fecha)} · ${c.peso_neto_kg === null ? "peso pendiente" : fmt2(c.peso_neto_kg) + " kg"}</span></label>`).join("")
-    : '<div class="empty" style="padding:10px 12px">No hay cilindros en precámara.</div>';
-}
+// ---------- barriles de una transformación ----------
+// Cómo se repartiría el aceite entre el barril abierto y los barriles nuevos (lo usa el Cuaderno).
 function planBarriles(aceite) {
   const ultimo = barriles[0];
   const cap = ultimo ? ultimo.capacidad_kg : 183;
@@ -748,93 +853,569 @@ function planBarriles(aceite) {
   while (resto > 0.004 && codigo !== null) { codigo += 1; const t = Math.min(cap, resto); lineas.push({ codigo: String(codigo), kg: t, previo: 0, nuevo: true }); resto -= t; }
   return { lineas, cap };
 }
-function resumenTransformacion() {
-  const marc = cilindrosMarcados();
-  const emulsion = marc.reduce((a, c) => a + Number(c.dataset.peso), 0);
-  const corridas = [...new Set(marc.flatMap((c) => (c.dataset.corridas ? c.dataset.corridas.split("|") : [])))];
-  const aceite = Number(document.getElementById("trAceite").value) || 0;
-  const filas = [["Cilindros seleccionados", `${marc.length} · ${fmt2(emulsion)} kg de emulsión`]];
-  if (corridas.length) filas.push(["Corridas de origen", escapeHtml(corridas.join(", "))]);
-  if (aceite > 0 && emulsion > 0) filas.push(["Conversión aceite / emulsión", `${(aceite / emulsion * 100).toFixed(1)} %`]);
-  if (aceite > 0 && marc.length) {
-    const { lineas, cap } = planBarriles(aceite);
-    const comp = lineas.filter((l) => !l.nuevo), nuevos = lineas.filter((l) => l.nuevo);
-    if (comp.length) filas.push([comp.length === 1 ? "Barril abierto por completar" : "Barriles abiertos por completar", comp.map((l) => `${l.codigo} con ${fmt2(l.kg)} kg`).join(", ")]);
-    if (nuevos.length) filas.push(["Barriles nuevos", nuevos.map((l) => l.codigo).join(", ")]);
-    const ult = lineas[lineas.length - 1];
-    if (ult) {
-      const usado = ult.previo + ult.kg;
-      if (usado < cap - 0.005) filas.push(["Queda abierto", `${ult.codigo} · ${fmt2(usado)} de ${fmt2(cap)} kg`]);
-    }
-  }
-  document.getElementById("trResumen").innerHTML = filas.map(([a, b]) => `<div class="lookup-row"><span>${a}</span><span class="num">${b}</span></div>`).join("");
-}
-["trCilindros", "trAceite"].forEach((id) => {
-  document.getElementById(id).addEventListener("input", resumenTransformacion);
-  document.getElementById(id).addEventListener("change", resumenTransformacion);
-});
-document.getElementById("trTodos").addEventListener("click", () => { document.querySelectorAll("#trCilindros input").forEach((c) => { c.checked = true; }); resumenTransformacion(); });
-document.getElementById("trNinguno").addEventListener("click", () => { document.querySelectorAll("#trCilindros input").forEach((c) => { c.checked = false; }); resumenTransformacion(); });
-document.getElementById("btnTransformacion").addEventListener("click", async () => {
-  const btn = document.getElementById("btnTransformacion");
-  aviso("trMensaje", "");
-  const cuerpo = {
-    fecha: document.getElementById("trFecha").value,
-    aceite_kg: Number(document.getElementById("trAceite").value) || 0,
-    cilindro_ids: cilindrosMarcados().map((c) => Number(c.value)),
-  };
-  const textoBoton = btn.textContent;
-  btn.disabled = true; btn.textContent = "Guardando…";
-  try {
-    const r = await apiPost("/api/aceite/transformaciones", cuerpo);
-    document.getElementById("trAceite").value = "";
-    const det = r.aportes.map((a) => `${a.codigo} (${fmt2(a.kg)} kg${a.nuevo ? ", nuevo" : ""})`).join(", ");
-    aviso("trMensaje", `Aceite registrado: ${det}. Actualizando la pantalla…`, "ok");
-    btn.textContent = "Actualizando…";
-    await recargar(["resumen", "barriles", "precamara", "transformaciones", "lista"]);       // las corridas disponibles no cambian
-    aviso("trMensaje", `Aceite registrado: ${det}.`, "ok");
-  } catch (e) { aviso("trMensaje", e.message); }
-  btn.disabled = false; btn.textContent = textoBoton;
-});
-
-// ---------- últimas transformaciones ----------
 function codigosBarriles(lista) {
   if (!lista || !lista.length) return "—";
   return lista.length <= 3 ? lista.join(", ") : `${lista[0]} a ${lista[lista.length - 1]} (${lista.length})`;
 }
-function renderTransformaciones() {
-  const vistas = transformaciones.slice(0, trLimite);
-  document.getElementById("tbTransformaciones").innerHTML = vistas.length ? vistas.map((t) => `<tr>
-      <td class="strong num">${fmtF(t.fecha)}</td>
-      <td class="right num">${t.n_cilindros}</td>
-      <td class="right num">${fmt2(t.emulsion_kg)}</td>
-      <td class="right num">${fmt2(t.aceite_kg)}</td>
-      <td class="right num">${t.emulsion_kg > 0 ? (t.aceite_kg / t.emulsion_kg * 100).toFixed(1) + " %" : "—"}</td>
-      <td class="num">${codigosBarriles(t.barriles)}</td>
-      <td><button class="btn-link btn-link-bad" data-accion="deshacer" data-id="${t.id}">Deshacer</button></td>
-    </tr>`).join("") : '<tr><td colspan="7" class="empty" style="text-align:center">Aún no hay transformaciones registradas.</td></tr>';
-  document.getElementById("masTransformaciones").innerHTML = transformaciones.length > trLimite
-    ? `<button type="button" class="btn-link strong" id="btnMasTr">Mostrar más (${fmtInt(transformaciones.length - trLimite)} restantes)</button>` : "";
+// ---------- cámara de barriles ----------
+const selBar = new Set();
+const camLimite = {};
+const SIN_UBIC = "Sin ubicación";
+
+// kg de aceite que da cada kg de emulsión, según lo ya transformado (si todavía no hay historia, 55 %)
+function conversionHistorica() {
+  const t = transformaciones.filter((x) => x.emulsion_kg > 0);
+  const e = t.reduce((a, x) => a + x.emulsion_kg, 0), a = t.reduce((s, x) => s + x.aceite_kg, 0);
+  return e > 0 ? a / e : 0.55;
 }
-document.getElementById("masTransformaciones").addEventListener("click", (ev) => {
-  if (!ev.target.closest("#btnMasTr")) return;
-  trLimite += 30;
-  renderTransformaciones();
-});
-document.getElementById("tbTransformaciones").addEventListener("click", async (ev) => {
-  const b = ev.target.closest('[data-accion="deshacer"]');
+
+function textoPlanAceite(aceite) {
+  if (!(aceite > 0)) return "";
+  const { lineas, cap } = planBarriles(aceite);
+  const comp = lineas.filter((l) => !l.nuevo), nuevos = lineas.filter((l) => l.nuevo);
+  const partes = [];
+  if (comp.length) partes.push(`completa ${comp.map((l) => `el barril ${l.codigo} (+${fmt2(l.kg)} kg)`).join(", ")}`);
+  if (nuevos.length) partes.push(`abre ${nuevos.length === 1 ? "el barril" : "los barriles"} ${nuevos.map((l) => l.codigo).join(", ")}`);
+  const ult = lineas[lineas.length - 1];
+  if (ult && ult.previo + ult.kg < cap - 0.005) partes.push(`queda abierto ${ult.codigo} con ${fmt2(ult.previo + ult.kg)} de ${fmt2(cap)} kg`);
+  return partes.length ? "Se " + partes.join("; ") + "." : "";
+}
+
+// ----- cámara de barriles -----
+function htmlBarril(b) {
+  const nivel = Math.max(0, Math.min(1, b.kg / b.capacidad_kg)), h = Math.round(34 * nivel);
+  const sel = selBar.has(b.id), abierto = b.estado === "ABIERTO";
+  const tip = `Barril ${b.codigo} · ${fmt2(b.kg)} de ${fmt2(b.capacidad_kg)} kg${abierto ? " · abierto" : ""}${b.mezcla ? ` · mezcla de ${b.n_origenes} corridas` : ""}`;
+  return `<button type="button" class="bar${sel ? " sel" : ""}${abierto ? " abierto" : ""}" data-id="${b.id}" aria-pressed="${sel}" aria-label="${tip}" title="${tip}">
+    <svg viewBox="0 0 34 50" aria-hidden="true"><rect class="env" x="3" y="3" width="28" height="44" rx="5"/><rect class="niv" x="4.5" y="${46 - h}" width="25" height="${h}" rx="4"/>${b.mezcla ? '<circle class="mez" cx="26" cy="9" r="3"/>' : ""}</svg>
+    <span class="cod">${b.codigo}</span></button>`;
+}
+
+function renderCamara() {
+  const ids = new Set(barriles.map((b) => b.id));
+  [...selBar].forEach((i) => { if (!ids.has(i)) selBar.delete(i); });
+  const cont = document.getElementById("cam");
+  if (!barriles.length) { cont.innerHTML = '<div class="empty" style="padding:26px 10px">Aún no hay barriles de aceite.</div>'; actualizarBarraCamara(); return; }
+  const ubic = (b) => b.ubicacion || SIN_UBIC;
+  const cuentas = {};
+  barriles.forEach((b) => { cuentas[ubic(b)] = (cuentas[ubic(b)] || 0) + 1; });
+  const orden = [...UBICACIONES, ...Object.keys(cuentas).filter((u) => !UBICACIONES.includes(u))];     // también las vacías: sirven para soltar
+  cont.innerHTML = orden.map((u) => {
+    const lista = barriles.filter((b) => ubic(b) === u).sort((a, b) => (b.estado === "ABIERTO") - (a.estado === "ABIERTO") || b.numero - a.numero);
+    const kg = lista.reduce((a, b) => a + b.kg, 0), lim = camLimite[u] || 48;
+    // si solo sobran unos pocos se muestran todos; el botón se guarda para las listas largas
+    const visibles = lista.length > lim + 8 ? lim : lista.length, ocultos = lista.length - visibles;
+    const cols = Math.max(3, Math.min(visibles, lista.length > 24 ? 16 : 8));
+    const destino = u !== SIN_UBIC ? ` data-destino="${escapeHtml(u)}"` : "";
+    return `<div class="cam-col${lista.length ? "" : " vacia"}" style="--cols:${cols}"${destino}><div class="cam-cab"><strong>${escapeHtml(u)}</strong><span>${lista.length ? `${lista.length} ${lista.length === 1 ? "barril" : "barriles"} · ${fmtKg(kg)} kg` : "Sin barriles"}</span></div>
+      <div class="cam-barriles">${lista.length ? lista.slice(0, visibles).map(htmlBarril).join("") : '<div class="cam-vacia">Suelte aquí un barril para moverlo a esta ubicación</div>'}</div>
+      ${ocultos > 0 ? `<button type="button" class="btn-link strong" data-mas="${escapeHtml(u)}">Mostrar los ${ocultos} restantes</button>` : ""}</div>`;
+  }).join("");
+  actualizarBarraCamara();
+}
+
+function actualizarBarraCamara() {
+  const marc = barriles.filter((b) => selBar.has(b.id));
+  const barra = document.getElementById("camBarra");
+  barra.hidden = !marc.length;
+  if (!marc.length) return;
+  const kg = marc.reduce((a, b) => a + b.kg, 0);
+  document.getElementById("camResumen").innerHTML = `<b>${marc.length} ${marc.length === 1 ? "barril elegido" : "barriles elegidos"}</b> · ${fmt2(kg)} kg de aceite`;
+  const destinos = [...UBICACIONES, ...new Set(barriles.map((b) => b.ubicacion).filter((u) => u && !UBICACIONES.includes(u)))];
+  document.getElementById("camDestinos").innerHTML = '<span class="hint-line">Mover a:</span> ' +
+    destinos.filter((u) => marc.some((b) => (b.ubicacion || "") !== u)).map((u) => `<button type="button" class="btn-ghost" data-destino="${escapeHtml(u)}">${escapeHtml(u)}</button>`).join(" ") +
+    ' <button type="button" class="btn-link" id="camQuitar">Quitar selección</button>';
+  const det = document.getElementById("camDetalle");
+  if (marc.length === 1) {
+    const b = marc[0];
+    det.hidden = false;
+    det.innerHTML = `<b>Barril ${b.codigo}</b> (n.º ${b.numero}) · ${fmt2(b.kg)} de ${fmt2(b.capacidad_kg)} kg · ${b.estado === "ABIERTO" ? `abierto, faltan ${fmt2(b.capacidad_kg - b.kg)} kg` : "lleno"} · ${escapeHtml(b.ubicacion || SIN_UBIC)}<br>` +
+      (b.aportes.length ? b.aportes.map((a) => `Transformado el ${fmtF(a.fecha)}: ${fmt2(a.kg)} kg de la emulsión del ${fmtF(a.registro_fecha)}${a.corridas.length ? " (" + escapeHtml(a.corridas.join(", ")) + ")" : ""}`).join("<br>") : "Sin aceite todavía.");
+  } else { det.hidden = true; det.innerHTML = ""; }
+}
+
+document.getElementById("cam").addEventListener("click", (ev) => {
+  if (Date.now() - arr.fin < 450) return;                  // el «clic» que sigue a soltar un arrastre no elige nada
+  const mas = ev.target.closest("[data-mas]");
+  if (mas) { camLimite[mas.dataset.mas] = 100000; renderCamara(); return; }
+  const b = ev.target.closest(".bar");
   if (!b) return;
-  const t = transformaciones.find((x) => String(x.id) === b.dataset.id);
-  if (!t) return;
-  const barrilesTxt = t.barriles.length ? ` y se quitará su aceite de los barriles ${codigosBarriles(t.barriles)}` : "";
-  const cilTxt = t.n_cilindros === 1 ? "Su cilindro volverá" : `Sus ${t.n_cilindros} cilindros volverán`;
-  if (!(await confirmar(`¿Deshacer la transformación del ${fmtF(t.fecha)} (${fmt2(t.aceite_kg)} kg de aceite)? ${cilTxt} a precámara${barrilesTxt}. Los demás barriles no se modifican; los que queden con espacio se completarán primero con la siguiente transformación.`))) return;
+  const id = Number(b.dataset.id), on = !selBar.has(id);
+  if (on) selBar.add(id); else selBar.delete(id);
+  b.classList.toggle("sel", on); b.setAttribute("aria-pressed", String(on));
+  actualizarBarraCamara();
+});
+let camMoviendo = false;
+// Mueve los barriles a una ubicación, de 4 en 4 para no saturar la conexión. `limpiar`: vacía toda la selección al terminar.
+async function moverBarriles(lista, destino, limpiar) {
+  lista = lista.filter((b) => (b.ubicacion || "") !== destino);
+  if (!lista.length || camMoviendo) return;
+  if (lista.length >= 10 && !(await confirmar(`¿Mover ${lista.length} barriles a «${destino}»?`))) return;
+  camMoviendo = true;
+  document.querySelectorAll("#camDestinos button").forEach((x) => { x.disabled = true; });
+  let movidos = 0, fallo = null;
   try {
-    const r = await apiDelete(`/api/aceite/transformaciones/${b.dataset.id}`);
+    for (let i = 0; i < lista.length; i += 4) {
+      await Promise.all(lista.slice(i, i + 4).map((b) => apiPost(`/api/aceite/barriles/${b.id}`, { ubicacion: destino }).then(() => { b.ubicacion = destino; movidos += 1; })));
+    }
+  } catch (e) { fallo = e; }
+  camMoviendo = false;
+  if (limpiar) selBar.clear(); else lista.forEach((b) => selBar.delete(b.id));
+  renderCamara(); renderBarriles();
+  if (fallo) toast(`Se movieron ${movidos} de ${lista.length} barriles. ${textoError(fallo)}`);
+  else toast(`${movidos} ${movidos === 1 ? "barril movido" : "barriles movidos"} a «${destino}».`, "ok");
+}
+
+document.getElementById("camBarra").addEventListener("click", async (ev) => {
+  if (ev.target.closest("#camQuitar")) { selBar.clear(); renderCamara(); return; }
+  const d = ev.target.closest("[data-destino]");
+  if (!d) return;
+  await moverBarriles(barriles.filter((b) => selBar.has(b.id)), d.dataset.destino, true);
+});
+
+// ----- arrastrar barriles hasta su ubicación -----
+// Con el ratón: se arrastra directamente. En la tablet: se mantiene presionado el barril un instante y luego se arrastra
+// (así no estorba al desplazar la pantalla con el dedo). Si el barril está entre los elegidos, se arrastran todos los elegidos.
+const arr = { activo: false, ids: [], ini: null, tactil: false, timer: 0, x: 0, y: 0, fantasma: null, col: null, raf: 0, fin: 0 };
+const camEl = document.getElementById("cam");
+
+function camMarcarDestino() {
+  const el = document.elementFromPoint(arr.x, arr.y);
+  const col = el && el.closest ? el.closest(".cam-col[data-destino]") : null;
+  document.querySelectorAll(".cam-col.sobre, .cam-col.sobre-igual").forEach((c) => { if (c !== col) c.classList.remove("sobre", "sobre-igual"); });
+  arr.col = null;
+  if (!col) return;
+  const hay = barriles.some((b) => arr.ids.includes(b.id) && (b.ubicacion || "") !== col.dataset.destino);
+  col.classList.toggle("sobre", hay);
+  col.classList.toggle("sobre-igual", !hay);
+  if (hay) arr.col = col.dataset.destino;
+}
+function camAutoDesplazar() {
+  if (!arr.activo) return;
+  const zona = 90, h = window.innerHeight;
+  const dy = arr.y < zona ? -Math.ceil((zona - arr.y) / 4) : arr.y > h - zona ? Math.ceil((arr.y - (h - zona)) / 4) : 0;
+  if (dy) { window.scrollBy(0, dy); camMarcarDestino(); }
+  arr.raf = requestAnimationFrame(camAutoDesplazar);
+}
+function camPonerFantasma() { arr.fantasma.style.left = arr.x + "px"; arr.fantasma.style.top = arr.y + "px"; }
+function camIniciarArrastre(id, x, y, tactil) {
+  if (camMoviendo || !barriles.some((b) => b.id === id)) return;
+  arr.activo = true; arr.tactil = tactil; arr.x = x; arr.y = y;
+  arr.ids = selBar.has(id) && selBar.size > 1 ? [...selBar] : [id];
+  const primero = barriles.find((b) => b.id === arr.ids[0]);
+  const f = document.createElement("div");
+  f.className = "cam-fantasma" + (tactil ? " tactil" : "");
+  f.innerHTML = htmlBarril(primero) + (arr.ids.length > 1 ? `<span class="cuenta">${arr.ids.length}</span>` : "");
+  document.body.appendChild(f);
+  arr.fantasma = f;
+  camPonerFantasma();
+  document.body.classList.add("arrastrando-barril");
+  camEl.querySelectorAll(".bar").forEach((b) => b.classList.toggle("arrastrando", arr.ids.includes(Number(b.dataset.id))));
+  camMarcarDestino();
+  arr.raf = requestAnimationFrame(camAutoDesplazar);
+}
+function camMoverArrastre(x, y) { arr.x = x; arr.y = y; camPonerFantasma(); camMarcarDestino(); }
+function camTerminarArrastre(cancelar) {
+  clearTimeout(arr.timer); arr.timer = 0;
+  if (!arr.activo) { arr.ini = null; return; }
+  cancelAnimationFrame(arr.raf);
+  const destino = cancelar ? null : arr.col, ids = arr.ids, eraSeleccion = ids.length > 1;
+  arr.activo = false; arr.ini = null; arr.fin = Date.now();
+  if (arr.fantasma) arr.fantasma.remove();
+  arr.fantasma = null;
+  document.body.classList.remove("arrastrando-barril");
+  document.querySelectorAll(".cam-col.sobre, .cam-col.sobre-igual").forEach((c) => c.classList.remove("sobre", "sobre-igual"));
+  camEl.querySelectorAll(".bar.arrastrando").forEach((b) => b.classList.remove("arrastrando"));
+  if (destino) moverBarriles(barriles.filter((b) => ids.includes(b.id)), destino, eraSeleccion);
+}
+
+// ratón
+function camRatonMover(ev) {
+  if (!arr.activo) {
+    if (!arr.ini || Math.hypot(ev.clientX - arr.ini.x, ev.clientY - arr.ini.y) < 6) return;
+    camIniciarArrastre(arr.ini.id, ev.clientX, ev.clientY, false);
+    if (!arr.activo) return;
+  }
+  ev.preventDefault();
+  camMoverArrastre(ev.clientX, ev.clientY);
+}
+function camRatonSoltar(ev) {
+  document.removeEventListener("mousemove", camRatonMover);
+  document.removeEventListener("mouseup", camRatonSoltar);
+  if (arr.activo && ev && typeof ev.clientX === "number") camMoverArrastre(ev.clientX, ev.clientY);      // el destino es donde se suelta
+  camTerminarArrastre(false);
+}
+camEl.addEventListener("mousedown", (ev) => {
+  if (ev.button !== 0 || camMoviendo) return;
+  const b = ev.target.closest(".bar");
+  if (!b) return;
+  arr.ini = { id: Number(b.dataset.id), x: ev.clientX, y: ev.clientY };
+  document.addEventListener("mousemove", camRatonMover);
+  document.addEventListener("mouseup", camRatonSoltar);
+});
+
+// dedo (tablet): mantener presionado ~0.4 s y arrastrar; si el dedo se mueve antes, es un desplazamiento normal de la pantalla
+camEl.addEventListener("touchstart", (ev) => {
+  clearTimeout(arr.timer); arr.timer = 0;
+  const b = ev.target.closest(".bar");
+  if (!b || ev.touches.length !== 1 || camMoviendo) return;
+  const t = ev.touches[0];
+  arr.ini = { id: Number(b.dataset.id), x: t.clientX, y: t.clientY };
+  arr.timer = setTimeout(() => {
+    arr.timer = 0;
+    if (!arr.ini) return;
+    camIniciarArrastre(arr.ini.id, arr.ini.x, arr.ini.y, true);
+    if (arr.activo && navigator.vibrate) navigator.vibrate(12);
+  }, 400);
+}, { passive: true });
+camEl.addEventListener("touchmove", (ev) => {
+  const t = ev.touches[0];
+  if (!t) return;
+  if (arr.activo && arr.tactil) { ev.preventDefault(); camMoverArrastre(t.clientX, t.clientY); return; }
+  if (arr.timer && arr.ini && Math.hypot(t.clientX - arr.ini.x, t.clientY - arr.ini.y) > 10) { clearTimeout(arr.timer); arr.timer = 0; arr.ini = null; }
+}, { passive: false });
+camEl.addEventListener("touchend", (ev) => {
+  if (arr.activo && arr.tactil) {
+    ev.preventDefault();
+    const t = ev.changedTouches && ev.changedTouches[0];
+    if (t) camMoverArrastre(t.clientX, t.clientY);                      // el destino es donde se levanta el dedo
+    camTerminarArrastre(false);
+  } else { clearTimeout(arr.timer); arr.timer = 0; arr.ini = null; }
+});
+camEl.addEventListener("touchcancel", () => camTerminarArrastre(true));
+camEl.addEventListener("contextmenu", (ev) => { if (ev.target.closest(".bar") && (arr.tactil || arr.activo)) ev.preventDefault(); });
+camEl.addEventListener("dragstart", (ev) => ev.preventDefault());      // evita el arrastre nativo de imágenes/enlaces
+
+// ---------- cuaderno de emulsión y aceite ----------
+// Cada fila es una transformación: a la izquierda los cilindros de emulsión que se usaron, a la derecha el aceite que dieron.
+// Abajo queda la cola de espera (emulsión sin aceite, de la más antigua a la más reciente): el aceite se pega siempre a los más viejos.
+let cuaCil = [];
+const cua = { modo: "aceite", manual: null, visibles: 6, corrSel: new Set(), recien: new Set(), tidNueva: null };
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const partesFecha = (iso) => { const [, m, d] = String(iso).slice(0, 10).split("-"); return { m: Number(m), d: Number(d) }; };
+const diasDesde = (iso) => Math.max(0, Math.round((Date.now() - new Date(String(iso).slice(0, 10) + "T00:00:00").getTime()) / 86400000));
+const $c = (id) => document.getElementById(id);
+const LLAVE = (cls) => `<div class="cua-llave ${cls || ""}"><svg viewBox="0 0 40 100" preserveAspectRatio="none" aria-hidden="true"><path d="M2,5 H14 V95 H2 M14,50 H38"/></svg></div>`;
+
+function cuaCilHtml(c, clase, tocable) {
+  const pend = c.peso_neto_kg === null, tag = tocable ? "button" : "span";
+  return `<${tag}${tocable ? ' type="button"' : ""} class="ci ${clase}${pend ? " pend-sin-peso" : ""}${cua.recien.has(c.numero) ? " nuevo" : ""}" data-cil="${c.id}"${tocable ? ` aria-pressed="${/\bsel\b/.test(clase)}" aria-label="Cilindro ${c.codigo}"` : ""} title="${c.codigo} · ${pend ? "peso pendiente" : fmt2(c.peso_neto_kg) + " kg"}"><svg viewBox="0 0 42 54" aria-hidden="true"><rect class="cu" x="4" y="9" width="34" height="41" rx="4"/><ellipse class="cu" cx="21" cy="9" rx="17" ry="5"/><line class="ban" x1="4" y1="21" x2="38" y2="21"/><line class="ban" x1="4" y1="38" x2="38" y2="38"/><text x="21" y="33" text-anchor="middle">${c.numero}</text></svg><em>${pend ? "¿kg?" : Math.round(c.peso_neto_kg)}</em></${tag}>`;
+}
+// los cilindros se agrupan por la emulsión (registro) de la que salieron, con su fecha y sus corridas encima
+function cuaGrupos(cils, clase, tocable) {
+  const grupos = [];
+  cils.forEach((c) => {
+    let g = grupos[grupos.length - 1];
+    if (!g || g.reg !== c.registro_id) { g = { reg: c.registro_id, fecha: c.registro_fecha || c.fecha, corridas: c.corridas || [], lista: [] }; grupos.push(g); }
+    g.lista.push(c);
+  });
+  return `<div class="cua-grupos">${grupos.map((g) => `<div class="cua-grupo"><div class="cua-grupo-et" title="${escapeHtml(g.corridas.join(", "))}">${fmtDM(g.fecha)}${g.corridas.length ? " · " + escapeHtml(g.corridas.join(" + ")) : ""}</div>
+    <div class="cua-grupo-dr">${g.lista.map((c) => cuaCilHtml(c, typeof clase === "function" ? clase(c) : clase, tocable)).join("")}</div></div>`).join("")}</div>`;
+}
+function cuaBarril(cod, kg, cap, completo, extra) {
+  const f = Math.max(0, Math.min(1, kg / cap)), h = Math.round(22 * f);
+  return `<span class="cb${f < 0.995 ? " parcial" : ""}${extra || ""}" data-barril="${cod}" title="Barril ${cod} · ${fmt2(kg)} de ${fmt2(cap)} kg"><svg viewBox="0 0 20 28" aria-hidden="true"><rect class="env" x="1.5" y="1.5" width="17" height="25" rx="3.5"/><rect class="niv" x="3" y="${25 - h}" width="14" height="${h}" rx="2"/></svg>${completo ? cod : String(cod).slice(-3)}</span>`;
+}
+function cuaBarra(conv) {
+  const hist = conversionHistorica();
+  const raro = Math.abs(conv - hist) > 0.12;
+  return `<div class="conv" title="Conversión ${(conv * 100).toFixed(1)} % · la habitual es ${(hist * 100).toFixed(0)} %"><i style="width:${Math.min(100, conv * 100)}%${raro ? ";background:#F5B1A8" : ""}"></i><u style="left:${Math.min(100, hist * 100)}%"></u></div>`;
+}
+
+function cuaBloques() {
+  const porT = new Map(), cola = [];
+  cuaCil.forEach((c) => {
+    if (c.transformacion_id === null) cola.push(c);
+    else { if (!porT.has(c.transformacion_id)) porT.set(c.transformacion_id, []); porT.get(c.transformacion_id).push(c); }
+  });
+  cola.sort((a, b) => a.numero - b.numero);
+  const hechos = [...porT.entries()].map(([tid, cil]) => {
+    cil.sort((a, b) => a.numero - b.numero);
+    const t = transformaciones.find((x) => x.id === tid);
+    return { tid, cil, t, fecha: (t && t.fecha) || cil[0].transformacion_fecha };
+  }).sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.tid - b.tid));
+  return { hechos, cola };
+}
+
+// qué cilindros de la cola cubre el aceite escrito: los más antiguos, hasta cubrir los kg (el último entra si se llena más de la mitad)
+function cuaSeleccion(cola) {
+  if (cua.modo !== "aceite") return new Set();
+  const ids = new Set(cola.map((c) => c.id));
+  if (cua.manual) { cua.manual = new Set([...cua.manual].filter((i) => ids.has(i))); return cua.manual; }
+  const a = Number($c("cuaAceite").value) || 0;
+  if (!(a > 0)) return new Set();
+  const conv = conversionHistorica(), conPeso = cola.filter((c) => c.peso_neto_kg), medio = conPeso.length ? conPeso.reduce((s, c) => s + c.peso_neto_kg, 0) / conPeso.length : 160;
+  const sel = new Set(); let acum = 0;
+  for (const c of cola) {
+    const e = (c.peso_neto_kg === null ? medio : c.peso_neto_kg) * conv;
+    if (acum + e / 2 > a) break;
+    acum += e; sel.add(c.id);
+  }
+  return sel;
+}
+
+function cuaFilaHecho(b) {
+  const f = partesFecha(b.fecha), emul = b.cil.reduce((a, c) => a + (c.peso_neto_kg || 0), 0);
+  const t = b.t, aceite = t ? t.aceite_kg : null, conv = aceite && emul ? aceite / emul : null;
+  const cods = t ? t.barriles : [];
+  const chips = cods.map((cod) => {
+    const bb = barriles.find((x) => x.codigo === cod);
+    return cuaBarril(cod, bb ? bb.kg : 0, bb ? bb.capacidad_kg : 183, cods.length <= 5);
+  }).join("");
+  return `<div class="cua-fila${cua.tidNueva === b.tid ? " foco" : ""}" data-tid="${b.tid}">
+    <div class="cua-izq"><div class="cua-fecha"><b>${f.d}</b><span>${MESES[f.m - 1]}</span></div>
+      <div class="cua-izq-cuerpo"><div class="cua-meta"><b>${b.cil.length} ${b.cil.length === 1 ? "cilindro" : "cilindros"}</b> · ${fmt2(emul)} kg de emulsión</div>${cuaGrupos(b.cil, "hecho", false)}</div></div>
+    ${LLAVE("")}
+    <div class="cua-der"><div class="et">Aceite · ${fmtF(b.fecha)}</div>
+      <div class="gr">${aceite === null ? "—" : fmt2(aceite)} <small>kg</small></div>
+      ${conv ? `${cuaBarra(conv)}<div class="sb">Conversión ${(conv * 100).toFixed(1)} %</div>` : ""}
+      <div class="cua-barriles">${chips || '<span class="sb">Sin barriles</span>'}</div>
+      <button type="button" class="btn-link" data-deshacer="${b.tid}">Deshacer esta transformación</button></div></div>`;
+}
+
+function cuaFilaPrevia(selCil) {
+  const emul = selCil.reduce((a, c) => a + (c.peso_neto_kg || 0), 0), a = Number($c("cuaAceite").value) || 0, conv = conversionHistorica();
+  const cuerpo = a > 0
+    ? `<div class="gr">${fmt2(a)} <small>kg</small></div>${emul ? cuaBarra(a / emul) : ""}<div class="sb">Conversión ${emul ? (a / emul * 100).toFixed(1) : "—"} %${emul && Math.abs(a / emul - conv) > 0.12 ? " · lejos de lo habitual" : ""}</div>`
+    : `<div class="gr">≈ ${fmtKg(emul * conv)} <small>kg</small></div><div class="sb">Aceite esperado con la conversión habitual (${(conv * 100).toFixed(0)} %)</div>`;
+  let chips = "";
+  if (a > 0) { const { lineas, cap } = planBarriles(a); chips = lineas.map((l) => cuaBarril(l.codigo, l.previo + l.kg, cap, lineas.length <= 5)).join(""); }
+  return `<div class="cua-fila" id="cuaPrevia">
+    <div class="cua-izq" style="border-color:var(--forest-2);background:var(--forest-tint)"><div class="cua-fecha"><b>${selCil.length}</b><span>elegidos</span></div>
+      <div class="cua-izq-cuerpo"><div class="cua-meta"><b>Cilindros que cubre este aceite</b> · ${fmt2(emul)} kg de emulsión · toque un cilindro para quitarlo o agregarlo</div>${cuaGrupos(selCil, "sel", true)}</div></div>
+    ${LLAVE("pre")}
+    <div class="cua-der pre"><div class="et">Vista previa · aún no registrado</div>${cuerpo}<div class="cua-barriles">${chips}</div></div></div>`;
+}
+
+function cuaFantasmas() {
+  if (cua.modo !== "emulsion") return [];
+  const n = Math.min(60, Math.max(0, Math.floor(Number($c("cuaEmuN").value) || 0))), peso = Number($c("cuaEmuPeso").value) || 0;
+  return Array.from({ length: n }, (_, i) => ({ id: "g" + i, numero: ultimoCilindro + 1 + i, codigo: PREFIJO + (ultimoCilindro + 1 + i), peso_neto_kg: peso > 0 ? peso / n : null }));
+}
+
+function renderCuaderno() {
+  const cont = $c("cuaderno");
+  if (!cuaCil.length && !datos.registros.length) { cont.innerHTML = '<div class="empty">Aún no hay emulsión registrada.</div>'; $c("cuaTope").innerHTML = ""; return; }
+  const { hechos, cola } = cuaBloques();
+  const sel = cuaSeleccion(cola), selCil = cola.filter((c) => sel.has(c.id)), resto = cola.filter((c) => !sel.has(c.id)), fant = cuaFantasmas();
+  // ---- indicadores de arriba
+  const kgCola = cola.reduce((a, c) => a + (c.peso_neto_kg || 0), 0), conv = conversionHistorica(), esperado = kgCola * conv;
+  const cap = barriles[0] ? barriles[0].capacidad_kg : 183, abierto = barriles.filter((b) => b.estado === "ABIERTO").sort((a, b) => b.numero - a.numero)[0];
+  const viejo = cola[0], dias = viejo ? diasDesde(viejo.registro_fecha || viejo.fecha) : 0;
+  $c("cuaTope").innerHTML = `
+    <div class="cua-stat"><div class="et">En cola de espera</div><div class="vl">${cola.length} ${cola.length === 1 ? "cilindro" : "cilindros"}</div><div class="nt">${fmt2(kgCola)} kg de emulsión sin aceite</div></div>
+    <div class="cua-stat${dias > 14 ? " alerta" : ""}"><div class="et">El más antiguo</div><div class="vl">${viejo ? fmtDM(viejo.registro_fecha || viejo.fecha) : "—"}</div><div class="nt">${viejo ? `lleva ${dias} ${dias === 1 ? "día" : "días"} esperando` : "No hay nada esperando"}</div></div>
+    <div class="cua-stat verde"><div class="et">Aceite esperado</div><div class="vl">≈ ${fmtKg(esperado)} kg</div><div class="nt">≈ ${(esperado / cap).toFixed(1)} barriles · conversión ${(conv * 100).toFixed(0)} %</div></div>
+    <div class="cua-stat"><div class="et">Barril abierto</div><div class="vl">${abierto ? abierto.codigo : "—"}</div><div class="nt">${abierto ? `${fmt2(abierto.kg)} de ${fmt2(abierto.capacidad_kg)} kg · faltan ${fmt2(abierto.capacidad_kg - abierto.kg)}` : "Todos los barriles están llenos"}</div></div>`;
+  // ---- historial (los más recientes; los anteriores se pliegan)
+  const nVis = Math.min(hechos.length, cua.visibles), ocultos = hechos.slice(0, hechos.length - nVis), visibles = hechos.slice(hechos.length - nVis);
+  let h = "";
+  if (ocultos.length) {
+    const cils = ocultos.reduce((a, b) => a + b.cil.length, 0), emul = ocultos.reduce((a, b) => a + b.cil.reduce((s, c) => s + (c.peso_neto_kg || 0), 0), 0), ace = ocultos.reduce((a, b) => a + (b.t ? b.t.aceite_kg : 0), 0);
+    h += `<div class="cua-plegado"><span><b>${ocultos.length} transformaciones anteriores</b> (${fmtDM(ocultos[0].fecha)} al ${fmtDM(ocultos[ocultos.length - 1].fecha)}) · ${fmtInt(cils)} cilindros · ${fmtKg(emul)} kg de emulsión → ${fmtKg(ace)} kg de aceite</span>
+      <span class="acciones"><button type="button" class="btn-ghost" data-cua="mas">Ver 10 más</button><button type="button" class="btn-ghost" data-cua="todas">Ver todas</button></span></div>`;
+  }
+  h += visibles.map(cuaFilaHecho).join("");
+  // ---- cola de espera
+  h += `<div class="cua-banda">En cola de espera <small>${cola.length ? `${cola.length} ${cola.length === 1 ? "cilindro espera" : "cilindros esperan"} su aceite, del más antiguo al más reciente` : "no hay emulsión esperando aceite"}</small></div>`;
+  if (selCil.length) h += cuaFilaPrevia(selCil);
+  const tocable = cua.modo === "aceite";
+  if (resto.length || fant.length) {
+    const gr = resto.length ? cuaGrupos(resto, "", tocable) : "";
+    const gf = fant.length ? `<div class="cua-grupos" style="margin-top:6px"><div class="cua-grupo"><div class="cua-grupo-et">Emulsión nueva · se agregará al final de la cola</div><div class="cua-grupo-dr">${fant.map((c) => cuaCilHtml(c, "fantasma", false)).join("")}</div></div></div>` : "";
+    const kgR = resto.reduce((a, c) => a + (c.peso_neto_kg || 0), 0);
+    h += `<div class="cua-fila"><div class="cua-izq"><div class="cua-fecha"><b>${resto.length}</b><span>en cola</span></div>
+      <div class="cua-izq-cuerpo"><div class="cua-meta"><b>Esperando su aceite</b> · ${fmt2(kgR)} kg de emulsión${resto.length && tocable ? " · toque un cilindro para elegirlo" : ""}</div>${gr}${gf}</div></div>
+      ${LLAVE("espera")}
+      <div class="cua-der espera"><div class="et">Aceite</div><div class="gr">Pendiente</div><div class="sb">Cuando salga aceite se pega a estos cilindros, empezando por el más antiguo.</div></div></div>`;
+  } else if (!selCil.length) {
+    h += '<div class="cua-vacio">No hay emulsión esperando aceite. Anote la emulsión nueva en la barra de abajo.</div>';
+  }
+  cont.innerHTML = h;
+}
+
+function cuaIr(selector, extra) {
+  const el = document.querySelector(selector);
+  if (!el) return false;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("foco");
+  if (extra) { const x = el.querySelector(extra); if (x) x.classList.add("foco"); }
+  setTimeout(() => { el.classList.remove("foco"); if (extra) el.querySelectorAll(".foco").forEach((e) => e.classList.remove("foco")); }, 4200);
+  return true;
+}
+
+// ----- barra de abajo: aceite y emulsión -----
+// 529, 530, 534, 535, 536 -> "529 a 530, 534 a 536": los saltos se ven (no parece un rango corrido cuando falta alguno)
+function cuaRangos(nums) {
+  const o = [...nums].sort((x, y) => x - y), partes = [];
+  for (let i = 0; i < o.length; ) {
+    let j = i;
+    while (j + 1 < o.length && o[j + 1] === o[j] + 1) j++;
+    partes.push(j === i ? String(o[i]) : j === i + 1 ? `${o[i]} y ${o[j]}` : `${o[i]} a ${o[j]}`);
+    i = j + 1;
+  }
+  return partes.join(", ");
+}
+function cuaLineas() {
+  const { cola } = cuaBloques();
+  if (cua.modo === "aceite") {
+    const a = Number($c("cuaAceite").value) || 0, sel = cola.filter((c) => cuaSeleccion(cola).has(c.id)), conv = conversionHistorica();
+    let t;
+    if (!sel.length) t = a > 0 ? `Con ${fmt2(a)} kg todavía no alcanza para el primer cilindro de la cola.` : "Escriba los kg de aceite y el panel marca los cilindros más antiguos que cubre. También puede tocar los cilindros de la cola.";
+    else {
+      const emul = sel.reduce((s, c) => s + (c.peso_neto_kg || 0), 0), nums = sel.map((c) => c.numero).sort((x, y) => x - y);
+      const real = a > 0 && emul > 0 ? a / emul : null;
+      t = `<b>${sel.length} ${sel.length === 1 ? "cilindro" : "cilindros"}</b> (${cuaRangos(nums)}) · ${fmt2(emul)} kg de emulsión` +
+        (real !== null ? ` · conversión <b class="${Math.abs(real - conv) > 0.12 ? "mal" : "bien"}">${(real * 100).toFixed(1)} %</b> ${Math.abs(real - conv) > 0.12 ? "(lejos del " + (conv * 100).toFixed(0) + " % habitual: revise)" : "(normal)"}` : ` · aceite esperado ≈ ${fmtKg(emul * conv)} kg`) +
+        (a > 0 ? `<br>${escapeHtml(textoPlanAceite(a))}` : "") +
+        (cua.manual ? ' · <button type="button" class="btn-link" data-cua="auto" style="min-height:0;padding:0">Volver a la sugerencia</button>' : "");
+    }
+    $c("cuaLineaAceite").innerHTML = t;
+  } else {
+    const n = Math.floor(Number($c("cuaEmuN").value) || 0), peso = Number($c("cuaEmuPeso").value) || 0;
+    const mpC = [...cua.corrSel].reduce((s, id) => { const c = corridasDisp.find((x) => x.id === id); return s + (c ? c.kg : 0); }, 0), mp = Number($c("cuaEmuMp").value) || mpC;
+    const f = [];
+    if (n > 0) f.push(`Se crearán <b>${PREFIJO}${ultimoCilindro + 1}${n > 1 ? " a " + (ultimoCilindro + n) : ""}</b>`);
+    if (n > 0 && peso > 0) f.push(`<b>${fmt2(peso / n)} kg</b> por cilindro`);
+    if (mp > 0) f.push(`MP ${fmtKg(mp)} kg${peso > 0 ? ` · ${fmt2(peso / mp * 1000)} kg de emulsión por t de MP` : ""}`);
+    $c("cuaLineaEmu").innerHTML = f.length ? f.join(" · ") : "Elija las corridas, cuántos cilindros salieron y su peso total: los cilindros aparecen en la cola.";
+  }
+}
+function cuaChipsCorridas() {
+  const lista = corridasDisp.filter((c) => c.kg > 0);
+  $c("cuaCorridas").innerHTML = lista.length ? lista.map((c) => {
+    const ya = c.registro_id !== null;
+    return `<button type="button" class="cua-chip${ya ? " ya" : ""}${cua.corrSel.has(c.id) ? " on" : ""}" data-corrida="${c.id}"${ya ? " disabled" : ""} title="${ya ? "Ya está vinculada a otro registro de emulsión" : ""}">${escapeHtml(c.nombre)} · ${fmtDM(c.fecha)} · ${fmtKg(c.kg)} kg${ya ? " · ya vinculada" : ""}</button>`;
+  }).join("") : '<span class="hint-line">No hay corridas de los últimos 21 días.</span>';
+}
+function cuaModo(m) {
+  cua.modo = m;
+  document.querySelectorAll(".cua-tab").forEach((b) => { const on = b.dataset.modo === m; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
+  $c("dockAceite").hidden = m !== "aceite"; $c("dockEmulsion").hidden = m !== "emulsion";
+  if (m === "emulsion") cua.manual = null;
+  renderCuaderno(); cuaLineas();
+}
+function cuaRefrescar() { renderCuaderno(); cuaLineas(); }
+
+document.querySelector(".cua-tabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-modo]"); if (b) cuaModo(b.dataset.modo); });
+["cuaAceite"].forEach((id) => $c(id).addEventListener("input", () => { cua.manual = null; cuaRefrescar(); }));
+["cuaEmuN", "cuaEmuPeso", "cuaEmuMp"].forEach((id) => $c(id).addEventListener("input", cuaRefrescar));
+$c("cuaMenos").addEventListener("click", () => { $c("cuaEmuN").value = Math.max(0, (Math.floor(Number($c("cuaEmuN").value)) || 0) - 1) || ""; cuaRefrescar(); });
+$c("cuaMas").addEventListener("click", () => { $c("cuaEmuN").value = Math.min(60, (Math.floor(Number($c("cuaEmuN").value)) || 0) + 1); cuaRefrescar(); });
+$c("cuaCorridas").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-corrida]");
+  if (!b || b.disabled) return;
+  const id = Number(b.dataset.corrida);
+  if (cua.corrSel.has(id)) cua.corrSel.delete(id); else cua.corrSel.add(id);
+  cuaChipsCorridas(); cuaLineas();
+});
+$c("cuaLineaAceite").addEventListener("click", (ev) => { if (ev.target.closest('[data-cua="auto"]')) { cua.manual = null; cuaRefrescar(); } });
+
+$c("cuaderno").addEventListener("click", async (ev) => {
+  const acc = ev.target.closest("[data-cua]");
+  if (acc) { cua.visibles = acc.dataset.cua === "todas" ? 1e6 : cua.visibles + 10; renderCuaderno(); return; }
+  const des = ev.target.closest("[data-deshacer]");
+  if (des) {
+    const t = transformaciones.find((x) => String(x.id) === des.dataset.deshacer);
+    if (!t) return;
+    const bar = t.barriles.length ? ` y se quitará su aceite de los barriles ${codigosBarriles(t.barriles)}` : "";
+    if (!(await confirmar(`¿Deshacer la transformación del ${fmtF(t.fecha)} (${fmt2(t.aceite_kg)} kg de aceite)? ${t.n_cilindros === 1 ? "Su cilindro volverá" : `Sus ${t.n_cilindros} cilindros volverán`} a la cola${bar}.`))) return;
+    try {
+      const r = await apiDelete(`/api/aceite/transformaciones/${des.dataset.deshacer}`);
+      await recargar(["resumen", "barriles", "precamara", "transformaciones", "lista"]);
+      const libres = (r.libres || []).map((x) => `${x.codigo} (${fmt2(x.kg_libre)} kg libres)`).join(", ");
+      toast("La transformación fue deshecha." + (libres ? ` Barriles con espacio: ${libres}.` : ""), "ok");
+    } catch (e) { toast(textoError(e)); }
+    return;
+  }
+  const b = ev.target.closest("button.ci[data-cil]");
+  if (!b || cua.modo !== "aceite") return;
+  const { cola } = cuaBloques();
+  if (!cua.manual) cua.manual = new Set(cuaSeleccion(cola));
+  const id = Number(b.dataset.cil);
+  if (cua.manual.has(id)) cua.manual.delete(id); else cua.manual.add(id);
+  cuaRefrescar();
+});
+
+$c("cuaRegAceite").addEventListener("click", async () => {
+  const btn = $c("cuaRegAceite");
+  aviso("cuaMsgAceite", "");
+  const { cola } = cuaBloques(), sel = cola.filter((c) => cuaSeleccion(cola).has(c.id));
+  const cuerpo = { fecha: $c("cuaFecha").value, aceite_kg: Number($c("cuaAceite").value) || 0, cilindro_ids: sel.map((c) => c.id) };
+  if (!(cuerpo.aceite_kg > 0)) { aviso("cuaMsgAceite", "Indique los kg de aceite obtenidos."); return; }
+  if (!cuerpo.fecha) { aviso("cuaMsgAceite", "Indique la fecha de la transformación."); return; }
+  if (!cuerpo.cilindro_ids.length) { aviso("cuaMsgAceite", "Ningún cilindro de la cola queda cubierto por ese aceite: toque los cilindros que se transformaron."); return; }
+  const emul = sel.reduce((s, c) => s + (c.peso_neto_kg || 0), 0), real = emul > 0 ? cuerpo.aceite_kg / emul : null, hist = conversionHistorica();
+  if (real !== null && Math.abs(real - hist) > 0.2 && !(await confirmar(`La conversión sería ${(real * 100).toFixed(1)} %, muy lejos del ${(hist * 100).toFixed(0)} % habitual. ¿Registrar este aceite de todos modos?`))) return;
+  const texto = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try {
+    const r = await apiPost("/api/aceite/transformaciones", cuerpo);
+    const det = r.aportes.map((a) => `${a.codigo} (${fmt2(a.kg)} kg${a.nuevo ? ", nuevo" : ""})`).join(", ");
+    $c("cuaAceite").value = ""; cua.manual = null; cua.tidNueva = r.id;
+    btn.textContent = "Actualizando…";
     await recargar(["resumen", "barriles", "precamara", "transformaciones", "lista"]);
-    const libres = (r.libres || []).map((x) => `${x.codigo} (${fmt2(x.kg_libre)} kg libres)`).join(", ");
-    aviso("mensajeGlobal", "La transformación fue deshecha." + (libres ? ` Barriles con espacio: ${libres}.` : ""), "ok");
-  } catch (e) { toast(textoError(e)); }
+    toast(`Aceite registrado: ${det}.`, "ok");
+    cuaIr(`.cua-fila[data-tid="${r.id}"]`);
+    setTimeout(() => { cua.tidNueva = null; }, 5000);
+  } catch (e) { aviso("cuaMsgAceite", textoError(e)); }
+  btn.disabled = false; btn.textContent = texto;
+});
+
+$c("cuaRegEmu").addEventListener("click", async () => {
+  const btn = $c("cuaRegEmu");
+  aviso("cuaMsgEmu", "");
+  const cuerpo = {
+    fecha: $c("cuaEmuFecha").value, corrida_ids: [...cua.corrSel], mp_kg_manual: Number($c("cuaEmuMp").value) || null,
+    n_cilindros: Math.floor(Number($c("cuaEmuN").value)) || 0, peso_total_kg: Number($c("cuaEmuPeso").value) || 0,
+  };
+  if (!cuerpo.fecha) { aviso("cuaMsgEmu", "Indique la fecha de la emulsión."); return; }
+  if (!cuerpo.corrida_ids.length && !cuerpo.mp_kg_manual) { aviso("cuaMsgEmu", "Elija las corridas de origen o indique la MP procesada."); return; }
+  if (cuerpo.n_cilindros < 1) { aviso("cuaMsgEmu", "Indique cuántos cilindros salieron."); return; }
+  if (!(cuerpo.peso_total_kg > 0)) { aviso("cuaMsgEmu", "Indique el peso neto total de la emulsión."); return; }
+  const texto = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try {
+    const r = await apiPost("/api/emulsion", cuerpo);
+    const cods = r.cilindros;
+    ["cuaEmuN", "cuaEmuPeso", "cuaEmuMp"].forEach((id) => { $c(id).value = ""; });
+    cua.corrSel.clear();
+    const previo = ultimoCilindro;
+    btn.textContent = "Actualizando…";
+    await recargar(["resumen", "precamara", "corridas", "lista"]);
+    cua.recien = new Set(cuaCil.filter((c) => c.numero > previo).map((c) => c.numero));
+    cuaRefrescar(); cuaChipsCorridas();
+    toast(`Emulsión registrada: ${cods.length === 1 ? cods[0] : cods[0] + " a " + cods[cods.length - 1].replace(PREFIJO, "")}, de ${fmt2(r.peso_por_cilindro_kg)} kg c/u.`, "ok");
+    const ult = document.querySelector(`#cuaderno button.ci[data-cil="${(cuaCil.find((c) => c.numero === previo + 1) || {}).id}"]`);
+    if (ult) ult.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => { cua.recien = new Set(); }, 5000);
+  } catch (e) { aviso("cuaMsgEmu", textoError(e)); }
+  btn.disabled = false; btn.textContent = texto;
+});
+
+// ----- búsqueda: un cilindro (EORG-2026-529 o 529) o un barril (código de 6 cifras) -----
+$c("cuaBuscarForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  aviso("cuaBuscarMsg", "");
+  const dig = $c("cuaBuscar").value.toUpperCase().replace(/^EORG-2026-/, "").replace(/\D/g, "");
+  if (!dig) { aviso("cuaBuscarMsg", "Escriba el número de un cilindro o el código de un barril."); return; }
+  if (dig.length >= 5) {
+    const b = barriles.find((x) => x.codigo === dig);
+    if (!b) { aviso("cuaBuscarMsg", `No hay ningún barril con el código ${dig}.`); return; }
+    const { hechos } = cuaBloques(), donde = hechos.filter((h) => h.t && h.t.barriles.includes(dig));
+    cua.visibles = 1e6; renderCuaderno();
+    aviso("cuaBuscarMsg", `Barril ${b.codigo}: ${fmt2(b.kg)} de ${fmt2(b.capacidad_kg)} kg · ${b.ubicacion || "sin ubicación"}${donde.length ? ` · aceite del ${donde.map((h) => fmtF(h.fecha)).join(" y del ")}` : ""}.`, "ok");
+    if (donde.length) setTimeout(() => cuaIr(`.cua-fila[data-tid="${donde[0].tid}"]`, `.cb[data-barril="${dig}"]`), 60);
+    return;
+  }
+  const c = cuaCil.find((x) => x.numero === Number(dig));
+  if (!c) { aviso("cuaBuscarMsg", `No existe el cilindro ${PREFIJO}${dig}.`); return; }
+  cua.visibles = 1e6; renderCuaderno();
+  aviso("cuaBuscarMsg", `${c.codigo} · ${c.peso_neto_kg === null ? "peso pendiente" : fmt2(c.peso_neto_kg) + " kg"} · emulsión del ${fmtF(c.registro_fecha || c.fecha)} · ${c.transformacion_id === null ? "sigue en la cola de espera" : "transformado el " + fmtF(c.transformacion_fecha)}.`, "ok");
+  setTimeout(() => {
+    const el = document.querySelector(`#cuaderno [data-cil="${c.id}"]`);
+    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("foco"); setTimeout(() => el.classList.remove("foco"), 4200); }
+  }, 60);
 });
 
 // ---------- carga general ----------
@@ -844,31 +1425,33 @@ async function recargar(partes) {
   const pedidos = {
     resumen: () => apiGet("/api/subproductos/resumen"),
     barriles: () => apiGet("/api/aceite/barriles"),
-    precamara: () => apiGet("/api/emulsion/cilindros?estado=PRECAMARA"),
     transformaciones: () => apiGet("/api/subproductos/transformaciones"),
     corridas: () => apiGet("/api/subproductos/corridas?dias=21"),
     lista: () => apiGet(`/api/emulsion/cilindros?estado=${cilFiltro}&limite=${cilLimite}`),
+    cuaderno: () => apiGet("/api/emulsion/cilindros"),         // todos los cilindros, para el cuaderno
   };
+  // «precamara» quiere decir «cambiaron los cilindros»: se vuelve a traer el cuaderno completo
+  if (partes && partes.includes("precamara") && !partes.includes("cuaderno")) partes = [...partes, "cuaderno"];
   const claves = Object.keys(pedidos).filter((k) => !partes || partes.includes(k));
   const valores = await Promise.all(claves.map((k) => pedidos[k]()));
   const R = Object.fromEntries(claves.map((k, i) => [k, valores[i]]));
   if (R.resumen) datos = R.resumen;
   if (R.barriles) barriles = R.barriles;
-  if (R.precamara) precamara = R.precamara.slice().sort((a, b) => a.numero - b.numero);
   if (R.transformaciones) transformaciones = R.transformaciones;
   if (R.corridas) corridasDisp = R.corridas;
+  if (R.cuaderno) cuaCil = R.cuaderno;
   ultimoCilindro = Math.max(0, ...datos.registros.map((r) => r.ultimo_cilindro || 0));
   renderKpis(); renderGrafico(); renderResumen(); renderBarriles();
-  renderCorridasDisp(); renderPrecamara(); renderTransformaciones();
-  resumenEmulsion(); resumenTransformacion();
+  renderCamara();
+  cuaChipsCorridas(); cuaRefrescar();
   if (R.lista) await cargarCilindros(R.lista);
 }
 
-document.getElementById("emuFecha").value = hoy();
-document.getElementById("trFecha").value = hoy();
+document.getElementById("cuaFecha").value = hoy();
+document.getElementById("cuaEmuFecha").value = hoy();
 recargar().then(() => {
   const h = location.hash.slice(1);
-  if (["resumen", "emulsion", "aceite", "registrar"].includes(h)) abrirVista(h);
+  if (["cuaderno", "camara", "resumen", "emulsion", "aceite"].includes(h)) abrirVista(h);
 }).catch((e) => {
   document.getElementById("kpis").innerHTML = "";
   aviso("mensajeGlobal", e.message);
