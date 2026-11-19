@@ -88,7 +88,7 @@
         <div class="hint-line">El Ratio se calcula automáticamente (Brix final ÷ Acidez); no es necesario digitarlo.</div>
 
         <div class="field">
-          <label>Lotes de este tanque <span class="hint-line" style="display:inline">(toque hasta 5 · quedan marcados para el siguiente tanque)</span></label>
+          <label>Lotes de este tanque <span class="hint-line" style="display:inline">(toque los que alimentaron el tanque · quedan marcados para el siguiente tanque)</span></label>
           <div id="lotesTanque" class="chips-lotes"><span class="hint-line">Elija una corrida</span></div>
         </div>
 
@@ -157,7 +157,7 @@ const hintComparacion = document.getElementById("hintComparacion");
 let corridaDeLotes = null;
 let lotesCorrida = [];                 // lotes registrados en la corrida elegida: [{numero, proveedor}]
 const lotesMarcados = new Set();       // selección del formulario «Nueva medición» (se conserva entre tanques)
-const MAX_LOTES = 5;
+const MAX_LOTES = 15;               // mismo tope que el servidor (MAX_LOTES_POR_TANQUE en api.py)
 
 function htmlChips(lotes, marcados) {
   return lotes.map((l) => `<label class="chip-lote" title="${escapeHtml(l.proveedor || "")}"><input type="checkbox" value="${l.numero}"${marcados.has(l.numero) ? " checked" : ""}>${l.numero}</label>`).join("");
@@ -166,14 +166,14 @@ function renderChipsNuevo() {
   document.getElementById("lotesTanque").innerHTML = htmlChips(lotesCorrida, lotesMarcados) +
     '<button type="button" class="chip-lote chip-mas" id="btnOtroLote" title="Agregar un lote que no está en la lista">+ otro</button>';
 }
-// no deja marcar más de cinco lotes en un mismo tanque
+// no deja marcar más lotes de los que admite un tanque
 function limitarLotes(ev) {
   const cb = ev.target.closest('.chip-lote input[type="checkbox"]');
   if (!cb) return false;
   const cont = cb.closest(".chips-lotes");
   if (cb.checked && cont.querySelectorAll("input:checked").length > MAX_LOTES) {
     cb.checked = false;
-    avisar("Un tanque puede tener como máximo cinco lotes.");
+    avisar(`Un tanque puede tener como máximo ${MAX_LOTES} lotes.`);
     return false;
   }
   return true;
@@ -188,7 +188,7 @@ function agregarOtroLote(entrada) {
   const n = Math.floor(Number(entrada.value));
   if (n > 0) {
     if (!lotesCorrida.some((l) => l.numero === n)) { lotesCorrida.push({ numero: n, proveedor: "" }); lotesCorrida.sort((a, b) => a.numero - b.numero); }
-    if (lotesMarcados.size >= MAX_LOTES && !lotesMarcados.has(n)) avisar("Un tanque puede tener como máximo cinco lotes.");
+    if (lotesMarcados.size >= MAX_LOTES && !lotesMarcados.has(n)) avisar(`Un tanque puede tener como máximo ${MAX_LOTES} lotes.`);
     else lotesMarcados.add(n);
   }
   renderChipsNuevo();
@@ -379,7 +379,7 @@ function filaEdicionMedicion(fila, id) {
         ${campo("Tanque", "edit-tanque", d.tanque, "text")}
         ${campo("Litros", "edit-litros", d.litros, "number", 1, "opcional")}
       </div>
-      <div class="field"><label>Lotes de este tanque <span class="hint-line" style="display:inline">(hasta 5)</span></label>
+      <div class="field"><label>Lotes de este tanque <span class="hint-line" style="display:inline"></span></label>
         <div class="chips-lotes edit-lotes">${htmlChips(lotes, marcados)}<button type="button" class="chip-lote chip-mas" title="Agregar un lote que no está en la lista">+ otro</button></div></div>
       <div class="two-col">
         ${campo("Brix inicial", "edit-brix-inicial", d.brixInicial, "number", 0.01)}
@@ -457,7 +457,7 @@ function agregarFichaEdicion(entrada) {
       cb = lab.querySelector("input");
     }
     if (!cb.checked) {
-      if (cont.querySelectorAll("input:checked").length >= MAX_LOTES) avisar("Un tanque puede tener como máximo cinco lotes.");
+      if (cont.querySelectorAll("input:checked").length >= MAX_LOTES) avisar(`Un tanque puede tener como máximo ${MAX_LOTES} lotes.`);
       else cb.checked = true;
     }
   }

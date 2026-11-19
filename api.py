@@ -2361,6 +2361,7 @@ def eliminar_parada(parada_id: int):
 # mediciones de tanque (Brix/Acidez real medido, no el estimado de los lotes)
 # ---------------------------------------------------------------------------
 _tanque_lotes_listo = False
+MAX_LOTES_POR_TANQUE = 15   # una corrida puede tener 11 o más lotes en proceso; el tope solo evita marcar de más por error
 
 
 def _asegurar_tanque_lotes() -> bool:
@@ -2385,10 +2386,10 @@ def _asegurar_tanque_lotes() -> bool:
 
 
 def _guardar_lotes_tanque(conn, medicion_id: int, lotes: List[int]):
-    """Reemplaza los lotes de un tanque. Un tanque puede llevar hasta cinco lotes (cuando se mezclan)."""
+    """Reemplaza los lotes de un tanque. Un tanque puede llevar varios lotes (cuando se mezclan), hasta MAX_LOTES_POR_TANQUE."""
     nums = list(dict.fromkeys(int(x) for x in lotes))
-    if len(nums) > 5:
-        raise HTTPException(status_code=400, detail="Un tanque puede tener como máximo cinco lotes.")
+    if len(nums) > MAX_LOTES_POR_TANQUE:
+        raise HTTPException(status_code=400, detail=f"Un tanque puede tener como máximo {MAX_LOTES_POR_TANQUE} lotes.")
     conn.execute(text("DELETE FROM tanque_lotes WHERE medicion_id = :m"), {"m": medicion_id})
     if not nums:
         return
@@ -2440,7 +2441,7 @@ class NuevaMedicionTanque(BaseModel):
     acidez: float
     ph: Optional[float] = None
     observaciones: Optional[str] = ""
-    lotes: Optional[List[int]] = None  # lotes que alimentaron este tanque (hasta 5); None = no tocar
+    lotes: Optional[List[int]] = None  # lotes que alimentaron este tanque (hasta MAX_LOTES_POR_TANQUE); None = no tocar
     forzar: bool = False               # la persona confirmó registrarlo aunque ya haya un tanque con ese nombre en la corrida
 
 
