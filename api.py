@@ -962,6 +962,37 @@ def listar_corridas(abiertas: bool = False):
         return rows(result)
 
 
+@app.get("/api/corridas/completitud")
+def completitud_corridas():
+    """Qué datos tiene cargados cada corrida, para el semáforo de la lista de «Corridas»: lotes (con kg y con brix de línea),
+    producto terminado, mediciones de tanque y paradas. Una sola consulta para todas las corridas."""
+    with engine.connect() as conn:
+        return rows(conn.execute(text(
+            """
+            SELECT c.id,
+                   COALESCE(a.n, 0)        AS lotes,
+                   COALESCE(a.sin_kg, 0)   AS sin_kg,
+                   COALESCE(a.sin_brix, 0) AS sin_brix,
+                   COALESCE(p.pt, 0)       AS pt_kg,
+                   COALESCE(t.n, 0)        AS tanques,
+                   COALESCE(t.litros, 0)   AS litros,
+                   COALESCE(pa.n, 0)       AS paradas,
+                   COALESCE(pa.minutos, 0) AS minutos_parada
+            FROM corridas c
+            LEFT JOIN (SELECT corrida_id, count(*) AS n,
+                              count(*) FILTER (WHERE kg_asignados IS NULL)       AS sin_kg,
+                              count(*) FILTER (WHERE brix_produccion IS NULL)    AS sin_brix
+                       FROM asignaciones GROUP BY corrida_id) a ON a.corrida_id = c.id
+            LEFT JOIN (SELECT corrida_id, SUM(pt_kg) AS pt FROM corrida_productos
+                       WHERE tipo = 'salida' AND cuenta_como_pt GROUP BY corrida_id) p ON p.corrida_id = c.id
+            LEFT JOIN (SELECT corrida_id, count(*) AS n, SUM(litros) AS litros FROM mediciones_tanque GROUP BY corrida_id) t ON t.corrida_id = c.id
+            LEFT JOIN (SELECT corrida_id, count(*) AS n,
+                              ROUND(SUM(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)) AS minutos
+                       FROM paradas GROUP BY corrida_id) pa ON pa.corrida_id = c.id
+            """
+        )))
+
+
 class OrdenCorridas(BaseModel):
     ids: List[int]      # todas las corridas de la lista, de arriba hacia abajo
 
@@ -1059,6 +1090,8 @@ def crear_corrida(c: NuevaCorrida):
         raise HTTPException(status_code=400, detail="El nombre de la corrida no puede estar vacío.")
     try:
         with engine.begin() as conn:
+            if conn.execute(text("SELECT 1 FROM corridas WHERE nombre = :n"), {"n": nombre}).scalar():
+                raise HTTPException(status_code=409, detail=f"Ya existe una corrida con el nombre «{nombre}».")
             result = conn.execute(
                 text(
                     f"""
@@ -1081,25 +1114,62 @@ def crear_corrida(c: NuevaCorrida):
 class EditarCorrida(BaseModel):
     nombre: str
     tipo_proceso: Optional[str] = None
+    fecha_inicio: Optional[str] = None    # «2026-11-19T00:49»; None = no tocar
+    fecha_final: Optional[str] = None     # solo corridas ya cerradas; None = no tocar
+
+
+def _a_minuto(valor):
+    return valor.replace(second=0, microsecond=0) if isinstance(valor, datetime) else valor
 
 
 @app.post("/api/corridas/{corrida_id}")
 def editar_corrida(corrida_id: int, c: EditarCorrida):
-    """Corrige nombre/tipo de proceso de una corrida ya creada (ej. se eligió
-    el tipo equivocado al crearla) - no toca fecha_inicio ni asignaciones."""
+    """Corrige nombre, tipo de proceso y horas de inicio/fin de una corrida ya creada (ej. se eligió el tipo equivocado,
+    o «en realidad empezó/terminó a otra hora»). La hora de fin solo se corrige en corridas cerradas (la de una abierta
+    se pone al finalizarla). Si cambia una hora, el stock de inicio/cierre se vuelve a calcular con ese nuevo momento,
+    igual que al crear o finalizar la corrida. No toca las asignaciones."""
     nombre = c.nombre.strip()
     if not nombre:
         raise HTTPException(status_code=400, detail="El nombre de la corrida no puede estar vacío.")
+    avisos = []
     with engine.begin() as conn:
-        result = conn.execute(
-            text(
-                "UPDATE corridas SET nombre = :nombre, tipo_proceso = :tipo_proceso "
-                "WHERE id = :id RETURNING id"
-            ),
+        actual = conn.execute(text("SELECT estado, fecha_inicio, fecha_final FROM corridas WHERE id = :id"), {"id": corrida_id}).fetchone()
+        if actual is None:
+            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+        if conn.execute(text("SELECT 1 FROM corridas WHERE nombre = :n AND id <> :id"), {"n": nombre, "id": corrida_id}).scalar():
+            raise HTTPException(status_code=409, detail=f"Ya existe otra corrida con el nombre «{nombre}».")
+        nuevo_inicio = _instante(c.fecha_inicio, "hora de inicio") if c.fecha_inicio else actual.fecha_inicio
+        nuevo_fin = actual.fecha_final
+        if c.fecha_final:
+            if actual.estado != "cerrada":
+                raise HTTPException(status_code=400, detail="La hora de fin de una corrida abierta se pone al finalizarla.")
+            nuevo_fin = _instante(c.fecha_final, "hora de fin")
+        if nuevo_fin is not None and nuevo_fin < nuevo_inicio:
+            raise HTTPException(status_code=400, detail=f"La hora de fin no puede ser anterior al inicio de la corrida ({_hm(nuevo_inicio)}).")
+        cambia_inicio = _a_minuto(nuevo_inicio) != _a_minuto(actual.fecha_inicio)
+        cambia_fin = nuevo_fin is not None and _a_minuto(nuevo_fin) != _a_minuto(actual.fecha_final)
+        conn.execute(
+            text("UPDATE corridas SET nombre = :nombre, tipo_proceso = :tipo_proceso WHERE id = :id"),
             {"id": corrida_id, "nombre": nombre, "tipo_proceso": c.tipo_proceso},
         )
-        if result.scalar() is None:
-            raise HTTPException(status_code=404, detail="Corrida no encontrada.")
+        if cambia_inicio:
+            conn.execute(
+                text(f"UPDATE corridas SET fecha_inicio = :fecha_inicio, stock_inicio_kg = {_sql_stock_total_asof('fecha_inicio')} WHERE id = :id"),
+                {"id": corrida_id, "fecha_inicio": nuevo_inicio},
+            )
+        if cambia_fin:
+            conn.execute(
+                text(f"UPDATE corridas SET fecha_final = :fecha_final, stock_cierre_kg = {_sql_stock_total_asof('fecha_final')} WHERE id = :id"),
+                {"id": corrida_id, "fecha_final": nuevo_fin},
+            )
+        if cambia_inicio or cambia_fin:
+            fuera = conn.execute(
+                text("SELECT count(*) FROM paradas WHERE corrida_id = :c AND (hora_inicio < CAST(:ini AS timestamp) "
+                     "OR (CAST(:fin AS timestamp) IS NOT NULL AND COALESCE(hora_fin, hora_inicio) > CAST(:fin AS timestamp)))"),
+                {"c": corrida_id, "ini": nuevo_inicio, "fin": nuevo_fin},
+            ).scalar()
+            if fuera:
+                avisos.append(f"{fuera} parada{'s' if fuera != 1 else ''} de esta corrida quedan fuera del nuevo horario.")
         # si el tipo de proceso cambia hacia o desde "PRE CC", los lotes
         # derivados de todo lo ya asignado acá tienen que recalcularse -
         # ej. una corrida creada con el tipo equivocado y corregida después
@@ -1110,7 +1180,7 @@ def editar_corrida(corrida_id: int, c: EditarCorrida):
         ))
         for l in lotes_afectados:
             _sync_lote_derivado_pre_cc(conn, l["lote_numero"])
-    return {"ok": True}
+    return {"ok": True, "avisos": avisos}
 
 
 class FinalizarCorrida(BaseModel):
@@ -1337,15 +1407,20 @@ def reporte_corrida_pdf(corrida_id: int):
             ),
             {"c": corrida_id},
         ))
+        # una parada compartida con otras corridas en paralelo sale en cada una; aquí se anota con cuáles
+        tambien_en = (
+            "(SELECT string_agg(c2.nombre, ' · ' ORDER BY c2.nombre) FROM paradas p2 JOIN corridas c2 ON c2.id = p2.corrida_id "
+            "WHERE p2.grupo_id = p.grupo_id AND p2.id <> p.id) AS tambien_en,"
+        ) if _asegurar_grupo_paradas() else ""
         paradas = rows(conn.execute(
             text(
-                """
-                SELECT hora_inicio, hora_fin, area_proceso, tipo_parada,
-                       equipo_afectado, descripcion_falla,
-                       CASE WHEN hora_fin IS NULL THEN NULL
-                            ELSE ROUND(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)
+                f"""
+                SELECT p.hora_inicio, p.hora_fin, p.area_proceso, p.tipo_parada,
+                       p.equipo_afectado, p.descripcion_falla, {tambien_en}
+                       CASE WHEN p.hora_fin IS NULL THEN NULL
+                            ELSE ROUND(EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60)
                        END AS duracion_minutos
-                FROM paradas WHERE corrida_id = :c ORDER BY hora_inicio ASC
+                FROM paradas p WHERE p.corrida_id = :c ORDER BY p.hora_inicio ASC
                 """
             ),
             {"c": corrida_id},
@@ -2007,6 +2082,42 @@ class NuevaAsignacion(BaseModel):
     observaciones: Optional[str] = ""
 
 
+TOLERANCIA_KG_SALDO = Decimal("1")      # diferencia de kg que se perdona al cuadrar un consumo con el saldo exacto del lote
+
+
+def _ajustar_kg_a_saldo(conn, lote_numero: int, kg, bines=None, excluir_asignacion_id=None):
+    """Cuadra el consumo con el saldo exacto del lote. Calcular el kg como «bines × kg por bin» deja decimales de más o de menos
+    (12,000.05 contra 12,000) y bastaba ese resto para que el sistema rechazara el consumo. Dos casos, con tolerancia de 1 kg:
+      - se pasa del saldo por unos centésimos: se baja al saldo exacto;
+      - lo que sobraría es menos de 1 kg y el consumo termina el lote (es de silo, o se llevan todos los bines que quedan):
+        se toma todo el saldo, para que el lote quede en 0 y «Procesado» en vez de colgado con un resto de decimales.
+    Devuelve (kg_final, se_ajustó). `kg` None («kg pendiente») no se toca."""
+    if kg is None:
+        return kg, False
+    lote = conn.execute(
+        text(
+            "SELECT l.peso_neto_kg AS peso, l.bines_totales AS bt, "
+            "       COALESCE((SELECT SUM(a.kg_asignados) FROM asignaciones a WHERE a.lote_numero = l.numero "
+            "                  AND (CAST(:ex AS integer) IS NULL OR a.id <> CAST(:ex AS integer))), 0) AS usado_kg, "
+            "       COALESCE((SELECT SUM(a.bines_consumidos) FROM asignaciones a WHERE a.lote_numero = l.numero "
+            "                  AND (CAST(:ex AS integer) IS NULL OR a.id <> CAST(:ex AS integer))), 0) AS usado_bines "
+            "FROM lotes l WHERE l.numero = :n"
+        ),
+        {"n": lote_numero, "ex": excluir_asignacion_id},
+    ).mappings().first()
+    if lote is None or lote["peso"] is None:
+        return kg, False
+    disponible = Decimal(lote["peso"]) - Decimal(lote["usado_kg"])
+    pedido = Decimal(str(kg))
+    if pedido > disponible and pedido - disponible <= TOLERANCIA_KG_SALDO:
+        return float(disponible), True
+    if Decimal("0") < disponible - pedido <= TOLERANCIA_KG_SALDO:
+        termina_lote = lote["bt"] is None or (bines is not None and int(lote["bt"]) - int(lote["usado_bines"]) - int(bines) <= 0)
+        if termina_lote and (lote["bt"] is not None or bines is None):
+            return float(disponible), True
+    return kg, False
+
+
 @app.post("/api/asignaciones")
 def crear_asignacion(a: NuevaAsignacion):
     if a.kg_asignados is not None and a.kg_asignados <= 0:
@@ -2045,6 +2156,7 @@ def crear_asignacion(a: NuevaAsignacion):
                         status_code=400,
                         detail=f"Ese lote solo tiene {disponibles} bin(es) disponibles (de {totales} en total).",
                     )
+            kg_final, kg_ajustado = _ajustar_kg_a_saldo(conn, a.lote_numero, a.kg_asignados, a.bines_consumidos)
             result = conn.execute(
                 text(
                     """
@@ -2060,7 +2172,7 @@ def crear_asignacion(a: NuevaAsignacion):
                     "corrida_id": a.corrida_id,
                     "turno": a.turno,
                     "origen": a.tipo_almacen_origen,
-                    "kg": a.kg_asignados,
+                    "kg": kg_final,
                     "bines": a.bines_consumidos,
                     "desc": a.porcentaje_descuento,
                     "obs": a.observaciones,
@@ -2079,7 +2191,7 @@ def crear_asignacion(a: NuevaAsignacion):
             # que ya se podía tocar desde Lotes, solo que ahora se dispara solo.
             _marcar_estado_por_consumo(conn, a.lote_numero)
             _sync_lote_derivado_pre_cc(conn, a.lote_numero)
-        return {"id": new_id, "ok": True}
+        return {"id": new_id, "ok": True, **({"kg_ajustado": kg_final} if kg_ajustado else {})}
     except HTTPException:
         raise
     except Exception as e:
@@ -2118,12 +2230,13 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
                         status_code=400,
                         detail=f"Ese lote solo tiene {disponibles} bin(es) disponibles (de {totales} en total).",
                     )
+            kg_final, kg_ajustado = _ajustar_kg_a_saldo(conn, lote_numero, a.kg_asignados, a.bines_consumidos, excluir_asignacion_id=asignacion_id)
             result = conn.execute(
                 text(
                     "UPDATE asignaciones SET kg_asignados = :kg, bines_consumidos = :bines, porcentaje_descuento = :desc "
                     "WHERE id = :id RETURNING id"
                 ),
-                {"id": asignacion_id, "kg": a.kg_asignados, "bines": a.bines_consumidos, "desc": a.porcentaje_descuento},
+                {"id": asignacion_id, "kg": kg_final, "bines": a.bines_consumidos, "desc": a.porcentaje_descuento},
             )
             if result.scalar() is None:
                 raise HTTPException(status_code=404, detail="Asignación no encontrada.")
@@ -2137,7 +2250,7 @@ def editar_asignacion(asignacion_id: int, a: EditarAsignacion):
         raise
     except Exception as e:
         raise _error_http(e)
-    return {"ok": True}
+    return {"ok": True, **({"kg_ajustado": kg_final} if kg_ajustado else {})}
 
 
 @app.delete("/api/asignaciones/{asignacion_id}")
@@ -2162,20 +2275,45 @@ _PARADA_COLS = (
     "responsable_solucion, solucion_obs, recomendacion"
 )
 
+_paradas_grupo_listo = False
+
+
+def _asegurar_grupo_paradas() -> bool:
+    """Una parada que afectó a varias corridas en paralelo (ej. JSA y JCC) se escribe UNA sola vez en la pantalla, pero se guarda como una
+    fila por corrida (así cada corrida la ve en su registro y en su PDF), unidas por `grupo_id`: se editan, se cierran y se eliminan
+    juntas. La columna se crea sola la primera vez que se usa, así no hace falta correr ningún script en cada PC."""
+    global _paradas_grupo_listo
+    if _paradas_grupo_listo:
+        return True
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE paradas ADD COLUMN IF NOT EXISTS grupo_id INTEGER"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_paradas_grupo ON paradas(grupo_id) WHERE grupo_id IS NOT NULL"))
+    except Exception as e:
+        print(f"[paradas compartidas] no se pudo crear la columna: {e}")
+        return False
+    _paradas_grupo_listo = True
+    return True
+
 
 @app.get("/api/corridas/{corrida_id}/paradas")
 def listar_paradas(corrida_id: int):
+    con_grupo = _asegurar_grupo_paradas()
+    extra = (
+        "p.grupo_id, (SELECT string_agg(c2.nombre, ' · ' ORDER BY c2.nombre) FROM paradas p2 "
+        "JOIN corridas c2 ON c2.id = p2.corrida_id WHERE p2.grupo_id = p.grupo_id AND p2.id <> p.id) AS tambien_en,"
+    ) if con_grupo else ""
     with engine.connect() as conn:
         result = conn.execute(
             text(
                 f"""
-                SELECT id, corrida_id, hora_inicio, hora_fin, {_PARADA_COLS}, creado_en,
-                       CASE WHEN hora_fin IS NULL THEN NULL
-                            ELSE ROUND(EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)
+                SELECT p.id, p.corrida_id, p.hora_inicio, p.hora_fin, {_PARADA_COLS}, p.creado_en, {extra}
+                       CASE WHEN p.hora_fin IS NULL THEN NULL
+                            ELSE ROUND(EXTRACT(EPOCH FROM (p.hora_fin - p.hora_inicio)) / 60)
                        END AS duracion_minutos
-                FROM paradas
-                WHERE corrida_id = :c
-                ORDER BY hora_inicio DESC
+                FROM paradas p
+                WHERE p.corrida_id = :c
+                ORDER BY p.hora_inicio DESC
                 """
             ),
             {"c": corrida_id},
@@ -2195,10 +2333,12 @@ class DatosParada(BaseModel):
     solucion_obs: Optional[str] = None
     recomendacion: Optional[str] = None
     forzar: bool = False      # la persona confirmó registrarla aunque se cruce con otra parada de la misma corrida
+    solo_esta: bool = False   # al editar una parada compartida: cambiarla solo en esta corrida (la separa de las demás)
 
 
 class NuevaParada(DatosParada):
     corrida_id: int
+    tambien_corridas: List[int] = []     # otras corridas en paralelo a las que afectó la misma parada
 
 
 def _params_parada(p: DatosParada):
@@ -2240,8 +2380,21 @@ def _solape_de_parada(conn, corrida_id, hora_inicio, hora_fin, excluir_id=None):
     ).fetchone()
 
 
-def _aviso_de_cruce(cruce) -> JSONResponse:
-    return _pedir_confirmacion(f"Esta parada se cruza con otra ya registrada en la misma corrida ({_hm(cruce[0])} a {_hm(cruce[1]) if cruce[1] else 'en curso'}).")
+def _aviso_de_cruce(cruce, corrida=None) -> JSONResponse:
+    donde = f"en la corrida «{corrida}»" if corrida else "en la misma corrida"
+    return _pedir_confirmacion(f"Esta parada se cruza con otra ya registrada {donde} ({_hm(cruce[0])} a {_hm(cruce[1]) if cruce[1] else 'en curso'}).")
+
+
+def _miembros_del_grupo(conn, parada_id: int, con_grupo: bool):
+    """(id, corrida_id) de la parada y de las que comparten su grupo; solo ella si no es compartida."""
+    fila = conn.execute(
+        text("SELECT corrida_id, " + ("grupo_id" if con_grupo else "NULL") + " AS grupo_id FROM paradas WHERE id = :id"), {"id": parada_id}
+    ).fetchone()
+    if fila is None:
+        return None, None, []
+    if fila.grupo_id is None:
+        return fila, None, [(parada_id, fila.corrida_id)]
+    return fila, fila.grupo_id, [(r[0], r[1]) for r in conn.execute(text("SELECT id, corrida_id FROM paradas WHERE grupo_id = :g ORDER BY id"), {"g": fila.grupo_id})]
 
 
 @app.post("/api/paradas")
@@ -2249,28 +2402,39 @@ def crear_parada(p: NuevaParada):
     if not p.hora_inicio:
         raise HTTPException(status_code=400, detail="La hora de inicio es obligatoria.")
     _validar_horas_parada(p.hora_inicio, p.hora_fin)
+    destinos = list(dict.fromkeys([p.corrida_id] + [int(x) for x in (p.tambien_corridas or [])]))
+    if len(destinos) > 1 and not _asegurar_grupo_paradas():
+        raise HTTPException(status_code=500, detail="No se pudo registrar la parada en varias corridas. Intente nuevamente.")
     try:
         with engine.begin() as conn:
+            nombres = {r[0]: r[1] for r in conn.execute(text("SELECT id, nombre FROM corridas WHERE id = ANY(:ids)"), {"ids": destinos})}
+            faltan = [c for c in destinos if c not in nombres]
+            if faltan:
+                raise HTTPException(status_code=404, detail=f"La corrida {faltan[0]} no existe.")
             if not p.forzar:
-                cruce = _solape_de_parada(conn, p.corrida_id, p.hora_inicio, p.hora_fin)
-                if cruce:
-                    return _aviso_de_cruce(cruce)
-            result = conn.execute(
-                text(
-                    """
-                    INSERT INTO paradas
-                        (corrida_id, turno, hora_inicio, hora_fin, area_proceso, tipo_parada,
-                         equipo_afectado, descripcion_falla, responsable_solucion, solucion_obs, recomendacion)
-                    VALUES
-                        (:corrida_id, :turno, :hora_inicio, :hora_fin, :area_proceso, :tipo_parada,
-                         :equipo_afectado, :descripcion_falla, :responsable_solucion, :solucion_obs, :recomendacion)
-                    RETURNING id
-                    """
-                ),
-                {"corrida_id": p.corrida_id, **_params_parada(p)},
-            )
-            new_id = result.scalar()
-        return {"id": new_id, "ok": True}
+                for cid in destinos:
+                    cruce = _solape_de_parada(conn, cid, p.hora_inicio, p.hora_fin)
+                    if cruce:
+                        return _aviso_de_cruce(cruce, nombres[cid] if len(destinos) > 1 else None)
+            ids = []
+            for cid in destinos:
+                ids.append(conn.execute(
+                    text(
+                        """
+                        INSERT INTO paradas
+                            (corrida_id, turno, hora_inicio, hora_fin, area_proceso, tipo_parada,
+                             equipo_afectado, descripcion_falla, responsable_solucion, solucion_obs, recomendacion)
+                        VALUES
+                            (:corrida_id, :turno, :hora_inicio, :hora_fin, :area_proceso, :tipo_parada,
+                             :equipo_afectado, :descripcion_falla, :responsable_solucion, :solucion_obs, :recomendacion)
+                        RETURNING id
+                        """
+                    ),
+                    {"corrida_id": cid, **_params_parada(p)},
+                ).scalar())
+            if len(ids) > 1:
+                conn.execute(text("UPDATE paradas SET grupo_id = :g WHERE id = ANY(:ids)"), {"g": ids[0], "ids": ids})
+        return {"id": ids[0], "ids": ids, "ok": True}
     except HTTPException:
         raise
     except Exception as e:
@@ -2289,20 +2453,17 @@ def cerrar_parada(parada_id: int, p: CerrarParada):
     servidor: hora_inicio se guarda como hora local "de pared" (viene de un
     <input datetime-local>, sin zona horaria) y un servidor en la nube suele
     correr en UTC, así que un now() del servidor quedaría ~5 horas adelantado
-    frente a hora_inicio y la duración calculada saldría mal."""
+    frente a hora_inicio y la duración calculada saldría mal. Si la parada es
+    compartida con otras corridas, se cierra en todas."""
+    con_grupo = _asegurar_grupo_paradas()
     with engine.begin() as conn:
         inicio = conn.execute(text("SELECT hora_inicio FROM paradas WHERE id = :id AND hora_fin IS NULL"), {"id": parada_id}).scalar()
         if inicio is not None and _instante(p.hora_fin, "hora de fin") < inicio:
             raise HTTPException(status_code=400, detail=f"La hora de fin no puede ser anterior a la hora de inicio ({_hm(inicio)}).")
+        _fila, _grupo, miembros = _miembros_del_grupo(conn, parada_id, con_grupo)
         result = conn.execute(
-            text(
-                """
-                UPDATE paradas SET hora_fin = :hora_fin
-                WHERE id = :id AND hora_fin IS NULL
-                RETURNING id
-                """
-            ),
-            {"id": parada_id, "hora_fin": p.hora_fin},
+            text("UPDATE paradas SET hora_fin = :hora_fin WHERE id = ANY(:ids) AND hora_fin IS NULL RETURNING id"),
+            {"ids": [m[0] for m in miembros] or [parada_id], "hora_fin": p.hora_fin},
         )
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Parada no encontrada o ya estaba cerrada.")
@@ -2311,34 +2472,46 @@ def cerrar_parada(parada_id: int, p: CerrarParada):
 
 @app.post("/api/paradas/{parada_id}")
 def editar_parada(parada_id: int, p: DatosParada):
+    """Edita una parada. Si es compartida con otras corridas en paralelo, el cambio se aplica a todas (salvo `solo_esta`)."""
     if not p.hora_inicio:
         raise HTTPException(status_code=400, detail="La hora de inicio es obligatoria.")
     _validar_horas_parada(p.hora_inicio, p.hora_fin)
+    con_grupo = _asegurar_grupo_paradas()
     try:
         with engine.begin() as conn:
-            corrida_id = conn.execute(text("SELECT corrida_id FROM paradas WHERE id = :id"), {"id": parada_id}).scalar()
-            if corrida_id is None:
+            fila, grupo, miembros = _miembros_del_grupo(conn, parada_id, con_grupo)
+            if fila is None:
                 raise HTTPException(status_code=404, detail="Parada no encontrada.")
+            if p.solo_esta:
+                miembros = [(parada_id, fila.corrida_id)]
+            nombres = {r[0]: r[1] for r in conn.execute(text("SELECT id, nombre FROM corridas WHERE id = ANY(:ids)"), {"ids": [m[1] for m in miembros]})}
             if not p.forzar:
-                cruce = _solape_de_parada(conn, corrida_id, p.hora_inicio, p.hora_fin, excluir_id=parada_id)
-                if cruce:
-                    return _aviso_de_cruce(cruce)
-            result = conn.execute(
-                text(
-                    """
-                    UPDATE paradas SET
-                        turno = :turno, hora_inicio = :hora_inicio, hora_fin = :hora_fin,
-                        area_proceso = :area_proceso, tipo_parada = :tipo_parada,
-                        equipo_afectado = :equipo_afectado, descripcion_falla = :descripcion_falla,
-                        responsable_solucion = :responsable_solucion, solucion_obs = :solucion_obs,
-                        recomendacion = :recomendacion
-                    WHERE id = :id RETURNING id
-                    """
-                ),
-                {"id": parada_id, **_params_parada(p)},
-            )
-            if result.scalar() is None:
-                raise HTTPException(status_code=404, detail="Parada no encontrada.")
+                for mid, cid in miembros:
+                    cruce = _solape_de_parada(conn, cid, p.hora_inicio, p.hora_fin, excluir_id=mid)
+                    if cruce:
+                        return _aviso_de_cruce(cruce, nombres.get(cid) if len(miembros) > 1 else None)
+            for mid, _cid in miembros:
+                result = conn.execute(
+                    text(
+                        """
+                        UPDATE paradas SET
+                            turno = :turno, hora_inicio = :hora_inicio, hora_fin = :hora_fin,
+                            area_proceso = :area_proceso, tipo_parada = :tipo_parada,
+                            equipo_afectado = :equipo_afectado, descripcion_falla = :descripcion_falla,
+                            responsable_solucion = :responsable_solucion, solucion_obs = :solucion_obs,
+                            recomendacion = :recomendacion
+                        WHERE id = :id RETURNING id
+                        """
+                    ),
+                    {"id": mid, **_params_parada(p)},
+                )
+                if result.scalar() is None:
+                    raise HTTPException(status_code=404, detail="Parada no encontrada.")
+            if p.solo_esta and grupo is not None:                  # se separa del grupo; si queda una sola, deja de ser compartida
+                conn.execute(text("UPDATE paradas SET grupo_id = NULL WHERE id = :id"), {"id": parada_id})
+                restantes = [r[0] for r in conn.execute(text("SELECT id FROM paradas WHERE grupo_id = :g"), {"g": grupo})]
+                if len(restantes) == 1:
+                    conn.execute(text("UPDATE paradas SET grupo_id = NULL WHERE id = :id"), {"id": restantes[0]})
     except HTTPException:
         raise
     except Exception as e:
@@ -2348,12 +2521,13 @@ def editar_parada(parada_id: int, p: DatosParada):
 
 @app.delete("/api/paradas/{parada_id}")
 def eliminar_parada(parada_id: int):
+    """Elimina la parada; si es compartida con otras corridas en paralelo, se elimina de todas."""
+    con_grupo = _asegurar_grupo_paradas()
     with engine.begin() as conn:
-        result = conn.execute(
-            text("DELETE FROM paradas WHERE id = :id RETURNING id"), {"id": parada_id}
-        )
-        if result.scalar() is None:
+        fila, _grupo, miembros = _miembros_del_grupo(conn, parada_id, con_grupo)
+        if fila is None:
             raise HTTPException(status_code=404, detail="Parada no encontrada.")
+        conn.execute(text("DELETE FROM paradas WHERE id = ANY(:ids)"), {"ids": [m[0] for m in miembros]})
     return {"ok": True}
 
 

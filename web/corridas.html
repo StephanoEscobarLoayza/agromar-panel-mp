@@ -254,6 +254,51 @@ function nowLocalDatetime() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// El Excel de Trazabilidad guarda cada corrida con la fecha en que TERMINÓ; el panel la crea con la de inicio. Esta función propone el
+// mismo nombre con la fecha de fin (null si ya la lleva o si el nombre no empieza con «día-mes»).
+let CORRIDAS_POR_ID = {};
+function nombreConFechaDeFin(nombre, fechaFinIso) {
+  const m = /^(\d{1,2})-([A-Za-zñÑ]+)(.*)$/.exec(nombre || "");
+  if (!m || !fechaFinIso) return null;
+  const mes = m[2].toLowerCase();
+  if (!MESES.some((x) => x.toLowerCase() === mes) && mes !== "septiembre") return null;
+  const d = new Date(fechaFinIso);
+  if (isNaN(d)) return null;
+  const nuevo = `${String(d.getDate()).padStart(2, "0")}-${MESES[d.getMonth()]}${m[3]}`;
+  return nuevo === nombre ? null : nuevo;
+}
+function nombreEnUso(nombre, idExcluir) {
+  return Object.values(CORRIDAS_POR_ID).some((c) => c.nombre === nombre && Number(c.id) !== Number(idExcluir));
+}
+// Al cerrar una corrida: ofrece cambiar el nombre a la fecha de fin (no lo cambia si ya existe otra corrida con ese nombre).
+async function sugerirRenombrarAlCerrar(id, fechaFin) {
+  const c = CORRIDAS_POR_ID[id];
+  const nuevo = c ? nombreConFechaDeFin(c.nombre, fechaFin) : null;
+  if (!nuevo) return;
+  if (nombreEnUso(nuevo, id)) {
+    avisar(`El nombre «${c.nombre}» lleva la fecha de inicio; con la de fin sería «${nuevo}», pero ya lo usa otra corrida. No se cambió.`);
+    return;
+  }
+  if (!(await confirmar(`El nombre «${c.nombre}» lleva la fecha de inicio, y el Excel guarda las corridas con la fecha de fin. ¿Cambiarlo a «${nuevo}»?`))) return;
+  try {
+    await apiPost(`/api/corridas/${id}`, { nombre: nuevo, tipo_proceso: c.tipo_proceso });
+  } catch (e) {
+    avisar(e.message);
+  }
+}
+// En el panel de edición: muestra cómo quedaría el nombre con la fecha de fin que está escrita ahí.
+function actualizarSugerenciaNombre(id) {
+  const caja = document.getElementById(`ed-sugerencia-${id}`);
+  const fin = document.getElementById(`ed-fin-${id}`);
+  const nombre = document.getElementById(`ed-nombre-${id}`);
+  if (!caja || !fin || !nombre) return;
+  const nuevo = nombreConFechaDeFin(nombre.value.trim(), fin.value);
+  if (!nuevo) { caja.innerHTML = ""; return; }
+  caja.innerHTML = nombreEnUso(nuevo, id)
+    ? `Con la fecha de fin el nombre sería «${escapeHtml(nuevo)}», pero ya lo usa otra corrida.`
+    : `Con la fecha de fin el nombre sería «${escapeHtml(nuevo)}». <button type="button" class="btn-link strong" data-accion="usar-nombre-fin" data-id="${id}" data-nombre="${escapeHtml(nuevo)}">Usar ese nombre</button>`;
+}
+
 function sugerirNombre() {
   const fechaStr = document.getElementById("ncFecha").value;
   const tipo = document.getElementById("ncTipo").value;
@@ -271,6 +316,27 @@ const _TRAZO = 'viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-wid
 const ICONO_SUBIR = `<svg ${_TRAZO}><path d="M3.5 10.5 8 6l4.5 4.5"/></svg>`;
 const ICONO_BAJAR = `<svg ${_TRAZO}><path d="M3.5 5.5 8 10l4.5-4.5"/></svg>`;
 const ICONO_ASA = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="6" cy="3.5" r="1.3"/><circle cx="10" cy="3.5" r="1.3"/><circle cx="6" cy="8" r="1.3"/><circle cx="10" cy="8" r="1.3"/><circle cx="6" cy="12.5" r="1.3"/><circle cx="10" cy="12.5" r="1.3"/></svg>';
+
+let COMPLETITUD = {};   // qué datos tiene cargados cada corrida (GET /api/corridas/completitud)
+function fmtMin(min) {
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
+// Semáforo de datos: solo para corridas de los últimos 30 días (las más viejas se cargaron con otro criterio).
+function semaforoCorrida(c) {
+  const d = COMPLETITUD[c.id];
+  if (!d || (Date.now() - new Date(c.fecha_inicio)) / 86400000 > 30) return "";
+  const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+  const faltan = [];
+  if (d.lotes === 0) faltan.push("sin lotes");
+  if (d.sin_kg > 0) faltan.push(plural(d.sin_kg, "lote sin kg", "lotes sin kg"));
+  if (!(Number(d.pt_kg) > 0)) faltan.push("sin producto terminado");
+  if (d.tanques === 0) faltan.push("sin mediciones de tanque");
+  const paradas = d.paradas > 0 ? `${plural(d.paradas, "parada", "paradas")} (${fmtMin(Number(d.minutos_parada))})` : "sin paradas registradas";
+  const ok = faltan.length === 0;
+  return `<div class="completitud ${ok ? "ok" : "falta"}" title="Lotes con kg, producto terminado y mediciones de tanque"><span class="punto"></span>`
+    + `<span>${ok ? "Datos completos" : "Falta: " + faltan.join(" · ")}</span><span class="completitud-nota">· ${paradas}</span></div>`;
+}
 
 let CORRIDAS_EN_PARALELO = new Set();   // ids de corridas que comparten día de inicio con otra corrida, o siguen abiertas a la vez
 
@@ -316,12 +382,20 @@ function corridaCard(c) {
         </div>
       </div>
       <div class="running-total"><span class="num">${fmtKg(c.kg_asignados_total)}</span> kg procesados</div>
+      ${semaforoCorrida(c)}
       <div class="corrida-acciones">${acciones.join("")}</div>
       <div class="editar-panel" id="ed-panel-${c.id}" style="display:none">
         <div class="two-col">
           <div class="field"><label>Nombre</label><input type="text" id="ed-nombre-${c.id}" value="${escapeHtml(c.nombre)}"></div>
           <div class="field"><label>Tipo de proceso</label><select id="ed-tipo-${c.id}">${opcionesTipo}</select></div>
         </div>
+        <div class="two-col">
+          <div class="field"><label>Hora de inicio</label><input type="datetime-local" id="ed-inicio-${c.id}" value="${escapeHtml(String(c.fecha_inicio).slice(0, 16))}"></div>
+          ${abierta
+            ? '<div class="field"><label>Hora de fin</label><div class="hint-line">Se pone al finalizar la corrida.</div></div>'
+            : `<div class="field"><label>Hora de fin</label><input type="datetime-local" id="ed-fin-${c.id}" value="${escapeHtml(String(c.fecha_final).slice(0, 16))}"></div>`}
+        </div>
+        <div class="hint-line" id="ed-sugerencia-${c.id}"></div>
         <div id="ed-msg-${c.id}"></div>
         <div class="two-col" style="margin-top:8px">
           <button class="btn-link strong" data-accion="guardar-editar" data-id="${c.id}">Guardar cambios</button>
@@ -555,7 +629,9 @@ document.getElementById("corridas").addEventListener("click", (ev) => {
 
 async function cargar() {
   try {
-    const corridas = await apiGet("/api/corridas");
+    const [corridas, completitud] = await Promise.all([apiGet("/api/corridas"), apiGet("/api/corridas/completitud").catch(() => [])]);
+    CORRIDAS_POR_ID = Object.fromEntries(corridas.map((c) => [c.id, c]));
+    COMPLETITUD = Object.fromEntries(completitud.map((x) => [x.id, x]));
     const cont = document.getElementById("corridas");
     // en paralelo = empezaron el mismo día, o siguen abiertas las dos a la vez (el cierre de una corrida
     // finalizada tarde no es confiable para comparar horarios, por eso no se usa)
@@ -667,6 +743,10 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
   if (accion === "editar-corrida") {
     const panel = document.getElementById(`ed-panel-${id}`);
     panel.style.display = panel.style.display === "none" ? "block" : "none";
+    actualizarSugerenciaNombre(id);
+  } else if (accion === "usar-nombre-fin") {
+    document.getElementById(`ed-nombre-${id}`).value = btn.dataset.nombre;
+    actualizarSugerenciaNombre(id);
   } else if (accion === "cancelar-editar") {
     document.getElementById(`ed-panel-${id}`).style.display = "none";
   } else if (accion === "guardar-editar") {
@@ -677,8 +757,11 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
       msg.innerHTML = '<div class="msg bad">Asigne un nombre a la corrida.</div>';
       return;
     }
+    const inicioEl = document.getElementById(`ed-inicio-${id}`);
+    const finEl = document.getElementById(`ed-fin-${id}`);
     try {
-      await apiPost(`/api/corridas/${id}`, { nombre, tipo_proceso: tipo });
+      const r = await apiPost(`/api/corridas/${id}`, { nombre, tipo_proceso: tipo, fecha_inicio: inicioEl ? inicioEl.value || null : null, fecha_final: finEl ? finEl.value || null : null });
+      if (r && r.avisos && r.avisos.length) avisar(r.avisos.join(" "));
       cargar();
     } catch (e) {
       msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
@@ -703,6 +786,7 @@ document.getElementById("corridas").addEventListener("click", async (ev) => {
     if (!(await confirmar(`¿Finalizar "${btn.dataset.nombre}" con cierre el ${fecha.replace("T", " ")}?`))) return;
     try {
       await apiPost(`/api/corridas/${id}/finalizar`, { fecha_final: fecha });
+      await sugerirRenombrarAlCerrar(id, fecha);
       cargar();
     } catch (e) {
       msg.innerHTML = `<div class="msg bad">${escapeHtml(e.message)}</div>`;
@@ -874,6 +958,7 @@ document.getElementById("btnReportePeriodo").addEventListener("click", () => {
 // PT kg en vivo mientras se llena tambores/peso en cualquier panel de productos
 document.getElementById("corridas").addEventListener("input", (ev) => {
   const el = ev.target;
+  if (el.id.startsWith("ed-fin-") || el.id.startsWith("ed-nombre-")) { actualizarSugerenciaNombre(el.id.split("-").pop()); return; }
   if (!el.id.startsWith("prod-tambores-") && !el.id.startsWith("prod-peso-")) return;
   const id = el.id.split("-").pop();
   const tambores = Number(document.getElementById(`prod-tambores-${id}`).value) || 0;

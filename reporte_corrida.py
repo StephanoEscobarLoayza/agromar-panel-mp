@@ -216,7 +216,8 @@ def _tabla_paradas(paradas):
         fmt_minutos(p.get("duracion_minutos")),
         p.get("area_proceso") or "—",
         p.get("tipo_parada") or "—",
-        (p.get("descripcion_falla") or p.get("equipo_afectado") or "—"),
+        (p.get("descripcion_falla") or p.get("equipo_afectado") or "—")
+        + (f" (También en: {p['tambien_en']})" if p.get("tambien_en") else ""),
     ] for p in paradas]
     return tabla(
         ["Inicio", "Fin", "Duración", "Área", "Tipo", "Falla"], filas,

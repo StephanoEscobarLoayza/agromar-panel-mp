@@ -252,6 +252,7 @@ CREATE TABLE paradas (
     responsable_solucion TEXT,              -- Mantenimiento / Maquinista
     solucion_obs         TEXT,              -- "solución y/o observaciones" de la hoja de paradas
     recomendacion        TEXT,
+    grupo_id             INTEGER,           -- paradas que afectaron a varias corridas en paralelo comparten grupo_id (la API crea la columna sola si falta)
     creado_en            TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CHECK (hora_fin IS NULL OR hora_fin >= hora_inicio)

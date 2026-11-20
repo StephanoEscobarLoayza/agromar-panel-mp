@@ -76,6 +76,11 @@
           <div class="field"><label for="turno">Turno</label><select id="turno"></select></div>
         </div>
 
+        <div class="field" id="campoTambien" style="display:none">
+          <label>Esta parada también afectó a <span class="hint-line" style="display:inline">(corridas en paralelo: se escribe una sola vez y aparece en cada una, en su registro y en su PDF)</span></label>
+          <div class="chips-lotes" id="tambienCorridas"></div>
+        </div>
+
         <div class="two-col">
           <div class="field"><label for="horaInicio">Hora de inicio</label><input type="datetime-local" id="horaInicio"></div>
           <div class="field"><label for="horaFin">Hora de fin <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label><input type="datetime-local" id="horaFin"></div>
@@ -221,7 +226,26 @@ async function cargarCorridas() {
   }
   F.corrida.innerHTML = corridas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join("");
   F.inicio.value = ahoraLocal();
+  corridasAbiertas = corridas;
+  renderTambien(true);
   cargarParadas();
+}
+
+// Corridas en paralelo: las otras corridas abiertas que empezaron a la par (a menos de 6 h) vienen marcadas; se puede quitar la marca.
+let corridasAbiertas = [];
+const campoTambien = document.getElementById("campoTambien");
+const tambienBox = document.getElementById("tambienCorridas");
+function renderTambien(reiniciar) {
+  const actual = Number(F.corrida.value);
+  const yo = corridasAbiertas.find(c => c.id === actual);
+  const otras = corridasAbiertas.filter(c => c.id !== actual);
+  const antes = new Set([...tambienBox.querySelectorAll("input:checked")].map(i => Number(i.value)));
+  campoTambien.style.display = otras.length ? "" : "none";
+  tambienBox.innerHTML = otras.map(c => {
+    const paralela = yo && Math.abs(new Date(c.fecha_inicio) - new Date(yo.fecha_inicio)) <= 6 * 3600 * 1000;
+    const marcada = reiniciar ? paralela : antes.has(c.id);
+    return `<label class="chip-lote"><input type="checkbox" value="${c.id}"${marcada ? " checked" : ""}>${escapeHtml(c.nombre)}</label>`;
+  }).join("");
 }
 
 async function cargarParadas() {
@@ -247,7 +271,7 @@ async function cargarParadas() {
       <td>${escapeHtml(p.turno === "DÍA" ? "Día" : p.turno === "NOCHE" ? "Noche" : "—")}</td>
       <td>${escapeHtml(p.area_proceso || "—")}</td>
       <td>${escapeHtml(p.tipo_parada || "—")}</td>
-      <td><div title="${escapeHtml(p.descripcion_falla || "")}">${escapeHtml(p.descripcion_falla || "—")}${p.equipo_afectado ? ` — ${escapeHtml(p.equipo_afectado)}` : ""}</div></td>
+      <td><div title="${escapeHtml(p.descripcion_falla || "")}">${escapeHtml(p.descripcion_falla || "—")}${p.equipo_afectado ? ` — ${escapeHtml(p.equipo_afectado)}` : ""}</div>${p.tambien_en ? `<div class="hint-line" style="margin-top:3px">También en: ${escapeHtml(p.tambien_en)}</div>` : ""}</td>
       <td>${escapeHtml(p.responsable_solucion || "—")}</td>
       <td class="right" style="white-space:nowrap">
         ${p.hora_fin === null ? `<button class="btn-link strong" data-accion="cerrar" data-id="${p.id}">Cerrar</button>` : ""}
@@ -286,6 +310,8 @@ function filaEdicion(p) {
       <div class="field"><label>Descripción de la falla</label>${ta("desc", p.descripcion_falla)}</div>
       <div class="field"><label>Solución y/o observaciones</label>${ta("sol", p.solucion_obs)}</div>
       <div class="field"><label>Recomendación</label>${ta("rec", p.recomendacion)}</div>
+      ${p.tambien_en ? `<div class="field"><div class="hint-line">Esta parada también está en: ${escapeHtml(p.tambien_en)}. Los cambios se aplican a todas.</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer;margin-top:6px"><input type="checkbox" class="ed-solo" style="width:auto"> Cambiar solo en esta corrida (la separa de las demás)</label></div>` : ""}
       <div class="two-col">
         <button class="btn" data-accion="guardar" data-id="${p.id}">Guardar cambios</button>
         <button class="btn" data-accion="cancelar" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border)">Cancelar</button>
@@ -305,7 +331,8 @@ lista.addEventListener("click", async (ev) => {
     try { await apiPost(`/api/paradas/${id}/cerrar`, { hora_fin: ahoraLocal() }); await cargarParadas(); }
     catch (e) { avisar(e.message); }
   } else if (accion === "eliminar") {
-    if (!(await confirmar("¿Eliminar esta parada?"))) return;
+    const compartida = lista._paradas[id] && lista._paradas[id].tambien_en;
+    if (!(await confirmar(compartida ? `Esta parada también está en ${compartida}. ¿Eliminarla de todas?` : "¿Eliminar esta parada?"))) return;
     try { await apiDelete(`/api/paradas/${id}`); await cargarParadas(); }
     catch (e) { avisar(e.message); }
   } else if (accion === "editar") {
@@ -327,6 +354,7 @@ lista.addEventListener("click", async (ev) => {
         equipo_afectado: v("ed-equipo").value, descripcion_falla: v("ed-desc").value,
         responsable_solucion: v("ed-resp").value, solucion_obs: v("ed-sol").value,
         recomendacion: v("ed-rec").value,
+        solo_esta: !!(v("ed-solo") && v("ed-solo").checked),
       });
       if (guardada === null) return;          // la persona prefirió no registrarla (se cruzaba con otra parada)
       await cargarParadas();
@@ -334,7 +362,7 @@ lista.addEventListener("click", async (ev) => {
   }
 });
 
-F.corrida.addEventListener("change", cargarParadas);
+F.corrida.addEventListener("change", () => { renderTambien(true); cargarParadas(); });
 
 btnGuardar.addEventListener("click", async () => {
   if (!F.corrida.value) { mensaje.innerHTML = '<div class="msg bad">Elija una corrida.</div>'; return; }
@@ -357,9 +385,11 @@ btnGuardar.addEventListener("click", async () => {
       responsable_solucion: F.responsable.value,
       solucion_obs: F.solucion.value,
       recomendacion: F.recomendacion.value,
+      tambien_corridas: [...tambienBox.querySelectorAll("input:checked")].map(i => Number(i.value)),
     });
     if (guardada === null) { mensaje.innerHTML = ""; return; }          // la persona prefirió no registrarla (se cruzaba con otra parada)
-    mensaje.innerHTML = '<div class="msg ok">Parada registrada.</div>';
+    const nCorr = guardada && guardada.ids ? guardada.ids.length : 1;
+    mensaje.innerHTML = `<div class="msg ok">${nCorr > 1 ? `Parada registrada en ${nCorr} corridas.` : "Parada registrada."}</div>`;
     ["equipo", "descFalla", "solucion", "recomendacion"].forEach(k => F[k].value = "");
     F.fin.value = "";
     F.inicio.value = ahoraLocal();

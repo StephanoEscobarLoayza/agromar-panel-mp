@@ -273,7 +273,8 @@ recientesBody.addEventListener("click", async (ev) => {
     const descuentoInput = fila.querySelector(".edit-descuento-input");
     const descuento = descuentoInput && descuentoInput.value !== "" ? Number(descuentoInput.value) : null;
     try {
-      await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg, bines_consumidos: bines, porcentaje_descuento: descuento });
+      const r = await apiPost(`/api/asignaciones/${id}`, { kg_asignados: kg, bines_consumidos: bines, porcentaje_descuento: descuento });
+      if (r && r.kg_ajustado) avisar(`Se ajustó el consumo a ${fmtKg(r.kg_ajustado)} kg, el saldo exacto del lote (diferencia de decimales).`, "ok");
       cargarRecientes();
     } catch (e) {
       avisar(e.message);
@@ -513,7 +514,7 @@ btnGuardar.addEventListener("click", async () => {
 
   btnGuardar.disabled = true;
   try {
-    await apiPost("/api/asignaciones", {
+    const r = await apiPost("/api/asignaciones", {
       lote_numero: lote.numero,
       corrida_id: Number(corridaSel.value),
       turno: turnoSel.value,
@@ -525,7 +526,7 @@ btnGuardar.addEventListener("click", async () => {
     });
     mensaje.innerHTML = pendiente
       ? `<div class="msg ok">Lote ${lote.numero} marcado como iniciado — kg pendiente.</div>`
-      : `<div class="msg ok">Asignados ${fmtKg(kg)} kg del lote ${lote.numero}.</div>`;
+      : `<div class="msg ok">Asignados ${fmtKg(r && r.kg_ajustado ? r.kg_ajustado : kg)} kg del lote ${lote.numero}.${r && r.kg_ajustado ? " Se ajustó al saldo exacto del lote (diferencia de decimales)." : ""}</div>`;
     loteInput.value = "";
     lote = null;
     loteInfo.innerHTML = "";

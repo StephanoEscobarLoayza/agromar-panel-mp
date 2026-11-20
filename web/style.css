@@ -590,3 +590,9 @@ input[type="number"]{font-family:'IBM Plex Mono','SFMono-Regular',monospace}
 .dv-fila[hidden]{display:none}
 .dv-descarga{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 a.dv-btn{display:inline-block;text-decoration:none}
+.completitud{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 2px;font-size:13px;color:var(--text-2)}
+.completitud .punto{width:10px;height:10px;border-radius:50%;flex:none;background:var(--text-muted)}
+.completitud.ok .punto{background:var(--forest-2)}
+.completitud.falta .punto{background:var(--citrus)}
+.completitud.falta{color:var(--text)}
+.completitud-nota{color:var(--text-muted)}
