@@ -1158,9 +1158,10 @@ def editar_corrida(corrida_id: int, c: EditarCorrida):
                 {"id": corrida_id, "fecha_inicio": nuevo_inicio},
             )
         if cambia_fin:
+            conn.execute(text("UPDATE corridas SET fecha_final = :fecha_final WHERE id = :id"), {"id": corrida_id, "fecha_final": nuevo_fin})
             conn.execute(
-                text(f"UPDATE corridas SET fecha_final = :fecha_final, stock_cierre_kg = {_sql_stock_total_asof('fecha_final')} WHERE id = :id"),
-                {"id": corrida_id, "fecha_final": nuevo_fin},
+                text("UPDATE corridas SET stock_cierre_kg = :s WHERE id = :id"),
+                {"id": corrida_id, "s": _stock_de_cierre_por_secuencia(conn, corrida_id, nuevo_fin)},
             )
         if cambia_inicio or cambia_fin:
             fuera = conn.execute(
@@ -1199,18 +1200,16 @@ def finalizar_corrida(corrida_id: int, f: FinalizarCorrida):
         if inicio is not None and _instante(f.fecha_final, "hora de fin") < inicio:
             raise HTTPException(status_code=400, detail=f"La hora de fin no puede ser anterior al inicio de la corrida ({_hm(inicio)}).")
         result = conn.execute(
-            text(
-                f"""
-                UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada',
-                       stock_cierre_kg = {_sql_stock_total_asof('fecha_final')}
-                WHERE id = :id AND estado = 'abierta'
-                RETURNING id
-                """
-            ),
+            text("UPDATE corridas SET fecha_final = :fecha_final, estado = 'cerrada' WHERE id = :id AND estado = 'abierta' RETURNING id"),
             {"id": corrida_id, "fecha_final": f.fecha_final},
         )
         if result.scalar() is None:
             raise HTTPException(status_code=404, detail="Corrida no encontrada o ya estaba cerrada.")
+        # la foto del stock al cerrar sigue el orden de las corridas (no la fecha en que se registró cada consumo)
+        conn.execute(
+            text("UPDATE corridas SET stock_cierre_kg = :s WHERE id = :id"),
+            {"id": corrida_id, "s": _stock_de_cierre_por_secuencia(conn, corrida_id, f.fecha_final)},
+        )
     return {"ok": True}
 
 
@@ -1678,6 +1677,16 @@ def _saldo_tras_corrida(conn, corrida_id: int, fecha_corte, seq=None):
             "es_stock": (l.estado_actual or "").strip().upper() in ("EN PROCESO", "EN ESPERA") or float(l.kg_saldo or 0) <= 0.01,
         }
     return res
+
+
+def _stock_de_cierre_por_secuencia(conn, corrida_id: int, fecha_final) -> float:
+    """Stock de planta que queda AL TERMINAR esta corrida: peso de cada lote menos lo consumido por esta corrida y por todas las
+    anteriores en la secuencia de «Corridas». Cuenta el consumo según el orden de las corridas y no según CUÁNDO se registró,
+    así la foto sale igual aunque los datos de la corrida (o de las anteriores) se carguen días después de cerrarla.
+    `fecha_final` es la hora de cierre (datetime o texto «2026-11-20T01:15»)."""
+    fin = fecha_final if isinstance(fecha_final, datetime) else _instante(fecha_final, "hora de fin")
+    tras = _saldo_tras_corrida(conn, corrida_id, fin.date())
+    return round(sum(t["kg_saldo"] for t in tras.values() if t["es_stock"] and t["kg_saldo"] > 0.01), 2)
 
 
 def _datos_trazabilidad(corrida_id: int, seq=None) -> dict:
@@ -2287,8 +2296,14 @@ def _asegurar_grupo_paradas() -> bool:
         return True
     try:
         with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE paradas ADD COLUMN IF NOT EXISTS grupo_id INTEGER"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_paradas_grupo ON paradas(grupo_id) WHERE grupo_id IS NOT NULL"))
+            # solo se altera la tabla si falta la columna: un ALTER TABLE pide un bloqueo exclusivo (aunque no cambie nada) y
+            # puede quedar esperando detrás de otra consulta, con las demás pidiendo paradas detrás de él
+            existe = conn.execute(text(
+                "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'paradas' AND column_name = 'grupo_id'"
+            )).scalar()
+            if not existe:
+                conn.execute(text("ALTER TABLE paradas ADD COLUMN IF NOT EXISTS grupo_id INTEGER"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_paradas_grupo ON paradas(grupo_id) WHERE grupo_id IS NOT NULL"))
     except Exception as e:
         print(f"[paradas compartidas] no se pudo crear la columna: {e}")
         return False
